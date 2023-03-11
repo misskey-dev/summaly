@@ -298,7 +298,7 @@ describe("oEmbed", () => {
 	});
 
 	test('allows safelisted permissions', async () => {
-		await setUpFastify('oembed-allow-safelisted-features.json');
+		await setUpFastify('oembed-allow-safelisted-permissions.json');
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/');
 		expect(summary.player.allow).toStrictEqual([
@@ -308,7 +308,7 @@ describe("oEmbed", () => {
 	});
 
 	test('ignores rare permissions', async () => {
-		await setUpFastify('oembed-ignore-rare-features.json');
+		await setUpFastify('oembed-ignore-rare-permissions.json');
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/');
 		expect(summary.player.allow).toStrictEqual(['autoplay']);
