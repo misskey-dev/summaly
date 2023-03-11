@@ -21,7 +21,7 @@ import { summaly } from 'summaly';
 summaly(url[, opts])
 ```
 
-As Fastify plugin:  
+As Fastify plugin:
 (will listen `GET` of `/`)
 
 ```javascript
@@ -64,15 +64,16 @@ A Promise of an Object that contains properties below:
 
 #### Root
 
-| Property        | Type     | Description                              |
-| :-------------- | :------- | :--------------------------------------- |
-| **description** | *string* | The description of the web page          |
-| **icon**        | *string* | The url of the icon of the web page      |
-| **sitename**    | *string* | The name of the web site                 |
-| **thumbnail**   | *string* | The url of the thumbnail of the web page |
-| **player**      | *Player* | The player of the web page               |
-| **title**       | *string* | The title of the web page                |
-| **url**         | *string* | The url of the web page                  |
+| Property        | Type               | Description                                 |
+| :-------------- | :-------           | :------------------------------------------ |
+| **description** | *string*           | The description of the web page             |
+| **icon**        | *string*           | The url of the icon of the web page         |
+| **sitename**    | *string*           | The name of the web site                    |
+| **thumbnail**   | *string*           | The url of the thumbnail of the web page    |
+| **oEmbed**      | *OEmbedRichIframe* | The oEmbed rich iframe info of the web page |
+| **player**      | *Player*           | The player of the web page                  |
+| **title**       | *string*           | The title of the web page                   |
+| **url**         | *string*           | The url of the web page                     |
 
 #### Player
 
@@ -81,6 +82,24 @@ A Promise of an Object that contains properties below:
 | **url**         | *string* | The url of the player                    |
 | **width**       | *number* | The width of the player                  |
 | **height**      | *number* | The height of the player                 |
+
+#### oEmbed
+
+| Property        | Type       | Description                                   |
+| :-------------- | :--------- | :-------------------------------------------- |
+| **src**         | *string*   | The source for the iframe                     |
+| **height**      | *number*   | The height of the iframe                      |
+| **allow**       | *string[]* | The name of the `allow`ed features for iframe |
+
+Currently the possible items in `allow` are:
+
+* `autoplay`
+* `clipboard-write`
+* `fullscreen`
+* `encrypted-media`
+* `picture-in-picture`
+
+See [Permissions Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Permissions_Policy) in MDN for details of them.
 
 ### Example
 
