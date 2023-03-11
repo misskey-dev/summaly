@@ -332,4 +332,11 @@ describe("oEmbed", () => {
 		expect(summary.player.url).toBe('https://example.com/');
 		expect(summary.player.allow).toStrictEqual([]);
 	});
+
+	test('width: 100%', async () => {
+		await setUpFastify('oembed-percentage-width.json');
+		const summary = await summaly(host);
+		expect(summary.player.width).toBe(null);
+		expect(summary.player.height).toBe(300);
+	});
 });
