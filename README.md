@@ -85,11 +85,11 @@ A Promise of an Object that contains properties below:
 
 #### oEmbed
 
-| Property        | Type       | Description                                      |
-| :-------------- | :--------- | :----------------------------------------------- |
-| **src**         | *string*   | The source for the iframe                        |
-| **height**      | *number*   | The height of the iframe                         |
-| **allow**       | *string[]* | The name of the `allow`ed permissions for iframe |
+| Property        | Type       | Description                                     |
+| :-------------- | :--------- | :---------------------------------------------- |
+| **src**         | *string*   | The source for the iframe                       |
+| **height**      | *number*   | The height of the iframe                        |
+| **allow**       | *string[]* | The names of the allowed permissions for iframe |
 
 Currently the possible items in `allow` are:
 
