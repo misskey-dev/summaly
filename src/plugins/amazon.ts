@@ -51,9 +51,9 @@ export async function summarize(url: URL.Url): Promise<summary> {
 		player: {
 			url: playerUrl || null,
 			width: playerWidth ? parseInt(playerWidth) : null,
-			height: playerHeight ? parseInt(playerHeight) : null
+			height: playerHeight ? parseInt(playerHeight) : null,
+			allow: playerUrl ? ['fullscreen', 'encrypted-media'] : [],
 		},
 		sitename: 'Amazon',
-		oEmbed: null,
 	};
 }
