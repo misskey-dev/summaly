@@ -38,9 +38,9 @@ export async function summarize(url: URL.Url): Promise<summary> {
 		player: {
 			url: null,
 			width: null,
-			height: null
+			height: null,
+			allow: [],
 		},
 		sitename: 'Wikipedia',
-		oEmbed: null,
 	};
 }

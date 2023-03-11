@@ -21,7 +21,7 @@ import { summaly } from 'summaly';
 summaly(url[, opts])
 ```
 
-As Fastify plugin:  
+As Fastify plugin:
 (will listen `GET` of `/`)
 
 ```javascript
@@ -60,27 +60,39 @@ interface IPlugin {
 
 A Promise of an Object that contains properties below:
 
-※ Almost all values are nullable. player shoud not be null.
+※ Almost all values are nullable. player should not be null.
 
 #### Root
 
-| Property        | Type     | Description                              |
-| :-------------- | :------- | :--------------------------------------- |
-| **description** | *string* | The description of the web page          |
-| **icon**        | *string* | The url of the icon of the web page      |
-| **sitename**    | *string* | The name of the web site                 |
-| **thumbnail**   | *string* | The url of the thumbnail of the web page |
-| **player**      | *Player* | The player of the web page               |
-| **title**       | *string* | The title of the web page                |
-| **url**         | *string* | The url of the web page                  |
+| Property        | Type               | Description                                 |
+| :-------------- | :-------           | :------------------------------------------ |
+| **description** | *string*           | The description of the web page             |
+| **icon**        | *string*           | The url of the icon of the web page         |
+| **sitename**    | *string*           | The name of the web site                    |
+| **thumbnail**   | *string*           | The url of the thumbnail of the web page    |
+| **oEmbed**      | *OEmbedRichIframe* | The oEmbed rich iframe info of the web page |
+| **player**      | *Player*           | The player of the web page                  |
+| **title**       | *string*           | The title of the web page                   |
+| **url**         | *string*           | The url of the web page                     |
 
 #### Player
 
-| Property        | Type     | Description                              |
-| :-------------- | :------- | :--------------------------------------- |
-| **url**         | *string* | The url of the player                    |
-| **width**       | *number* | The width of the player                  |
-| **height**      | *number* | The height of the player                 |
+| Property        | Type       | Description                                     |
+| :-------------- | :--------- | :---------------------------------------------- |
+| **url**         | *string*   | The url of the player                           |
+| **width**       | *number*   | The width of the player                         |
+| **height**      | *number*   | The height of the player                        |
+| **allow**       | *string[]* | The names of the allowed permissions for iframe |
+
+Currently the possible items in `allow` are:
+
+* `autoplay`
+* `clipboard-write`
+* `fullscreen`
+* `encrypted-media`
+* `picture-in-picture`
+
+See [Permissions Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Permissions_Policy) in MDN for details of them.
 
 ### Example
 

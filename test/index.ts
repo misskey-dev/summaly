@@ -213,6 +213,7 @@ describe('TwitterCard', () => {
 
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/embedurl');
+		expect(summary.player.allow).toStrictEqual(['fullscreen', 'encrypted-media']);
 	});
 
 	test('Player detection - Pleroma:video => video', async () => {
@@ -224,6 +225,7 @@ describe('TwitterCard', () => {
 
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/embedurl');
+		expect(summary.player.allow).toStrictEqual(['fullscreen', 'encrypted-media']);
 	});
 
 	test('Player detection - Pleroma:image => image', async () => {
@@ -256,44 +258,44 @@ describe("oEmbed", () => {
 		test(`Invalidity test: ${filename}`, async () => {
 			await setUpFastify(`invalid/${filename}`);
 			const summary = await summaly(host);
-			expect(summary.oEmbed).toBe(null);
+			expect(summary.player.url).toBe(null);
 		});
 	}
 
 	test('src', async () => {
 		await setUpFastify('oembed.json');
 		const summary = await summaly(host);
-		expect(summary.oEmbed?.src).toBe('https://example.com/');
+		expect(summary.player.url).toBe('https://example.com/');
 	});
 
 	test('max height', async () => {
 		await setUpFastify('oembed-too-tall.json');
 		const summary = await summaly(host);
-		expect(summary.oEmbed?.height).toBe(1024);
+		expect(summary.player.height).toBe(1024);
 	});
 
 	test('children are ignored', async () => {
 		await setUpFastify('oembed-iframe-child.json');
 		const summary = await summaly(host);
-		expect(summary.oEmbed?.src).toBe('https://example.com/');
+		expect(summary.player.url).toBe('https://example.com/');
 	});
 
 	test('allows fullscreen', async () => {
 		await setUpFastify('oembed-allow-fullscreen.json');
 		const summary = await summaly(host);
-		expect(summary.oEmbed?.src).toBe('https://example.com/');
+		expect(summary.player.url).toBe('https://example.com/');
 	});
 
 	test('allows safelisted features', async () => {
 		await setUpFastify('oembed-allow-safelisted-features.json');
 		const summary = await summaly(host);
-		expect(summary.oEmbed?.src).toBe('https://example.com/');
+		expect(summary.player.url).toBe('https://example.com/');
 	});
 
 	test('oEmbed with relative path', async () => {
 		await setUpFastify('oembed.json', 'htmls/oembed-relative.html');
 		const summary = await summaly(host);
-		expect(summary.oEmbed?.src).toBe('https://example.com/');
+		expect(summary.player.url).toBe('https://example.com/');
 	});
 
 	test('oEmbed with nonexistent path', async () => {
@@ -309,21 +311,21 @@ describe("oEmbed", () => {
 	test('oEmbed with OpenGraph', async () => {
 		await setUpFastify('oembed.json', 'htmls/oembed-and-og.html');
 		const summary = await summaly(host);
-		expect(summary.oEmbed?.src).toBe('https://example.com/');
+		expect(summary.player.url).toBe('https://example.com/');
 		expect(summary.description).toBe('blobcats rule the world');
 	});
 
 	test('Invalid oEmbed with valid OpenGraph', async () => {
 		await setUpFastify('invalid/oembed-insecure.json', 'htmls/oembed-and-og.html');
 		const summary = await summaly(host);
-		expect(summary.oEmbed).toBe(null);
+		expect(summary.player.url).toBe(null);
 		expect(summary.description).toBe('blobcats rule the world');
 	});
 
 	test('oEmbed with og:video', async () => {
 		await setUpFastify('oembed.json', 'htmls/oembed-and-og-video.html');
 		const summary = await summaly(host);
-		expect(summary.oEmbed).toBe(null);
-		expect(summary.player.url).toBe('https://example.com/embedurl');
+		expect(summary.player.url).toBe('https://example.com/');
+		expect(summary.player.allow).toStrictEqual([]);
 	});
 });
