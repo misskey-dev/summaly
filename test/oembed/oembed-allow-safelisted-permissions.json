@@ -1,0 +1,7 @@
+{
+  "version": "1.0",
+  "type": "rich",
+  "html": "<iframe src='https://example.com/' allow='autoplay;clipboard-write;fullscreen;encrypted-media;picture-in-picture;web-share'></iframe>",
+  "width": 500,
+  "height": 300
+}
