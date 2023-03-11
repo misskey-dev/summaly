@@ -1,0 +1,7 @@
+{
+  "version": "1.0",
+  "type": "rich",
+  "html": "<iframe src='https://example.com/' allow='autoplay;gyroscope;accelerometer'></iframe>",
+  "width": 500,
+  "height": 300
+}

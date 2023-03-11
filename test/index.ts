@@ -294,12 +294,24 @@ describe("oEmbed", () => {
 		await setUpFastify('oembed-allow-fullscreen.json');
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/');
+		expect(summary.player.allow).toStrictEqual(['fullscreen'])
 	});
 
-	test('allows safelisted features', async () => {
+	test('allows safelisted permissions', async () => {
 		await setUpFastify('oembed-allow-safelisted-features.json');
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/');
+		expect(summary.player.allow).toStrictEqual([
+			'autoplay', 'clipboard-write', 'fullscreen',
+			'encrypted-media', 'picture-in-picture', 'web-share',
+		]);
+	});
+
+	test('ignores rare permissions', async () => {
+		await setUpFastify('oembed-ignore-rare-features.json');
+		const summary = await summaly(host);
+		expect(summary.player.url).toBe('https://example.com/');
+		expect(summary.player.allow).toStrictEqual(['autoplay']);
 	});
 
 	test('oEmbed with relative path', async () => {
