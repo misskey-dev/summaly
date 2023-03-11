@@ -10,7 +10,7 @@ import * as cheerio from 'cheerio';
  *
  * Width should always be 100%.
  */
-async function getOEmbedRich($, pageUrl) {
+async function getOEmbedPlayer($, pageUrl) {
     const href = $('link[type="application/json+oembed"]').attr('href');
     if (!href) {
         return null;
@@ -24,7 +24,7 @@ async function getOEmbedRich($, pageUrl) {
         }
         catch { }
     })();
-    if (!body || body.version !== '1.0' || body.type !== 'rich') {
+    if (!body || body.version !== '1.0' || !['rich', 'video'].includes(body.type)) {
         // Not a well formed rich oEmbed
         return null;
     }
@@ -42,14 +42,13 @@ async function getOEmbedRich($, pageUrl) {
         // Should only have the body and html elements as the parents
         return null;
     }
-    const src = iframe.attr('src');
-    if (!src) {
+    const url = iframe.attr('src');
+    if (!url) {
         // No src?
         return null;
     }
     // XXX: Use global URL object instead of the deprecated `node:url`
-    const url = URL.parse(src);
-    if (url.protocol !== 'https:') {
+    if (URL.parse(url).protocol !== 'https:') {
         // Allow only HTTPS for best security
         return null;
     }
@@ -73,7 +72,8 @@ async function getOEmbedRich($, pageUrl) {
         return null;
     }
     return {
-        src,
+        url,
+        width: null,
         height,
         allow: allowedFeatures
     };
@@ -156,8 +156,7 @@ export default async (url, lang = null) => {
     };
     const [icon, oEmbed] = await Promise.all([
         getIcon(),
-        // playerあるならoEmbedは必要ない
-        !playerUrl ? getOEmbedRich($, url.href) : null,
+        getOEmbedPlayer($, url.href),
     ]);
     // Clean up the title
     title = cleanupTitle(title, siteName);
@@ -169,13 +168,13 @@ export default async (url, lang = null) => {
         icon: icon || null,
         description: description || null,
         thumbnail: image || null,
-        player: {
+        player: oEmbed ?? {
             url: playerUrl || null,
             width: Number.isNaN(playerWidth) ? null : playerWidth,
-            height: Number.isNaN(playerHeight) ? null : playerHeight
+            height: Number.isNaN(playerHeight) ? null : playerHeight,
+            allow: ['fullscreen', 'encrypted-media'],
         },
         sitename: siteName || null,
         sensitive,
-        oEmbed,
     };
 };
