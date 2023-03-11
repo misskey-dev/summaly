@@ -72,7 +72,14 @@ async function getOEmbedRich($: cheerio.CheerioAPI, pageUrl: string): Promise<OE
 	}
 
 	const allowedFeatures = (iframe.attr('allow') ?? '').split(/\s+/g);
-	const safeList = ['', 'fullscreen', 'encrypted-media', 'picture-in-picture'];
+	const safeList = [
+		'',
+		'autoplay',
+		'clipboard-write',
+		'fullscreen',
+		'encrypted-media',
+		'picture-in-picture'
+	];
 	if (allowedFeatures.some(allow => !safeList.includes(allow))) {
 		// This iframe is probably too powerful to be embedded
 		return null;
