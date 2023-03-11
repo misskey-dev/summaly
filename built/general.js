@@ -71,15 +71,23 @@ async function getOEmbedPlayer($, pageUrl) {
     }
     // TODO: This implementation only allows basic syntax of `allow`.
     // Might need to implement better later.
-    const allowedFeatures = (iframe.attr('allow') ?? '').split(/\s*;\s*/g).filter(s => s);
     const safeList = [
         'autoplay',
         'clipboard-write',
         'fullscreen',
         'encrypted-media',
-        'picture-in-picture'
+        'picture-in-picture',
+        'web-share',
     ];
-    if (allowedFeatures.some(allow => !safeList.includes(allow))) {
+    // YouTube has these but they are almost never used.
+    const ignoredList = [
+        'gyroscope',
+        'accelerometer',
+    ];
+    const allowedPermissions = (iframe.attr('allow') ?? '').split(/\s*;\s*/g)
+        .filter(s => s)
+        .filter(s => !ignoredList.includes(s));
+    if (allowedPermissions.some(allow => !safeList.includes(allow))) {
         // This iframe is probably too powerful to be embedded
         return null;
     }
@@ -87,7 +95,7 @@ async function getOEmbedPlayer($, pageUrl) {
         url,
         width,
         height,
-        allow: allowedFeatures
+        allow: allowedPermissions
     };
 }
 export default async (url, lang = null) => {
