@@ -2,5 +2,6 @@
   "version": "1.0",
   "type": "rich",
   "html": "<iframe src='http://example.com/'></iframe>",
+  "width": 500,
   "height": 300
 }

@@ -262,16 +262,12 @@ describe("oEmbed", () => {
 		});
 	}
 
-	test('src', async () => {
+	test('basic properties', async () => {
 		await setUpFastify('oembed.json');
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/');
-	});
-
-	test('max height', async () => {
-		await setUpFastify('oembed-too-tall.json');
-		const summary = await summaly(host);
-		expect(summary.player.height).toBe(1024);
+		expect(summary.player.width).toBe(500);
+		expect(summary.player.height).toBe(300);
 	});
 
 	test('children are ignored', async () => {

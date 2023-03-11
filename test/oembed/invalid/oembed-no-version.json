@@ -1,5 +1,6 @@
 {
   "type": "rich",
   "html": "<iframe src='https://example.com/'></iframe>",
+  "width": 500,
   "height": 300
 }
