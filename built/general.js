@@ -52,8 +52,10 @@ async function getOEmbedPlayer($, pageUrl) {
         // Allow only HTTPS for best security
         return null;
     }
-    const height = Math.min(Number(iframe.attr('height') ?? body.height), 1024);
-    if (Number.isNaN(height)) {
+    if (typeof body.width !== 'number' ||
+        body.width <= 0 ||
+        typeof body.height !== 'number' ||
+        body.height <= 0) {
         // No proper size info
         return null;
     }
@@ -73,8 +75,8 @@ async function getOEmbedPlayer($, pageUrl) {
     }
     return {
         url,
-        width: null,
-        height,
+        width: body.width,
+        height: body.height,
         allow: allowedFeatures
     };
 }
