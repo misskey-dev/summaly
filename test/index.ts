@@ -270,6 +270,20 @@ describe("oEmbed", () => {
 		expect(summary.player.height).toBe(300);
 	});
 
+	test('type: video', async () => {
+		await setUpFastify('oembed-video.json');
+		const summary = await summaly(host);
+		expect(summary.player.url).toBe('https://example.com/');
+		expect(summary.player.width).toBe(500);
+		expect(summary.player.height).toBe(300);
+	});
+
+	test('max height', async () => {
+		await setUpFastify('oembed-too-tall.json');
+		const summary = await summaly(host);
+		expect(summary.player.height).toBe(1024);
+	});
+
 	test('children are ignored', async () => {
 		await setUpFastify('oembed-iframe-child.json');
 		const summary = await summaly(host);
@@ -323,5 +337,12 @@ describe("oEmbed", () => {
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/');
 		expect(summary.player.allow).toStrictEqual([]);
+	});
+
+	test('width: 100%', async () => {
+		await setUpFastify('oembed-percentage-width.json');
+		const summary = await summaly(host);
+		expect(summary.player.width).toBe(null);
+		expect(summary.player.height).toBe(300);
 	});
 });

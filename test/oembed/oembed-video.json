@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "type": "rich",
+  "type": "video",
   "html": "<iframe src='https://example.com/'></iframe>",
-  "width": "blobcat",
+  "width": 500,
   "height": 300
 }

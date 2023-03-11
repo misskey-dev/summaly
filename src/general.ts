@@ -64,13 +64,21 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 		return null;
 	}
 
-	if (
-		typeof body.width !== 'number' ||
-		body.width <= 0 ||
-		typeof body.height !== 'number' ||
-		body.height <= 0
-	) {
-		// No proper size info
+	// Height is the most important, width is okay to be null. The implementer
+	// should choose fixed height instead of fixed aspect ratio if width is null.
+	//
+	// For example, Spotify's embed page does not strictly follow aspect ratio
+	// and thus keeping the height is better than keeping the aspect ratio.
+	//
+	// Spotify gives `width: 100%, height: 152px` for iframe while `width: 456,
+	// height: 152` for oEmbed data, and we treat any percentages as null here.
+	let width: number | null = Number(iframe.attr('width') ?? body.width);
+	if (Number.isNaN(width)) {
+		width = null;
+	}
+	const height = Math.min(Number(iframe.attr('height') ?? body.height), 1024);
+	if (Number.isNaN(height)) {
+		// No proper height info
 		return null;
 	}
 
@@ -91,8 +99,8 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 
 	return {
 		url,
-		width: body.width,
-		height: body.height,
+		width,
+		height,
 		allow: allowedFeatures
 	}
 }
