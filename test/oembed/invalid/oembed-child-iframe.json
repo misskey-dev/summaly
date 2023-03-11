@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "type": "rich",
+  "html": "<div><iframe src='https://example.com/'></iframe>",
+  "height": 300
+}

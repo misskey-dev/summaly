@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "type": "rich",
+  "html": "<iframe src='https://example.com/'><script>alert('Hahaha I take this world')</script></iframe>",
+  "height": 300
+}

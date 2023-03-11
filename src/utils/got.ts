@@ -108,16 +108,17 @@ async function getResponse(args: GotOptions) {
 		},
 	});
 
-	return await receiveResponce({ req, typeFilter: args.typeFilter });
+	return await receiveResponse({ req, typeFilter: args.typeFilter });
 }
 
-async function receiveResponce<T>(args: { req: Got.CancelableRequest<Got.Response<T>>, typeFilter?: RegExp }) {
+async function receiveResponse<T>(args: { req: Got.CancelableRequest<Got.Response<T>>, typeFilter?: RegExp }) {
 	const req = args.req;
 	const maxSize = MAX_RESPONSE_SIZE;
 
 	req.on('response', (res: Got.Response) => {
 		// Check html
 		if (args.typeFilter && !res.headers['content-type']?.match(args.typeFilter)) {
+			// console.warn(res.headers['content-type']);
 			req.cancel(`Rejected by type filter ${res.headers['content-type']}`);
 			return;
 		}

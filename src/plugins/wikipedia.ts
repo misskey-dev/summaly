@@ -40,6 +40,7 @@ export async function summarize(url: URL.Url): Promise<summary> {
 			width: null,
 			height: null
 		},
-		sitename: 'Wikipedia'
+		sitename: 'Wikipedia',
+		oEmbed: null,
 	};
 }

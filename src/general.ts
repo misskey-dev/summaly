@@ -4,8 +4,86 @@ import cleanupTitle from './utils/cleanup-title.js';
 
 import { decode as decodeHtml } from 'html-entities';
 
-import { head, scpaping } from './utils/got.js';
-import Summary from './summary.js';
+import { get, head, scpaping } from './utils/got.js';
+import type { default as Summary, OEmbedRichIframe } from './summary.js';
+import * as cheerio from 'cheerio';
+
+/**
+ * Contains only the html snippet for a sanitized iframe as the thumbnail is
+ * mostly covered in OpenGraph instead.
+ *
+ * Width should always be 100%.
+ */
+async function getOEmbedRich($: cheerio.CheerioAPI, pageUrl: string): Promise<OEmbedRichIframe | null> {
+	const href = $('link[type="application/json+oembed"]').attr('href');
+	if (!href) {
+		return null;
+	}
+
+	// XXX: Use global URL object instead of the deprecated `node:url`
+	// Disallow relative URL as no one seems to use it
+	const oEmbed = await get(URL.resolve(pageUrl, href));
+	const body = (() => {
+		try {
+			return JSON.parse(oEmbed);
+		} catch {}
+	})();
+
+	if (!body || body.version !== '1.0' || body.type !== 'rich') {
+		// Not a well formed rich oEmbed
+		return null;
+	}
+
+	if (!body.html.startsWith('<iframe ') || !body.html.endsWith('</iframe>')) {
+		// It includes something else than an iframe
+		return null;
+	}
+
+	const oEmbedHtml = cheerio.load(body.html);
+	const iframe = oEmbedHtml("iframe");
+
+	if (iframe.length !== 1) {
+		// Somehow we either have multiple iframes or none
+		return null;
+	}
+
+	if (iframe.parents().length !== 2) {
+		// Should only have the body and html elements as the parents
+		return null;
+	}
+
+	const src = iframe.attr('src');
+	if (!src) {
+		// No src?
+		return null;
+	}
+
+	// XXX: Use global URL object instead of the deprecated `node:url`
+	const url = URL.parse(src);
+	if (url.protocol !== 'https:') {
+		// Allow only HTTPS for best security
+		return null;
+	}
+
+	const height = Math.min(Number(iframe.attr('height') ?? body.height), 1024);
+	if (Number.isNaN(height)) {
+		// No proper size info
+		return null;
+	}
+
+	const allowedFeatures = (iframe.attr('allow') ?? '').split(/\s+/g);
+	const safeList = ['', 'fullscreen', 'encrypted-media', 'picture-in-picture'];
+	if (allowedFeatures.some(allow => !safeList.includes(allow))) {
+		// This iframe is probably too powerful to be embedded
+		return null;
+	}
+
+	return {
+		src,
+		height,
+		allow: allowedFeatures
+	}
+}
 
 export default async (url: URL.Url, lang: string | null = null): Promise<Summary | null> => {
 	if (lang && !lang.match(/^[\w-]+(\s*,\s*[\w-]+)*$/)) lang = null;
@@ -104,10 +182,18 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 		return '/' + relativeURLString;
 	};
 
-	const icon = await find(favicon) ||
-		// 相対指定を絶対指定に変換し再試行
-		await find(toAbsolute(favicon)) ||
-		null;
+	const getIcon = async () => {
+		return await find(favicon) ||
+			// 相対指定を絶対指定に変換し再試行
+			await find(toAbsolute(favicon)) ||
+			null;
+	}
+
+	const [icon, oEmbed] = await Promise.all([
+		getIcon(),
+		// playerあるならoEmbedは必要ない
+		!playerUrl ? getOEmbedRich($, url.href) : null,
+	])
 
 	// Clean up the title
 	title = cleanupTitle(title, siteName);
@@ -128,5 +214,6 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 		},
 		sitename: siteName || null,
 		sensitive,
+		oEmbed,
 	};
 };

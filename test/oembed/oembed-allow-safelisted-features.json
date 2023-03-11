@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "type": "rich",
+  "html": "<iframe src='https://example.com/' allow='fullscreen encrypted-media picture-in-picture'></iframe>",
+  "height": 300
+}

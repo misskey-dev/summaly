@@ -33,6 +33,11 @@ type Summary = {
 	 * Possibly sensitive
 	 */
 	sensitive?: boolean;
+
+	/**
+	 * The iframe information of oEmbed data from that web page
+	 */
+	oEmbed: OEmbedRichIframe | null;
 };
 
 export default Summary;
@@ -52,4 +57,25 @@ export type Player = {
 	 * The height of the player
 	 */
 	height: number | null;
+};
+
+/**
+ * Extracted iframe information from OEmbed html field.
+ * `width` is omitted here as it should always be 100%.
+ */
+export type OEmbedRichIframe = {
+	/**
+	 * The src of the iframe
+	 */
+	src: string,
+
+	/**
+	 * The height of the iframe
+	 */
+	height: number,
+
+	/**
+	 * The allowed feature list of the iframe
+	 */
+	allow: string[],
 };
