@@ -1,6 +1,6 @@
 {
   "version": "1.0",
   "type": "rich",
-  "html": "<iframe src='https://example.com/' allow='fullscreen camera'></iframe>",
+  "html": "<iframe src='https://example.com/' allow='fullscreen;camera'></iframe>",
   "height": 300
 }
