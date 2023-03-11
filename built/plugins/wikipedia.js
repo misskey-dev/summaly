@@ -31,6 +31,7 @@ export async function summarize(url) {
             width: null,
             height: null
         },
-        sitename: 'Wikipedia'
+        sitename: 'Wikipedia',
+        oEmbed: null,
     };
 }

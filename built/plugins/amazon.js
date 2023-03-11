@@ -38,6 +38,7 @@ export async function summarize(url) {
             width: playerWidth ? parseInt(playerWidth) : null,
             height: playerHeight ? parseInt(playerHeight) : null
         },
-        sitename: 'Amazon'
+        sitename: 'Amazon',
+        oEmbed: null,
     };
 }
