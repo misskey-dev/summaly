@@ -1,0 +1,7 @@
+{
+  "version": "1.0",
+  "type": "video",
+  "html": "<iframe src='https://example.com/'></iframe>",
+  "width": 500,
+  "height": 300
+}

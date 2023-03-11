@@ -270,6 +270,14 @@ describe("oEmbed", () => {
 		expect(summary.player.height).toBe(300);
 	});
 
+	test('type: video', async () => {
+		await setUpFastify('oembed-video.json');
+		const summary = await summaly(host);
+		expect(summary.player.url).toBe('https://example.com/');
+		expect(summary.player.width).toBe(500);
+		expect(summary.player.height).toBe(300);
+	});
+
 	test('children are ignored', async () => {
 		await setUpFastify('oembed-iframe-child.json');
 		const summary = await summaly(host);
