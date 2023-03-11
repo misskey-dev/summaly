@@ -278,6 +278,12 @@ describe("oEmbed", () => {
 		expect(summary.player.height).toBe(300);
 	});
 
+	test('max height', async () => {
+		await setUpFastify('oembed-too-tall.json');
+		const summary = await summaly(host);
+		expect(summary.player.height).toBe(1024);
+	});
+
 	test('children are ignored', async () => {
 		await setUpFastify('oembed-iframe-child.json');
 		const summary = await summaly(host);
