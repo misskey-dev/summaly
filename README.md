@@ -60,7 +60,7 @@ interface IPlugin {
 
 A Promise of an Object that contains properties below:
 
-※ Almost all values are nullable. player shoud not be null.
+※ Almost all values are nullable. player should not be null.
 
 #### Root
 
@@ -77,18 +77,11 @@ A Promise of an Object that contains properties below:
 
 #### Player
 
-| Property        | Type     | Description                              |
-| :-------------- | :------- | :--------------------------------------- |
-| **url**         | *string* | The url of the player                    |
-| **width**       | *number* | The width of the player                  |
-| **height**      | *number* | The height of the player                 |
-
-#### oEmbed
-
 | Property        | Type       | Description                                     |
 | :-------------- | :--------- | :---------------------------------------------- |
-| **src**         | *string*   | The source for the iframe                       |
-| **height**      | *number*   | The height of the iframe                        |
+| **url**         | *string*   | The url of the player                           |
+| **width**       | *number*   | The width of the player                         |
+| **height**      | *number*   | The height of the player                        |
 | **allow**       | *string[]* | The names of the allowed permissions for iframe |
 
 Currently the possible items in `allow` are:

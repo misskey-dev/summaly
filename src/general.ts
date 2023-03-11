@@ -5,7 +5,7 @@ import cleanupTitle from './utils/cleanup-title.js';
 import { decode as decodeHtml } from 'html-entities';
 
 import { get, head, scpaping } from './utils/got.js';
-import type { default as Summary, OEmbedRichIframe } from './summary.js';
+import type { default as Summary, Player } from './summary.js';
 import * as cheerio from 'cheerio';
 
 /**
@@ -14,7 +14,7 @@ import * as cheerio from 'cheerio';
  *
  * Width should always be 100%.
  */
-async function getOEmbedRich($: cheerio.CheerioAPI, pageUrl: string): Promise<OEmbedRichIframe | null> {
+async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<Player | null> {
 	const href = $('link[type="application/json+oembed"]').attr('href');
 	if (!href) {
 		return null;
@@ -29,7 +29,7 @@ async function getOEmbedRich($: cheerio.CheerioAPI, pageUrl: string): Promise<OE
 		} catch {}
 	})();
 
-	if (!body || body.version !== '1.0' || body.type !== 'rich') {
+	if (!body || body.version !== '1.0' || !['rich', 'video'].includes(body.type)) {
 		// Not a well formed rich oEmbed
 		return null;
 	}
@@ -52,15 +52,14 @@ async function getOEmbedRich($: cheerio.CheerioAPI, pageUrl: string): Promise<OE
 		return null;
 	}
 
-	const src = iframe.attr('src');
-	if (!src) {
+	const url = iframe.attr('src');
+	if (!url) {
 		// No src?
 		return null;
 	}
 
 	// XXX: Use global URL object instead of the deprecated `node:url`
-	const url = URL.parse(src);
-	if (url.protocol !== 'https:') {
+	if (URL.parse(url).protocol !== 'https:') {
 		// Allow only HTTPS for best security
 		return null;
 	}
@@ -87,7 +86,8 @@ async function getOEmbedRich($: cheerio.CheerioAPI, pageUrl: string): Promise<OE
 	}
 
 	return {
-		src,
+		url,
+		width: null,
 		height,
 		allow: allowedFeatures
 	}
@@ -199,8 +199,7 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 
 	const [icon, oEmbed] = await Promise.all([
 		getIcon(),
-		// playerあるならoEmbedは必要ない
-		!playerUrl ? getOEmbedRich($, url.href) : null,
+		getOEmbedPlayer($, url.href),
 	])
 
 	// Clean up the title
@@ -215,13 +214,13 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 		icon: icon || null,
 		description: description || null,
 		thumbnail: image || null,
-		player: {
+		player: oEmbed ?? {
 			url: playerUrl || null,
 			width: Number.isNaN(playerWidth) ? null : playerWidth,
-			height: Number.isNaN(playerHeight) ? null : playerHeight
+			height: Number.isNaN(playerHeight) ? null : playerHeight,
+			allow: ['fullscreen', 'encrypted-media'],
 		},
 		sitename: siteName || null,
 		sensitive,
-		oEmbed,
 	};
 };
