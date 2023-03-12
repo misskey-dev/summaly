@@ -213,7 +213,7 @@ describe('TwitterCard', () => {
 
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/embedurl');
-		expect(summary.player.allow).toStrictEqual(['fullscreen', 'encrypted-media']);
+		expect(summary.player.allow).toStrictEqual(['autoplay', 'encrypted-media', 'fullscreen']);
 	});
 
 	test('Player detection - Pleroma:video => video', async () => {
@@ -225,7 +225,7 @@ describe('TwitterCard', () => {
 
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/embedurl');
-		expect(summary.player.allow).toStrictEqual(['fullscreen', 'encrypted-media']);
+		expect(summary.player.allow).toStrictEqual(['autoplay', 'encrypted-media', 'fullscreen']);
 	});
 
 	test('Player detection - Pleroma:image => image', async () => {

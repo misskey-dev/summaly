@@ -239,7 +239,7 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 			url: playerUrl || null,
 			width: Number.isNaN(playerWidth) ? null : playerWidth,
 			height: Number.isNaN(playerHeight) ? null : playerHeight,
-			allow: ['fullscreen', 'encrypted-media'],
+			allow: ['autoplay', 'encrypted-media', 'fullscreen'],
 		},
 		sitename: siteName || null,
 		sensitive,
