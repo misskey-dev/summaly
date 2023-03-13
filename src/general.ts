@@ -1,4 +1,4 @@
-import * as URL from 'node:url';
+import { URL } from 'node:url';
 import clip from './utils/clip.js';
 import cleanupTitle from './utils/cleanup-title.js';
 
@@ -20,9 +20,7 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 		return null;
 	}
 
-	// XXX: Use global URL object instead of the deprecated `node:url`
-	// Disallow relative URL as no one seems to use it
-	const oEmbed = await get(URL.resolve(pageUrl, href));
+	const oEmbed = await get((new URL(href, pageUrl)).href);
 	const body = (() => {
 		try {
 			return JSON.parse(oEmbed);
@@ -58,9 +56,12 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 		return null;
 	}
 
-	// XXX: Use global URL object instead of the deprecated `node:url`
-	if (URL.parse(url).protocol !== 'https:') {
-		// Allow only HTTPS for best security
+	try {
+		if ((new URL(url)).protocol !== 'https:') {
+			// Allow only HTTPS for best security
+			return null;
+		}
+	} catch (e) {
 		return null;
 	}
 
@@ -114,8 +115,10 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 	}
 }
 
-export default async (url: URL.Url, lang: string | null = null): Promise<Summary | null> => {
+export default async (_url: URL | string, lang: string | null = null): Promise<Summary | null> => {
 	if (lang && !lang.match(/^[\w-]+(\s*,\s*[\w-]+)*$/)) lang = null;
+
+	const url = typeof _url === 'string' ? new URL(_url) : _url;
 
 	const res = await scpaping(url.href, { lang: lang || undefined });
 	const $ = res.$;
@@ -139,7 +142,7 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 		$('link[rel="apple-touch-icon"]').attr('href') ||
 		$('link[rel="apple-touch-icon image_src"]').attr('href');
 
-	image = image ? URL.resolve(url.href, image) : null;
+	image = image ? (new URL(image, url.href)).href : null;
 
 	const playerUrl =
 		(twitterCard !== 'summary_large_image' && $('meta[property="twitter:player"]').attr('content')) ||
@@ -173,12 +176,11 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 		description = null;
 	}
 
-	let siteName =
+	let siteName = decodeHtml(
 		$('meta[property="og:site_name"]').attr('content') ||
 		$('meta[name="application-name"]').attr('content') ||
-		url.hostname;
-
-	siteName = siteName ? decodeHtml(siteName) : null;
+		url.hostname
+	);
 
 	const favicon =
 		$('link[rel="shortcut icon"]').attr('href') ||
@@ -188,34 +190,17 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 	const sensitive = $('.tweet').attr('data-possibly-sensitive') === 'true'
 
 	const find = async (path: string) => {
-		const target = URL.resolve(url.href, path);
+		const target = new URL(path, url.href);
 		try {
-			await head(target);
+			await head(target.href);
 			return target;
 		} catch (e) {
 			return null;
 		}
 	};
 
-	// 相対的なURL (ex. test) を絶対的 (ex. /test) に変換
-	const toAbsolute = (relativeURLString: string): string => {
-		const relativeURL = URL.parse(relativeURLString);
-		const isAbsolute = relativeURL.slashes || relativeURL.path !== null && relativeURL.path[0] === '/';
-
-		// 既に絶対的なら、即座に値を返却
-		if (isAbsolute) {
-			return relativeURLString;
-		}
-
-		// スラッシュを付けて返却
-		return '/' + relativeURLString;
-	};
-
 	const getIcon = async () => {
-		return await find(favicon) ||
-			// 相対指定を絶対指定に変換し再試行
-			await find(toAbsolute(favicon)) ||
-			null;
+		return (await find(favicon)) || null;
 	}
 
 	const [icon, oEmbed] = await Promise.all([
@@ -232,7 +217,7 @@ export default async (url: URL.Url, lang: string | null = null): Promise<Summary
 
 	return {
 		title: title || null,
-		icon: icon || null,
+		icon: icon?.href || null,
 		description: description || null,
 		thumbnail: image || null,
 		player: oEmbed ?? {

@@ -2,7 +2,7 @@
  * summaly
  * https://github.com/syuilo/summaly
  */
-import * as URL from 'node:url';
+import { URL } from 'node:url';
 import tracer from 'trace-redirect';
 import general from './general.js';
 import { setAgent } from './utils/got.js';
@@ -30,7 +30,7 @@ export const summaly = async (url, options) => {
             actualUrl = url;
         }
     }
-    const _url = URL.parse(actualUrl, true);
+    const _url = new URL(actualUrl);
     // Find matching plugin
     const match = plugins.filter(plugin => plugin.test(_url))[0];
     // Get summary

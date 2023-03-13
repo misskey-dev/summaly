@@ -1,4 +1,4 @@
-import * as URL from 'node:url';
+import { URL } from 'node:url';
 import { get } from '../utils/got.js';
 import debug from 'debug';
 import summary from '../summary.js';
@@ -6,12 +6,12 @@ import clip from './../utils/clip.js';
 
 const log = debug('summaly:plugins:wikipedia');
 
-export function test(url: URL.Url): boolean {
+export function test(url: URL): boolean {
 	if (!url.hostname) return false;
 	return /\.wikipedia\.org$/.test(url.hostname);
 }
 
-export async function summarize(url: URL.Url): Promise<summary> {
+export async function summarize(url: URL): Promise<summary> {
 	const lang = url.host ? url.host.split('.')[0] : null;
 	const title = url.pathname ? url.pathname.split('/')[2] : null;
 	const endpoint = `https://${lang}.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro=&explaintext=&titles=${title}`;

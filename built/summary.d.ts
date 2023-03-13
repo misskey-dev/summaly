@@ -42,4 +42,8 @@ export declare type Player = {
      * The height of the player
      */
     height: number | null;
+    /**
+     * The allowed permissions of the iframe
+     */
+    allow: string[];
 };
