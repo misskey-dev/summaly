@@ -322,12 +322,16 @@ describe("oEmbed", () => {
 
 	test('oEmbed with nonexistent path', async () => {
 		await setUpFastify('oembed.json', 'htmls/oembed-nonexistent-path.html');
-		await expect(summaly(host)).rejects.toThrow('404 Not Found');
+		const summary = await summaly(host);
+		expect(summary.player.url).toBe(null);
+		expect(summary.description).toBe('nonexistent');
 	});
 
 	test('oEmbed with wrong path', async () => {
 		await setUpFastify('oembed.json', 'htmls/oembed-wrong-path.html');
-		await expect(summaly(host)).rejects.toThrow();
+		const summary = await summaly(host);
+		expect(summary.player.url).toBe(null);
+		expect(summary.description).toBe('wrong url');
 	});
 
 	test('oEmbed with OpenGraph', async () => {

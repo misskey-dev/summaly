@@ -20,7 +20,20 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 		return null;
 	}
 
-	const oEmbed = await get((new URL(href, pageUrl)).href);
+	const oEmbedUrl = (() => {
+		try {
+			return new URL(href, pageUrl);
+		} catch { return null }
+	})();
+	if (!oEmbedUrl) {
+		return null;
+	}
+
+	const oEmbed = await get(oEmbedUrl.href).catch(() => null);
+	if (!oEmbed) {
+		return null;
+	}
+
 	const body = (() => {
 		try {
 			return JSON.parse(oEmbed);
