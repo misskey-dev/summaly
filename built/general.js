@@ -103,6 +103,9 @@ async function getOEmbedPlayer($, pageUrl) {
     const allowedPermissions = (iframe.attr('allow') ?? '').split(/\s*;\s*/g)
         .filter(s => s)
         .filter(s => !ignoredList.includes(s));
+    if (iframe.attr('allowfullscreen') === '') {
+        allowedPermissions.push('fullscreen');
+    }
     if (allowedPermissions.some(allow => !safeList.includes(allow))) {
         // This iframe is probably too powerful to be embedded
         return null;

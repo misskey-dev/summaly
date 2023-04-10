@@ -294,7 +294,14 @@ describe("oEmbed", () => {
 		await setUpFastify('oembed-allow-fullscreen.json');
 		const summary = await summaly(host);
 		expect(summary.player.url).toBe('https://example.com/');
-		expect(summary.player.allow).toStrictEqual(['fullscreen'])
+		expect(summary.player.allow).toStrictEqual(['fullscreen']);
+	});
+
+	test('allows legacy allowfullscreen', async () => {
+		await setUpFastify('oembed-allow-fullscreen-legacy.json');
+		const summary = await summaly(host);
+		expect(summary.player.url).toBe('https://example.com/');
+		expect(summary.player.allow).toStrictEqual(['fullscreen']);
 	});
 
 	test('allows safelisted permissions', async () => {
