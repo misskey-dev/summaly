@@ -42,10 +42,12 @@ npm run serve
 
 ### Options
 
-| Property            | Type                   | Description              | Default |
-| :------------------ | :--------------------- | :----------------------- | :------ |
-| **followRedirects** | *boolean*              | Whether follow redirects | `true`  |
-| **plugins**         | *plugin[]* (see below) | Custom plugins           | `null`  |
+| Property            | Type                   | Description                     | Default |
+| :------------------ | :--------------------- | :------------------------------ | :------ |
+| **lang**            | *string*               | Accept-Language for the request | `null`  |
+| **followRedirects** | *boolean*              | Whether follow redirects        | `true`  |
+| **plugins**         | *plugin[]* (see below) | Custom plugins                  | `null`  |
+| **agent**           | *Got.Agents*           | Custom HTTP agent (see below)   | `null`  |
 
 #### Plugin
 
@@ -57,6 +59,15 @@ interface IPlugin {
 ```
 
 urls are WHATWG URL since v4.
+
+#### Custom HTTP agent for proxy
+You can specify agents to be passed to Got for proxy use, etc.  
+https://github.com/sindresorhus/got/blob/v12.6.0/documentation/tips.md#proxying
+
+**⚠️If you set some agent, local IP rejecting will not work.⚠️**  
+(Summaly usually rejects local IPs.)
+
+(Summaly currently does not support http2.)
 
 ### Returns
 
