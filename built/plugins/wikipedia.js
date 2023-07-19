@@ -33,5 +33,6 @@ export async function summarize(url) {
             allow: [],
         },
         sitename: 'Wikipedia',
+        activityPub: null,
     };
 }
