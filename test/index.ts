@@ -381,4 +381,15 @@ describe('ActivityPub', () => {
 		const summary = await summaly(host);
 		expect(summary.activityPub).toBe('https://misskey.test/notes/abcdefg');
 	});
+
+	test('Null', async () => {
+		app = fastify();
+		app.get('*', (request, reply) => {
+			return reply.send(fs.createReadStream(_dirname + '/htmls/basic.html'));
+		});
+		await app.listen({ port });
+
+		const summary = await summaly(host);
+		expect(summary.activityPub).toBe(null);
+	});
 });
