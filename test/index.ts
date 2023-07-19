@@ -369,3 +369,16 @@ describe("oEmbed", () => {
 		expect(summary.player.height).toBe(300);
 	});
 });
+
+describe('ActivityPub', () => {
+	test('Basic', async () => {
+		app = fastify();
+		app.get('*', (request, reply) => {
+			return reply.send(fs.createReadStream(_dirname + '/htmls/activitypub.html'));
+		});
+		await app.listen({ port });
+
+		const summary = await summaly(host);
+		expect(summary.activityPub).toBe('https://misskey.test/notes/abcdefg');
+	});
+});
