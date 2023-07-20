@@ -40,5 +40,6 @@ export async function summarize(url) {
             allow: playerUrl ? ['fullscreen', 'encrypted-media'] : [],
         },
         sitename: 'Amazon',
+        activityPub: null,
     };
 }

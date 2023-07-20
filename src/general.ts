@@ -203,6 +203,9 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 		$('link[rel="icon"]').attr('href') ||
 		'/favicon.ico';
 
+	const activityPub =
+		$('link[rel="alternate"][type="application/activitypub+json"]').attr('href') || null;
+
 	const sensitive = $('.tweet').attr('data-possibly-sensitive') === 'true'
 
 	const find = async (path: string) => {
@@ -244,5 +247,6 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 		},
 		sitename: siteName || null,
 		sensitive,
+		activityPub,
 	};
 };

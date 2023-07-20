@@ -27,6 +27,10 @@ declare type Summary = {
      * Possibly sensitive
      */
     sensitive?: boolean;
+    /**
+     * The url of the ActivityPub representation of that web page
+     */
+    activityPub: string | null;
 };
 export default Summary;
 export declare type Player = {
