@@ -204,7 +204,7 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 		'/favicon.ico';
 
 	const activityPub =
-		$('link[rel="alternate"][type="application/activitypub+json"]').attr('href') || null;
+		$('link[rel="alternate"][type="application/activity+json"]').attr('href') || null;
 
 	const sensitive = $('.tweet').attr('data-possibly-sensitive') === 'true'
 
