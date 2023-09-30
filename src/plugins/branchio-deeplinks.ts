@@ -5,7 +5,7 @@ import Summary from '../summary.js';
 
 export function test(url: URL): boolean {
 	// Branch.io を使用したディープリンクにマッチ
-	return url.hostname.match(/[a-zA-Z0-9]+\.app\.link/)?.length != 0 ||
+	return /^[a-zA-Z0-9]+\.app\.link$/.test(url.hostname) ||
 	url.hostname === 'spotify.link';
 }
 

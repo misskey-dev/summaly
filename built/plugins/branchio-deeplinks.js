@@ -1,7 +1,7 @@
 import general from '../general.js';
 export function test(url) {
     // Branch.io を使用したディープリンクにマッチ
-    return url.hostname.match(/[a-zA-Z0-9]+\.app\.link/)?.length != 0 ||
+    return /^[a-zA-Z0-9]+\.app\.link$/.test(url.hostname) ||
         url.hostname === 'spotify.link';
 }
 export async function summarize(url, lang = null) {
