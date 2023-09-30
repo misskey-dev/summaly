@@ -42,10 +42,12 @@ npm run serve
 
 ### Options
 
-| Property            | Type                   | Description              | Default |
-| :------------------ | :--------------------- | :----------------------- | :------ |
-| **followRedirects** | *boolean*              | Whether follow redirects | `true`  |
-| **plugins**         | *plugin[]* (see below) | Custom plugins           | `null`  |
+| Property            | Type                   | Description                     | Default |
+| :------------------ | :--------------------- | :------------------------------ | :------ |
+| **lang**            | *string*               | Accept-Language for the request | `null`  |
+| **followRedirects** | *boolean*              | Whether follow redirects        | `true`  |
+| **plugins**         | *plugin[]* (see below) | Custom plugins                  | `null`  |
+| **agent**           | *Got.Agents*           | Custom HTTP agent (see below)   | `null`  |
 
 #### Plugin
 
@@ -58,6 +60,15 @@ interface IPlugin {
 
 urls are WHATWG URL since v4.
 
+#### Custom HTTP agent for proxy
+You can specify agents to be passed to Got for proxy use, etc.  
+https://github.com/sindresorhus/got/blob/v12.6.0/documentation/tips.md#proxying
+
+**⚠️If you set some agent, local IP rejecting will not work.⚠️**  
+(Summaly usually rejects local IPs.)
+
+(Summaly currently does not support http2.)
+
 ### Returns
 
 A Promise of an Object that contains properties below:
@@ -68,13 +79,13 @@ A Promise of an Object that contains properties below:
 
 | Property        | Type               | Description                                 |
 | :-------------- | :-------           | :------------------------------------------ |
-| **description** | *string*           | The description of the web page             |
-| **icon**        | *string*           | The url of the icon of the web page         |
-| **sitename**    | *string*           | The name of the web site                    |
-| **thumbnail**   | *string*           | The url of the thumbnail of the web page    |
-| **oEmbed**      | *OEmbedRichIframe* | The oEmbed rich iframe info of the web page |
-| **player**      | *Player*           | The player of the web page                  |
 | **title**       | *string*           | The title of the web page                   |
+| **icon**        | *string*           | The url of the icon of the web page         |
+| **description** | *string*           | The description of the web page             |
+| **thumbnail**   | *string*           | The url of the thumbnail of the web page    |
+| **player**      | *Player*           | The player of the web page                  |
+| **sitename**    | *string*           | The name of the web site                    |
+| **sensitive**   | *boolean*          | Whether the url is sensitive                |
 | **url**         | *string*           | The url of the web page                     |
 
 #### Player

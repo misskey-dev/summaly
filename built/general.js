@@ -165,6 +165,7 @@ export default async (_url, lang = null) => {
     const favicon = $('link[rel="shortcut icon"]').attr('href') ||
         $('link[rel="icon"]').attr('href') ||
         '/favicon.ico';
+    const activityPub = $('link[rel="alternate"][type="application/activity+json"]').attr('href') || null;
     const sensitive = $('.tweet').attr('data-possibly-sensitive') === 'true';
     const find = async (path) => {
         const target = new URL(path, url.href);
@@ -201,5 +202,6 @@ export default async (_url, lang = null) => {
         },
         sitename: siteName || null,
         sensitive,
+        activityPub,
     };
 };
