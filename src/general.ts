@@ -138,10 +138,19 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 
 	const res = await scpaping(url.href, { lang: lang || undefined });
 	const $ = res.$;
-	const twitterCard = $('meta[property="twitter:card"]').attr('content');
+	const twitterCard =
+		$('meta[name="twitter:card"]').attr('content') ||
+		$('meta[property="twitter:card"]').attr('content');
+
+	// According to docs, name attribute of meta tag is used for twitter card but for compatibility, 
+	// this library will also look for property attribute.
+	// See https://developer.twitter.com/en/docs/twitter-for-websites/cards/overview/summary
+	// Property attribute is used for open graph.
+	// See https://ogp.me/
 
 	let title: string | null | undefined =
 		$('meta[property="og:title"]').attr('content') ||
+		$('meta[name="twitter:title"]').attr('content') ||
 		$('meta[property="twitter:title"]').attr('content') ||
 		$('title').text();
 
@@ -153,6 +162,7 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 
 	let image: string | null | undefined =
 		$('meta[property="og:image"]').attr('content') ||
+		$('meta[name="twitter:image"]').attr('content') ||
 		$('meta[property="twitter:image"]').attr('content') ||
 		$('link[rel="image_src"]').attr('href') ||
 		$('link[rel="apple-touch-icon"]').attr('href') ||
@@ -161,26 +171,27 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 	image = image ? (new URL(image, url.href)).href : null;
 
 	const playerUrl =
-		(twitterCard !== 'summary_large_image' && $('meta[property="twitter:player"]').attr('content')) ||
 		(twitterCard !== 'summary_large_image' && $('meta[name="twitter:player"]').attr('content')) ||
+		(twitterCard !== 'summary_large_image' && $('meta[property="twitter:player"]').attr('content')) ||
 		$('meta[property="og:video"]').attr('content') ||
 		$('meta[property="og:video:secure_url"]').attr('content') ||
 		$('meta[property="og:video:url"]').attr('content');
 
 	const playerWidth = parseInt(
-		$('meta[property="twitter:player:width"]').attr('content') ||
 		$('meta[name="twitter:player:width"]').attr('content') ||
+		$('meta[property="twitter:player:width"]').attr('content') ||
 		$('meta[property="og:video:width"]').attr('content') ||
 		'');
 
 	const playerHeight = parseInt(
-		$('meta[property="twitter:player:height"]').attr('content') ||
 		$('meta[name="twitter:player:height"]').attr('content') ||
+		$('meta[property="twitter:player:height"]').attr('content') ||
 		$('meta[property="og:video:height"]').attr('content') ||
 		'');
 
 	let description: string | null | undefined =
 		$('meta[property="og:description"]').attr('content') ||
+		$('meta[name="twitter:description"]').attr('content') ||
 		$('meta[property="twitter:description"]').attr('content') ||
 		$('meta[name="description"]').attr('content');
 
