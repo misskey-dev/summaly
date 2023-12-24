@@ -175,7 +175,9 @@ export default async (_url, lang = null) => {
         $('link[rel="icon"]').attr('href') ||
         '/favicon.ico';
     const activityPub = $('link[rel="alternate"][type="application/activity+json"]').attr('href') || null;
-    const sensitive = $('.tweet').attr('data-possibly-sensitive') === 'true';
+    // https://developer.mixi.co.jp/connect/mixi_plugin/mixi_check/spec_mixi_check/#toc-18-
+    const sensitive = $("meta[property='mixi:content-rating']").attr('content') == '1' ||
+        $('.tweet').attr('data-possibly-sensitive') === 'true';
     const find = async (path) => {
         const target = new URL(path, url.href);
         try {
