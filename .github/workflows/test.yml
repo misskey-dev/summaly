@@ -1,4 +1,4 @@
-name: Publish Node.js Package
+name: Test
 
 on: [push, pull_request]
 
