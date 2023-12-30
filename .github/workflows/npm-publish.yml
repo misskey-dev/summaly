@@ -10,6 +10,10 @@ jobs:
   publish:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      id-token: write
+
     strategy:
       matrix:
         node-version: [20.10.0]

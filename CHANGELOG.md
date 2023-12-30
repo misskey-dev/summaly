@@ -1,5 +1,9 @@
 5.0.0 / 2023-12-30
 ------------------
+* Fix .github/workflows/npm-publish.yml
+
+5.0.0 / 2023-12-30
+------------------
 * support `<link rel="alternate" type="application/activitypub+json" href="{href}">` https://github.com/misskey-dev/summaly/pull/10, https://github.com/misskey-dev/summaly/pull/11
   * 結果の`activityPub`プロパティでherfの内容を取得できます
 * branch.ioを用いたディープリンク（spotify.link）などでパースに失敗する問題を修正 https://github.com/misskey-dev/summaly/pull/13
