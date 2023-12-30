@@ -1,7 +1,13 @@
-4.1.0 / 2023-12-30
+5.0.0 / 2023-12-30
 ------------------
-* branch.ioを用いたディープリンク（spotify.link）などでパースに失敗する問題を修正
-* 'mixi:content-rating'をsensitive判定で見ることで、dlsiteなどでセンシティブ情報を得れるように
+* support `<link rel="alternate" type="application/activitypub+json" href="{href}">` https://github.com/misskey-dev/summaly/pull/10, https://github.com/misskey-dev/summaly/pull/11
+  * 結果の`activityPub`プロパティでherfの内容を取得できます
+* branch.ioを用いたディープリンク（spotify.link）などでパースに失敗する問題を修正 https://github.com/misskey-dev/summaly/pull/13
+* Twitter Cardが読めていない問題を修正 https://github.com/misskey-dev/summaly/pull/15
+* 'mixi:content-rating'をsensitive判定で見ることで、dlsiteなどでセンシティブ情報を得れるように https://github.com/misskey-dev/summaly/pull/16
+* sitenameをURLから生成する場合、ポートを含むように (URL.hostname → URL.host)
+* `Summary`型に`url`プロパティを追加した`SummalyResult`型をexportするように
+* `IPlugin`インターフェースを`SummalyPlugin`に改称
 
 4.0.2 / 2023-04-20
 ------------------

@@ -10,7 +10,6 @@ export function test(url: URL): boolean {
 }
 
 export async function summarize(url: URL, lang: string | null = null): Promise<Summary | null> {
-
 	// https://help.branch.io/using-branch/docs/creating-a-deep-link#redirections
 	// Web版に強制リダイレクトすることでbranch.ioの独自ページが開くのを防ぐ
 	url.searchParams.append('$web_only', 'true');

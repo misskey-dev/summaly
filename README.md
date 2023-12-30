@@ -41,7 +41,7 @@ npm run build
 npm run serve
 ```
 
-### Options
+#### opts (SummalyOptions)
 
 | Property            | Type                   | Description                     | Default |
 | :------------------ | :--------------------- | :------------------------------ | :------ |
@@ -53,7 +53,7 @@ npm run serve
 #### Plugin
 
 ``` typescript
-interface IPlugin {
+interface SummalyPlugin {
 	test: (url: URL) => boolean;
 	summarize: (url: URL) => Promise<Summary>;
 }
@@ -76,26 +76,31 @@ A Promise of an Object that contains properties below:
 
 ※ Almost all values are nullable. player should not be null.
 
-#### Root
+#### SummalyResult
 
 | Property        | Type               | Description                                 |
 | :-------------- | :-------           | :------------------------------------------ |
-| **title**       | *string*           | The title of the web page                   |
-| **icon**        | *string*           | The url of the icon of the web page         |
-| **description** | *string*           | The description of the web page             |
-| **thumbnail**   | *string*           | The url of the thumbnail of the web page    |
+| **title**       | *string* \| *null* | The title of the web page                   |
+| **icon**        | *string* \| *null* | The url of the icon of the web page         |
+| **description** | *string* \| *null* | The description of the web page             |
+| **thumbnail**   | *string* \| *null* | The url of the thumbnail of the web page    |
+| **sitename**    | *string* \| *null* | The name of the web site                    |
 | **player**      | *Player*           | The player of the web page                  |
-| **sitename**    | *string*           | The name of the web site                    |
 | **sensitive**   | *boolean*          | Whether the url is sensitive                |
+| **activityPub** | *string* \| *null* | The url of the ActivityPub representation of that web page |
 | **url**         | *string*           | The url of the web page                     |
+
+#### Summary
+
+`Omit<SummalyResult, "url">`
 
 #### Player
 
 | Property        | Type       | Description                                     |
 | :-------------- | :--------- | :---------------------------------------------- |
-| **url**         | *string*   | The url of the player                           |
-| **width**       | *number*   | The width of the player                         |
-| **height**      | *number*   | The height of the player                        |
+| **url**         | *string* \| *null* | The url of the player                           |
+| **width**       | *number* \| *null* | The width of the player                         |
+| **height**      | *number* \| *null* | The height of the player                        |
 | **allow**       | *string[]* | The names of the allowed permissions for iframe |
 
 Currently the possible items in `allow` are:
@@ -105,6 +110,7 @@ Currently the possible items in `allow` are:
 * `fullscreen`
 * `encrypted-media`
 * `picture-in-picture`
+* `web-share`
 
 See [Permissions Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Permissions_Policy) in MDN for details of them.
 
@@ -123,7 +129,7 @@ will be ... ↓
 ```json
 {
 	"title": "【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)",
-	"icon": "https://www.youtube.com/s/desktop/9318de79/img/favicon.ico",
+	"icon": "https://www.youtube.com/s/desktop/28b0985e/img/favicon.ico",
 	"description": "Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売予定THE IDOLM@STER CINDERELLA GIRLS CG STAR...",
 	"thumbnail": "https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg",
 	"player": {
@@ -135,11 +141,13 @@ will be ... ↓
 			"clipboard-write",
 			"encrypted-media",
 			"picture-in-picture",
-			"web-share"
+			"web-share",
+			"fullscreen",
 		]
 	},
 	"sitename": "YouTube",
 	"sensitive": false,
+	"activityPub": null,
 	"url": "https://www.youtube.com/watch?v=NMIEAhH_fTU"
 }
 ```

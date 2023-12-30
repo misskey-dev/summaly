@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "eslint": "eslint --quiet \"src/**/*.ts\"",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent=false --verbose false",
     "serve": "fastify start ./built/index.js"
   },
@@ -27,7 +28,11 @@
     "@types/debug": "4.1.7",
     "@types/escape-regexp": "^0.0.1",
     "@types/node": "20.10.6",
+    "@typescript-eslint/eslint-plugin": "^6.16.0",
+    "@typescript-eslint/parser": "^6.16.0",
     "debug": "^4.3.4",
+    "eslint": "^8.56.0",
+    "eslint-plugin-import": "^2.29.1",
     "fastify": "^4.25.2",
     "fastify-cli": "^5.9.0",
     "jest": "^29.7.0",

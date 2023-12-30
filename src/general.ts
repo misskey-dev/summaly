@@ -1,12 +1,11 @@
 import { URL } from 'node:url';
+import { decode as decodeHtml } from 'html-entities';
+import * as cheerio from 'cheerio';
 import clip from './utils/clip.js';
 import cleanupTitle from './utils/cleanup-title.js';
 
-import { decode as decodeHtml } from 'html-entities';
-
 import { get, head, scpaping } from './utils/got.js';
 import type { default as Summary, Player } from './summary.js';
-import * as cheerio from 'cheerio';
 
 /**
  * Contains only the html snippet for a sanitized iframe as the thumbnail is
@@ -23,7 +22,7 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 	const oEmbedUrl = (() => {
 		try {
 			return new URL(href, pageUrl);
-		} catch { return null }
+		} catch { return null; }
 	})();
 	if (!oEmbedUrl) {
 		return null;
@@ -51,7 +50,7 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 	}
 
 	const oEmbedHtml = cheerio.load(body.html);
-	const iframe = oEmbedHtml("iframe");
+	const iframe = oEmbedHtml('iframe');
 
 	if (iframe.length !== 1) {
 		// Somehow we either have multiple iframes or none
@@ -127,8 +126,8 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 		url,
 		width,
 		height,
-		allow: allowedPermissions
-	}
+		allow: allowedPermissions,
+	};
 }
 
 export default async (_url: URL | string, lang: string | null = null): Promise<Summary | null> => {
@@ -142,7 +141,7 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 		$('meta[name="twitter:card"]').attr('content') ||
 		$('meta[property="twitter:card"]').attr('content');
 
-	// According to docs, name attribute of meta tag is used for twitter card but for compatibility, 
+	// According to docs, name attribute of meta tag is used for twitter card but for compatibility,
 	// this library will also look for property attribute.
 	// See https://developer.twitter.com/en/docs/twitter-for-websites/cards/overview/summary
 	// Property attribute is used for open graph.
@@ -203,10 +202,10 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 		description = null;
 	}
 
-	let siteName = decodeHtml(
+	const siteName = decodeHtml(
 		$('meta[property="og:site_name"]').attr('content') ||
 		$('meta[name="application-name"]').attr('content') ||
-		url.hostname
+		url.host,
 	);
 
 	const favicon =
@@ -218,9 +217,8 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 		$('link[rel="alternate"][type="application/activity+json"]').attr('href') || null;
 
 	// https://developer.mixi.co.jp/connect/mixi_plugin/mixi_check/spec_mixi_check/#toc-18-
-	const sensitive = 
-		$("meta[property='mixi:content-rating']").attr('content') == '1' ||
-		$('.tweet').attr('data-possibly-sensitive') === 'true'
+	const sensitive =
+		$('meta[property=\'mixi:content-rating\']').attr('content') === '1';
 
 	const find = async (path: string) => {
 		const target = new URL(path, url.href);
@@ -234,12 +232,12 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 
 	const getIcon = async () => {
 		return (await find(favicon)) || null;
-	}
+	};
 
 	const [icon, oEmbed] = await Promise.all([
 		getIcon(),
 		getOEmbedPlayer($, url.href),
-	])
+	]);
 
 	// Clean up the title
 	title = cleanupTitle(title, siteName);

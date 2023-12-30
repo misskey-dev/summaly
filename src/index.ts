@@ -1,20 +1,20 @@
 /**
  * summaly
- * https://github.com/syuilo/summaly
+ * https://github.com/misskey-dev/summaly
  */
 
 import { URL } from 'node:url';
 import tracer from 'trace-redirect';
-import Summary from './summary.js';
-import type { IPlugin as _IPlugin } from './iplugin.js';
-export type IPlugin = _IPlugin;
+import { SummalyResult } from './summary.js';
+import { SummalyPlugin } from './iplugin.js';
+export * from './iplugin.js';
 import general from './general.js';
 import * as Got from 'got';
 import { setAgent } from './utils/got.js';
 import type { FastifyInstance } from 'fastify';
 import { plugins as builtinPlugins } from './plugins/index.js';
 
-type Options = {
+export type SummalyOptions = {
 	/**
 	 * Accept-Language for the request
 	 */
@@ -28,7 +28,7 @@ type Options = {
 	/**
 	 * Custom Plugins
 	 */
-	plugins?: IPlugin[];
+	plugins?: SummalyPlugin[];
 
 	/**
 	 * Custom HTTP agent
@@ -36,26 +36,19 @@ type Options = {
 	agent?: Got.Agents;
 };
 
-type Result = Summary & {
-	/**
-	 * The actual url of that web page
-	 */
-	url: string;
-};
-
-const defaultOptions = {
+export const summalyDefaultOptions = {
 	lang: null,
 	followRedirects: true,
 	plugins: [],
-} as Options;
+} as SummalyOptions;
 
 /**
  * Summarize an web page
  */
-export const summaly = async (url: string, options?: Options): Promise<Result> => {
+export const summaly = async (url: string, options?: SummalyOptions): Promise<SummalyResult> => {
 	if (options?.agent) setAgent(options.agent);
 
-	const opts = Object.assign(defaultOptions, options);
+	const opts = Object.assign(summalyDefaultOptions, options);
 
 	const plugins = builtinPlugins.concat(opts.plugins || []);
 
@@ -68,7 +61,7 @@ export const summaly = async (url: string, options?: Options): Promise<Result> =
 			actualUrl = url;
 		}
 	}
- 
+
 	const _url = new URL(actualUrl);
 
 	// Find matching plugin
@@ -78,7 +71,7 @@ export const summaly = async (url: string, options?: Options): Promise<Result> =
 	const summary = await (match ? match.summarize : general)(_url, opts.lang || undefined);
 
 	if (summary == null) {
-		throw 'failed summarize';
+		throw new Error('failed summarize');
 	}
 
 	return Object.assign(summary, {
@@ -86,7 +79,7 @@ export const summaly = async (url: string, options?: Options): Promise<Result> =
 	});
 };
 
-export default function (fastify: FastifyInstance, options: Options, done: (err?: Error) => void) {
+export default function (fastify: FastifyInstance, options: SummalyOptions, done: (err?: Error) => void) {
 	fastify.get<{
         Querystring: {
 				url?: string;
