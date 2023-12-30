@@ -11,6 +11,7 @@ const regCharset = new RegExp(/charset\s*=\s*["']?([\w-]+)/, 'i');
 export function detectEncoding(body: Buffer): string {
 	// By detection
 	const detected = jschardet.detect(body, { minimumThreshold: 0.99 });
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	if (detected) {
 		const candicate = detected.encoding;
 		const encoding = toEncoding(candicate);

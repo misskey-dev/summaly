@@ -36,7 +36,7 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 	const body = (() => {
 		try {
 			return JSON.parse(oEmbed);
-		} catch {}
+		} catch { /* empty */ }
 	})();
 
 	if (!body || body.version !== '1.0' || !['rich', 'video'].includes(body.type)) {
@@ -131,6 +131,7 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 }
 
 export default async (_url: URL | string, lang: string | null = null): Promise<Summary | null> => {
+	// eslint-disable-next-line no-param-reassign
 	if (lang && !lang.match(/^[\w-]+(\s*,\s*[\w-]+)*$/)) lang = null;
 
 	const url = typeof _url === 'string' ? new URL(_url) : _url;
@@ -153,6 +154,7 @@ export default async (_url: URL | string, lang: string | null = null): Promise<S
 		$('meta[property="twitter:title"]').attr('content') ||
 		$('title').text();
 
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	if (title === undefined || title === null) {
 		return null;
 	}

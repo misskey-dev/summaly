@@ -1,17 +1,18 @@
-import got, * as Got from 'got';
-import { StatusError } from './status-error.js';
-import { detectEncoding, toUtf8 } from './encoding.js';
-import * as cheerio from 'cheerio';
-import PrivateIp from 'private-ip';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import got, * as Got from 'got';
+import * as cheerio from 'cheerio';
+import PrivateIp from 'private-ip';
+import { StatusError } from './status-error.js';
+import { detectEncoding, toUtf8 } from './encoding.js';
 
 const _filename = fileURLToPath(import.meta.url);
 const _dirname = dirname(_filename);
 
 export let agent: Got.Agents = {};
 export function setAgent(_agent: Got.Agents) {
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	agent = _agent || {};
 }
 
@@ -37,7 +38,7 @@ export async function scpaping(url: string, opts?: { lang?: string; }) {
 		headers: {
 			'accept': 'text/html,application/xhtml+xml',
 			'user-agent': BOT_UA,
-			'accept-language': opts?.lang
+			'accept-language': opts?.lang,
 		},
 		typeFilter: /^(text\/html|application\/xhtml\+xml)/,
 	});

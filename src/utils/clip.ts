@@ -5,6 +5,7 @@ export default function(s: string, max: number): string {
 		return s;
 	}
 
+	// eslint-disable-next-line no-param-reassign
 	s = s.trim();
 
 	if (s.length > max) {

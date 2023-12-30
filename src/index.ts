@@ -5,14 +5,14 @@
 
 import { URL } from 'node:url';
 import tracer from 'trace-redirect';
+import * as Got from 'got';
 import { SummalyResult } from './summary.js';
 import { SummalyPlugin } from './iplugin.js';
 export * from './iplugin.js';
 import general from './general.js';
-import * as Got from 'got';
 import { setAgent } from './utils/got.js';
-import type { FastifyInstance } from 'fastify';
 import { plugins as builtinPlugins } from './plugins/index.js';
+import type { FastifyInstance } from 'fastify';
 
 export type SummalyOptions = {
 	/**
@@ -68,6 +68,7 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 	const match = plugins.filter(plugin => plugin.test(_url))[0];
 
 	// Get summary
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	const summary = await (match ? match.summarize : general)(_url, opts.lang || undefined);
 
 	if (summary == null) {
@@ -75,7 +76,7 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 	}
 
 	return Object.assign(summary, {
-		url: actualUrl
+		url: actualUrl,
 	});
 };
 
@@ -87,9 +88,10 @@ export default function (fastify: FastifyInstance, options: SummalyOptions, done
 			};
 	}>('/', async (req, reply) => {
 		const url = req.query.url as string;
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (url == null) {
 			return reply.status(400).send({
-				error: 'url is required'
+				error: 'url is required',
 			});
 		}
 
@@ -103,7 +105,7 @@ export default function (fastify: FastifyInstance, options: SummalyOptions, done
 			return summary;
 		} catch (e) {
 			return reply.status(500).send({
-				error: e
+				error: e,
 			});
 		}
 	});

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 export default function(val: string): boolean {
 	if (val === undefined) {
 		return true;

@@ -1,5 +1,4 @@
 import { URL } from 'node:url';
-import { scpaping } from '../utils/got.js';
 import general from '../general.js';
 import Summary from '../summary.js';
 

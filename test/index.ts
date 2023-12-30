@@ -8,13 +8,13 @@
 
 import fs, { readdirSync } from 'node:fs';
 import process from 'node:process';
-import fastify from 'fastify';
-import { summaly } from '../src/index.js';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, jest, test, describe, beforeEach, afterEach } from '@jest/globals';
 import { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
+import { expect, test, describe, beforeEach, afterEach } from '@jest/globals';
+import fastify from 'fastify';
+import { summaly } from '../src/index.js';
 import { StatusError } from '../src/utils/status-error.js';
 
 const _filename = fileURLToPath(import.meta.url);
@@ -35,7 +35,6 @@ const host = `http://localhost:${port}`;
 process.on('unhandledRejection', console.dir);
 
 let app: ReturnType<typeof fastify> | null = null;
-let n = 0;
 
 afterEach(async () => {
 	if (app) {
@@ -61,10 +60,10 @@ test('basic', async () => {
 			url: null,
 			width: null,
 			height: null,
-			"allow": [
-			  "autoplay",
-			  "encrypted-media",
-			  "fullscreen",
+			'allow': [
+				'autoplay',
+				'encrypted-media',
+				'fullscreen',
 			],
 		},
 		sitename: 'localhost:3060',
@@ -80,28 +79,28 @@ test('Stage Bye Stage', async () => {
 	const summary = await summaly('https://www.youtube.com/watch?v=NMIEAhH_fTU');
 	expect(summary).toEqual(
 		{
-			"title": "【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)",
-			"icon": "https://www.youtube.com/s/desktop/28b0985e/img/favicon.ico",
-			"description": "Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売予定THE IDOLM@STER CINDERELLA GIRLS CG STAR...",
-			"thumbnail": "https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg",
-			"player": {
-				"url": "https://www.youtube.com/embed/NMIEAhH_fTU?feature=oembed",
-				"width": 200,
-				"height": 113,
-				"allow": [
-					"autoplay",
-					"clipboard-write",
-					"encrypted-media",
-					"picture-in-picture",
-					"web-share",
-					"fullscreen",
-				]
+			'title': '【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)',
+			'icon': 'https://www.youtube.com/s/desktop/28b0985e/img/favicon.ico',
+			'description': 'Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売予定THE IDOLM@STER CINDERELLA GIRLS CG STAR...',
+			'thumbnail': 'https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg',
+			'player': {
+				'url': 'https://www.youtube.com/embed/NMIEAhH_fTU?feature=oembed',
+				'width': 200,
+				'height': 113,
+				'allow': [
+					'autoplay',
+					'clipboard-write',
+					'encrypted-media',
+					'picture-in-picture',
+					'web-share',
+					'fullscreen',
+				],
 			},
-			"sitename": "YouTube",
-			"sensitive": false,
-			"activityPub": null,
-			"url": "https://www.youtube.com/watch?v=NMIEAhH_fTU"
-		}
+			'sitename': 'YouTube',
+			'sensitive': false,
+			'activityPub': null,
+			'url': 'https://www.youtube.com/watch?v=NMIEAhH_fTU',
+		},
 	);
 });
 
@@ -164,7 +163,7 @@ describe('Private IP blocking', () => {
 			agent: {
 				http: new httpAgent({ keepAlive: true }),
 				https: new httpsAgent({ keepAlive: true }),
-			}
+			},
 		});
 		expect(summary.title).toBe('Strawberry Pasta');
 	});
@@ -299,7 +298,7 @@ describe('TwitterCard', () => {
 	});
 });
 
-describe("oEmbed", () => {
+describe('oEmbed', () => {
 	const setUpFastify = async (oEmbedPath: string, htmlPath = 'htmls/oembed.html') => {
 		app = fastify();
 		app.get('/', (request, reply) => {
@@ -307,11 +306,11 @@ describe("oEmbed", () => {
 		});
 		app.get('/oembed.json', (request, reply) => {
 			return reply.send(fs.createReadStream(
-				new URL(oEmbedPath, new URL('oembed/', import.meta.url))
+				new URL(oEmbedPath, new URL('oembed/', import.meta.url)),
 			));
 		});
 		await app.listen({ port });
-	}
+	};
 
 	for (const filename of readdirSync(new URL('oembed/invalid', import.meta.url))) {
 		test(`Invalidity test: ${filename}`, async () => {

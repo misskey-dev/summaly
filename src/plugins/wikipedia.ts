@@ -1,6 +1,6 @@
 import { URL } from 'node:url';
-import { get } from '../utils/got.js';
 import debug from 'debug';
+import { get } from '../utils/got.js';
 import summary from '../summary.js';
 import clip from './../utils/clip.js';
 
@@ -20,6 +20,7 @@ export async function summarize(url: URL): Promise<summary> {
 	log(`title is ${title}`);
 	log(`endpoint is ${endpoint}`);
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let body = await get(endpoint) as any;
 	body = JSON.parse(body);
 	log(body);
