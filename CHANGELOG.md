@@ -1,3 +1,7 @@
+5.0.3 / 2023-12-30
+------------------
+* Fix .github/workflows/npm-publish.yml
+
 5.0.2 / 2023-12-30
 ------------------
 * Fix .github/workflows/npm-publish.yml
