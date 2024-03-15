@@ -1,5 +1,5 @@
 import { URL } from 'node:url';
-import general from '../general.js';
+import general, { GeneralScrapingOptions } from '../general.js';
 import Summary from '../summary.js';
 
 export function test(url: URL): boolean {
@@ -8,10 +8,10 @@ export function test(url: URL): boolean {
 	url.hostname === 'spotify.link';
 }
 
-export async function summarize(url: URL, lang: string | null = null): Promise<Summary | null> {
+export async function summarize(url: URL, opts?: GeneralScrapingOptions): Promise<Summary | null> {
 	// https://help.branch.io/using-branch/docs/creating-a-deep-link#redirections
 	// Web版に強制リダイレクトすることでbranch.ioの独自ページが開くのを防ぐ
 	url.searchParams.append('$web_only', 'true');
 
-	return await general(url, lang);
+	return await general(url, opts);
 }
