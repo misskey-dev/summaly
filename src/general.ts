@@ -130,13 +130,30 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 	};
 }
 
-export default async (_url: URL | string, lang: string | null = null): Promise<Summary | null> => {
+export type GeneralScrapingOptions = {
+	lang?: string | null;
+	userAgent?: string;
+	responseTimeout?: number;
+	operationTimeout?: number;
+	contentLengthLimit?: number;
+	contentLengthRequired?: boolean;
+}
+
+export default async (_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> => {
+	let lang = opts?.lang;
 	// eslint-disable-next-line no-param-reassign
 	if (lang && !lang.match(/^[\w-]+(\s*,\s*[\w-]+)*$/)) lang = null;
 
 	const url = typeof _url === 'string' ? new URL(_url) : _url;
 
-	const res = await scpaping(url.href, { lang: lang || undefined });
+	const res = await scpaping(url.href, {
+		lang: lang || undefined,
+		userAgent: opts?.userAgent,
+		responseTimeout: opts?.responseTimeout,
+		operationTimeout: opts?.operationTimeout,
+		contentLengthLimit: opts?.contentLengthLimit,
+		contentLengthRequired: opts?.contentLengthRequired,
+	});
 	const $ = res.$;
 	const twitterCard =
 		$('meta[name="twitter:card"]').attr('content') ||

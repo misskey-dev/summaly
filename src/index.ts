@@ -9,7 +9,7 @@ import * as Got from 'got';
 import { SummalyResult } from './summary.js';
 import { SummalyPlugin } from './iplugin.js';
 export * from './iplugin.js';
-import general from './general.js';
+import general, { GeneralScrapingOptions } from './general.js';
 import { setAgent } from './utils/got.js';
 import { plugins as builtinPlugins } from './plugins/index.js';
 import type { FastifyInstance } from 'fastify';
@@ -34,6 +34,35 @@ export type SummalyOptions = {
 	 * Custom HTTP agent
 	 */
 	agent?: Got.Agents;
+
+	/**
+	 * User-Agent for the request
+	 */
+	userAgent?: string;
+
+	/**
+	 * Response timeout.
+	 * Set timeouts for each phase, such as host name resolution and socket communication.
+	 */
+	responseTimeout?: number;
+
+	/**
+	 * Operation timeout.
+	 * Set the timeout from the start to the end of the request.
+	 */
+	operationTimeout?: number;
+
+	/**
+	 * Maximum content length.
+	 * If set to true, an error will occur if the content-length value returned from the other server is larger than this parameter (or if the received body size exceeds this parameter).
+	 */
+	contentLengthLimit?: number;
+
+	/**
+	 * Content length required.
+	 * If set to true, it will be an error if the other server does not return content-length.
+	 */
+	contentLengthRequired?: boolean;
 };
 
 export const summalyDefaultOptions = {
@@ -68,8 +97,17 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 	const match = plugins.filter(plugin => plugin.test(_url))[0];
 
 	// Get summary
+	const scrapingOptions: GeneralScrapingOptions = {
+		lang: opts.lang,
+		userAgent: opts.userAgent,
+		responseTimeout: opts.responseTimeout,
+		operationTimeout: opts.operationTimeout,
+		contentLengthLimit: opts.contentLengthLimit,
+		contentLengthRequired: opts.contentLengthRequired,
+	};
+
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-	const summary = await (match ? match.summarize : general)(_url, opts.lang || undefined);
+	const summary = await (match ? match.summarize : general)(_url, scrapingOptions);
 
 	if (summary == null) {
 		throw new Error('failed summarize');
