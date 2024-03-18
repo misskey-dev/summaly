@@ -1,3 +1,12 @@
+5.1.0 / 2024-xx-xx
+* GETリクエストよりも前にHEADリクエストを送信し、その結果を使用して検証するように (#22)
+* 下記のパラメータを`summaly`メソッドのオプションに追加
+  - userAgent
+  - responseTimeout
+  - operationTimeout
+  - contentLengthLimit
+  - contentLengthRequired
+
 5.0.3 / 2023-12-30
 ------------------
 * Fix .github/workflows/npm-publish.yml

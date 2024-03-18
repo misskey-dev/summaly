@@ -43,12 +43,17 @@ npm run serve
 
 #### opts (SummalyOptions)
 
-| Property            | Type                   | Description                     | Default |
-| :------------------ | :--------------------- | :------------------------------ | :------ |
-| **lang**            | *string*               | Accept-Language for the request | `null`  |
-| **followRedirects** | *boolean*              | Whether follow redirects        | `true`  |
-| **plugins**         | *plugin[]* (see below) | Custom plugins                  | `null`  |
-| **agent**           | *Got.Agents*           | Custom HTTP agent (see below)   | `null`  |
+| Property                  | Type                   | Description                                                                                                                                                                         | Default                |
+|:--------------------------|:-----------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:-----------------------|
+| **lang**                  | *string*               | Accept-Language for the request                                                                                                                                                     | `null`                 |
+| **followRedirects**       | *boolean*              | Whether follow redirects                                                                                                                                                            | `true`                 |
+| **plugins**               | *plugin[]* (see below) | Custom plugins                                                                                                                                                                      | `null`                 |
+| **agent**                 | *Got.Agents*           | Custom HTTP agent (see below)                                                                                                                                                       | `null`                 |
+| **userAgent**             | *string*               | User-Agent for the request                                                                                                                                                          | `SummalyBot/[version]` |
+| **responseTimeout**       | *number*               | Set timeouts for each phase, such as host name resolution and socket communication.                                                                                                 | `20000`                |
+| **operationTimeout**      | *number*               | Set the timeout from the start to the end of the request.                                                                                                                           | `60000`                |
+| **contentLengthLimit**    | *number*               | If set to true, an error will occur if the content-length value returned from the other server is larger than this parameter (or if the received body size exceeds this parameter). | `10485760`             |
+| **contentLengthRequired** | *boolean*              | If set to true, it will be an error if the other server does not return content-length.                                                                                             | `false`                |
 
 #### Plugin
 
@@ -78,17 +83,17 @@ A Promise of an Object that contains properties below:
 
 #### SummalyResult
 
-| Property        | Type               | Description                                 |
-| :-------------- | :-------           | :------------------------------------------ |
-| **title**       | *string* \| *null* | The title of the web page                   |
-| **icon**        | *string* \| *null* | The url of the icon of the web page         |
-| **description** | *string* \| *null* | The description of the web page             |
-| **thumbnail**   | *string* \| *null* | The url of the thumbnail of the web page    |
-| **sitename**    | *string* \| *null* | The name of the web site                    |
-| **player**      | *Player*           | The player of the web page                  |
-| **sensitive**   | *boolean*          | Whether the url is sensitive                |
+| Property        | Type               | Description                                                |
+|:----------------|:-------------------|:-----------------------------------------------------------|
+| **title**       | *string* \| *null* | The title of the web page                                  |
+| **icon**        | *string* \| *null* | The url of the icon of the web page                        |
+| **description** | *string* \| *null* | The description of the web page                            |
+| **thumbnail**   | *string* \| *null* | The url of the thumbnail of the web page                   |
+| **sitename**    | *string* \| *null* | The name of the web site                                   |
+| **player**      | *Player*           | The player of the web page                                 |
+| **sensitive**   | *boolean*          | Whether the url is sensitive                               |
 | **activityPub** | *string* \| *null* | The url of the ActivityPub representation of that web page |
-| **url**         | *string*           | The url of the web page                     |
+| **url**         | *string*           | The url of the web page                                    |
 
 #### Summary
 
@@ -96,12 +101,12 @@ A Promise of an Object that contains properties below:
 
 #### Player
 
-| Property        | Type       | Description                                     |
-| :-------------- | :--------- | :---------------------------------------------- |
-| **url**         | *string* \| *null* | The url of the player                           |
-| **width**       | *number* \| *null* | The width of the player                         |
-| **height**      | *number* \| *null* | The height of the player                        |
-| **allow**       | *string[]* | The names of the allowed permissions for iframe |
+| Property   | Type               | Description                                     |
+|:-----------|:-------------------|:------------------------------------------------|
+| **url**    | *string* \| *null* | The url of the player                           |
+| **width**  | *number* \| *null* | The width of the player                         |
+| **height** | *number* \| *null* | The height of the player                        |
+| **allow**  | *string[]*         | The names of the allowed permissions for iframe |
 
 Currently the possible items in `allow` are:
 

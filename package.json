@@ -1,6 +1,6 @@
 {
   "name": "@misskey-dev/summaly",
-  "version": "5.0.4",
+  "version": "5.1.0",
   "description": "Get web page's summary",
   "author": "syuilo <syuilotan@yahoo.co.jp>",
   "license": "MIT",
