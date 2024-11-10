@@ -1,6 +1,6 @@
 import { URL } from 'node:url';
-import general, { GeneralScrapingOptions } from '../general.js';
-import Summary from '../summary.js';
+import general, { GeneralScrapingOptions } from '@/general.js';
+import Summary from '@/summary.js';
 
 export function test(url: URL): boolean {
 	// Branch.io を使用したディープリンクにマッチ

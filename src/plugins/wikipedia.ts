@@ -1,8 +1,8 @@
 import { URL } from 'node:url';
 import debug from 'debug';
-import { get } from '../utils/got.js';
-import summary from '../summary.js';
-import clip from './../utils/clip.js';
+import { get } from '@/utils/got.js';
+import summary from '@/summary.js';
+import { clip } from '@/utils/clip.js';
 
 const log = debug('summaly:plugins:wikipedia');
 

@@ -1,6 +1,6 @@
 import { URL } from 'node:url';
-import { scpaping } from '../utils/got.js';
-import summary from '../summary.js';
+import { scpaping } from '@/utils/got.js';
+import summary from '@/summary.js';
 
 export function test(url: URL): boolean {
 	return url.hostname === 'www.amazon.com' ||
