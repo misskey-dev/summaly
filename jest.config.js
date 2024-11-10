@@ -92,6 +92,9 @@ export default {
 		// TODO: Use `--allowImportingTsExtensions` on TypeScript 5.0 so that we can
 		// directly import `.ts` files without this hack.
 		'^(\\.{1,2}/.*)\\.js$': '$1',
+
+		// Resolve @/foo/bar to `../../src/foo/bar`
+		'^@/(.*)\\.js$': '<rootDir>/src/$1',
 	},
 
 	// An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader

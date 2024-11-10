@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
 import { expect, test, describe, beforeEach, afterEach } from '@jest/globals';
-import fastify from 'fastify';
+import fastify, { type FastifyInstance } from 'fastify';
 import { summaly } from '../src/index.js';
 import { StatusError } from '../src/utils/status-error.js';
 
@@ -34,7 +34,7 @@ const host = `http://localhost:${port}`;
 // Display detail of unhandled promise rejection
 process.on('unhandledRejection', console.dir);
 
-let app: ReturnType<typeof fastify> | null = null;
+let app: FastifyInstance | null = null;
 
 afterEach(async () => {
 	if (app) {
@@ -71,7 +71,7 @@ test('basic', async () => {
 		},
 		sitename: 'localhost:3060',
 		sensitive: false,
-		url: host,
+		url: host + '/',
 		activityPub: null,
 	});
 });
@@ -83,7 +83,7 @@ test('Stage Bye Stage', async () => {
 	expect(summary).toEqual(
 		{
 			'title': '【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)',
-			'icon': 'https://www.youtube.com/s/desktop/4feff1e2/img/favicon.ico',
+			'icon': 'https://www.youtube.com/s/desktop/711fd789/img/logos/favicon.ico',
 			'description': 'Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売予定THE IDOLM@STER CINDERELLA GIRLS CG STAR...',
 			'thumbnail': 'https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg',
 			'player': {

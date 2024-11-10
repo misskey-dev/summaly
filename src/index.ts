@@ -7,7 +7,7 @@ import { got, type Agents as GotAgents } from 'got';
 import type { FastifyInstance } from 'fastify';
 import { SummalyResult } from '@/summary.js';
 import { SummalyPlugin as _SummalyPlugin } from '@/iplugin.js';
-import general, { GeneralScrapingOptions } from '@/general.js';
+import { parseGeneral, type GeneralScrapingOptions } from '@/general.js';
 import { DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, agent, setAgent } from '@/utils/got.js';
 import { plugins as builtinPlugins } from '@/plugins/index.js';
 
@@ -125,7 +125,7 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 	};
 
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-	const summary = await (match ? match.summarize : general)(_url, scrapingOptions);
+	const summary = await (match ? match.summarize : parseGeneral)(_url, scrapingOptions);
 
 	if (summary == null) {
 		throw new Error('failed summarize');

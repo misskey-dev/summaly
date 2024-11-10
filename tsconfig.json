@@ -23,7 +23,6 @@
 		"emitDecoratorMetadata": true,
 		"resolveJsonModule": true,
 		"isolatedModules": true,
-		"rootDir": "./src",
 		"baseUrl": "./",
 		"paths": {
 			"@/*": [
@@ -44,6 +43,10 @@
 	},
 	"compileOnSave": false,
 	"include": [
-		"./src/**/*.ts"
+		"./src/**/*"
 	],
+	"exclude": [
+		"node_modules",
+		"test/**/*"
+	]
 }

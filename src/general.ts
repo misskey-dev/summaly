@@ -138,8 +138,7 @@ export type GeneralScrapingOptions = {
 	contentLengthRequired?: boolean;
 }
 
-// eslint-disable-next-line import/no-default-export
-export default async (_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> => {
+export async function parseGeneral(_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> {
 	let lang = opts?.lang;
 	if (lang && !lang.match(/^[\w-]+(\s*,\s*[\w-]+)*$/)) lang = null;
 
@@ -279,4 +278,4 @@ export default async (_url: URL | string, opts?: GeneralScrapingOptions): Promis
 		sensitive,
 		activityPub,
 	};
-};
+}
