@@ -1,6 +1,6 @@
-import nullOrEmpty from './null-or-empty.js';
+import { nullOrEmpty } from './null-or-empty.js';
 
-export default function(s: string, max: number): string {
+export function clip(s: string, max: number): string {
 	if (nullOrEmpty(s)) {
 		return s;
 	}

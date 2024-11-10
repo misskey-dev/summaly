@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 import escapeRegExp from 'escape-regexp';
 
-export default function(title: string, siteName?: string | null): string {
+export function cleanupTitle(title: string, siteName?: string | null): string {
 	title = title.trim();
 
 	if (siteName) {

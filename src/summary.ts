@@ -47,6 +47,7 @@ export type SummalyResult = Summary & {
 	url: string;
 };
 
+// eslint-disable-next-line import/no-default-export
 export default Summary;
 
 export type Player = {

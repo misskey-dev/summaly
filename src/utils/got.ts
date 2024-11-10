@@ -31,10 +31,10 @@ export type GotOptions = {
 
 const repo = JSON.parse(readFileSync(`${_dirname}/../../package.json`, 'utf8'));
 
-const DEFAULT_RESPONSE_TIMEOUT = 20 * 1000;
-const DEFAULT_OPERATION_TIMEOUT = 60 * 1000;
-const DEFAULT_MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
-const DEFAULT_BOT_UA = `SummalyBot/${repo.version}`;
+export const DEFAULT_RESPONSE_TIMEOUT = 20 * 1000;
+export const DEFAULT_OPERATION_TIMEOUT = 60 * 1000;
+export const DEFAULT_MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
+export const DEFAULT_BOT_UA = `SummalyBot/${repo.version}`;
 
 export async function scpaping(
 	url: string,

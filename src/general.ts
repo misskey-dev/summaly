@@ -1,11 +1,10 @@
-import { URL } from 'node:url';
 import { decode as decodeHtml } from 'html-entities';
 import * as cheerio from 'cheerio';
-import clip from './utils/clip.js';
-import cleanupTitle from './utils/cleanup-title.js';
+import type { default as Summary, Player } from '@/summary.js';
+import { clip } from '@/utils/clip.js';
+import { cleanupTitle } from '@/utils/cleanup-title.js';
 
-import { get, head, scpaping } from './utils/got.js';
-import type { default as Summary, Player } from './summary.js';
+import { get, head, scpaping } from '@/utils/got.js';
 
 /**
  * Contains only the html snippet for a sanitized iframe as the thumbnail is
@@ -139,9 +138,8 @@ export type GeneralScrapingOptions = {
 	contentLengthRequired?: boolean;
 }
 
-export default async (_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> => {
+export async function parseGeneral(_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> {
 	let lang = opts?.lang;
-	// eslint-disable-next-line no-param-reassign
 	if (lang && !lang.match(/^[\w-]+(\s*,\s*[\w-]+)*$/)) lang = null;
 
 	const url = typeof _url === 'string' ? new URL(_url) : _url;
@@ -280,4 +278,4 @@ export default async (_url: URL | string, opts?: GeneralScrapingOptions): Promis
 		sensitive,
 		activityPub,
 	};
-};
+}

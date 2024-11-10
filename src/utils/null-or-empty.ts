@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
-export default function(val: string): boolean {
+export function nullOrEmpty(val: string): boolean {
 	if (val === undefined) {
 		return true;
 	} else if (val === null) {
