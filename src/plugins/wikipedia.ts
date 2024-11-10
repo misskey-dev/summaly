@@ -1,4 +1,3 @@
-import { URL } from 'node:url';
 import debug from 'debug';
 import { get } from '@/utils/got.js';
 import summary from '@/summary.js';

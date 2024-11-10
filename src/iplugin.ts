@@ -1,6 +1,5 @@
-import type { URL } from 'node:url';
-import Summary from '@/summary.js';
-import { GeneralScrapingOptions } from '@/general.js';
+import type Summary from '@/summary.js';
+import type { GeneralScrapingOptions } from '@/general.js';
 
 export interface SummalyPlugin {
 	test: (url: URL) => boolean;

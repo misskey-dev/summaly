@@ -1,4 +1,3 @@
-import { URL } from 'node:url';
 import general, { GeneralScrapingOptions } from '@/general.js';
 import Summary from '@/summary.js';
 
