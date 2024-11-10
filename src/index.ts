@@ -4,14 +4,13 @@
  */
 
 import { URL } from 'node:url';
-import tracer from 'trace-redirect';
-import * as Got from 'got';
+import { got, type Agents as GotAgents } from 'got';
 import type { FastifyInstance } from 'fastify';
 import { SummalyResult } from '@/summary.js';
 import { SummalyPlugin } from '@/iplugin.js';
 export * from '@/iplugin.js';
 import general, { GeneralScrapingOptions } from '@/general.js';
-import { setAgent } from '@/utils/got.js';
+import { DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, agent, setAgent } from '@/utils/got.js';
 import { plugins as builtinPlugins } from '@/plugins/index.js';
 
 export type SummalyOptions = {
@@ -33,7 +32,7 @@ export type SummalyOptions = {
 	/**
 	 * Custom HTTP agent
 	 */
-	agent?: Got.Agents;
+	agent?: GotAgents;
 
 	/**
 	 * User-Agent for the request
@@ -85,7 +84,26 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 	if (opts.followRedirects) {
 		// .catch(() => url)にすればいいけど、jestにtrace-redirectを食わせるのが面倒なのでtry-catch
 		try {
-			actualUrl = await tracer(url);
+			const timeout = opts.responseTimeout ?? DEFAULT_RESPONSE_TIMEOUT;
+			const operationTimeout = opts.operationTimeout ?? DEFAULT_OPERATION_TIMEOUT;
+			actualUrl = await got
+				.head(url, {
+					timeout: {
+						lookup: timeout,
+						connect: timeout,
+						secureConnect: timeout,
+						socket: timeout, // read timeout
+						response: timeout,
+						send: timeout,
+						request: operationTimeout, // whole operation timeout
+					},
+					agent,
+					http2: false,
+					retry: {
+						limit: 0,
+					},
+				})
+				.then(res => res.url);
 		} catch (e) {
 			actualUrl = url;
 		}
@@ -121,10 +139,10 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 // eslint-disable-next-line import/no-default-export
 export default function (fastify: FastifyInstance, options: SummalyOptions, done: (err?: Error) => void) {
 	fastify.get<{
-        Querystring: {
-				url?: string;
-				lang?: string;
-			};
+		Querystring: {
+			url?: string;
+			lang?: string;
+		};
 	}>('/', async (req, reply) => {
 		const url = req.query.url as string;
 		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
