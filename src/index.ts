@@ -6,13 +6,13 @@
 import { URL } from 'node:url';
 import tracer from 'trace-redirect';
 import * as Got from 'got';
+import type { FastifyInstance } from 'fastify';
 import { SummalyResult } from '@/summary.js';
 import { SummalyPlugin } from '@/iplugin.js';
 export * from '@/iplugin.js';
 import general, { GeneralScrapingOptions } from '@/general.js';
 import { setAgent } from '@/utils/got.js';
 import { plugins as builtinPlugins } from '@/plugins/index.js';
-import type { FastifyInstance } from 'fastify';
 
 export type SummalyOptions = {
 	/**
@@ -118,6 +118,7 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 	});
 };
 
+// eslint-disable-next-line import/no-default-export
 export default function (fastify: FastifyInstance, options: SummalyOptions, done: (err?: Error) => void) {
 	fastify.get<{
         Querystring: {

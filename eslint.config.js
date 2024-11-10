@@ -3,7 +3,7 @@ import tsParser from '@typescript-eslint/parser';
 
 //@ts-check
 /** @type {import('eslint').Linter.Config[]}  */
-export default [
+export default [ // eslint-disable-line import/no-default-export
 	...pluginMisskey.configs['recommended'],
 	{
 		ignores: [
@@ -23,7 +23,11 @@ export default [
 				sourceType: 'module',
 				tsConfigRootDir: import.meta.dirname,	
 			},
-		}
+		},
+		rules: {
+			// 空文字でもフォールバックしたいので無効
+			'@typescript-eslint/prefer-nullish-coalescing': 'off',
+		},
 	},
 	{
 		files: ['**/*.js', '**/*.cjs'],
