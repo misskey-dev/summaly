@@ -3,15 +3,15 @@
  * https://github.com/misskey-dev/summaly
  */
 
-import { URL } from 'node:url';
 import { got, type Agents as GotAgents } from 'got';
 import type { FastifyInstance } from 'fastify';
 import { SummalyResult } from '@/summary.js';
-import { SummalyPlugin } from '@/iplugin.js';
-export * from '@/iplugin.js';
+import { SummalyPlugin as _SummalyPlugin } from '@/iplugin.js';
 import general, { GeneralScrapingOptions } from '@/general.js';
 import { DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, agent, setAgent } from '@/utils/got.js';
 import { plugins as builtinPlugins } from '@/plugins/index.js';
+
+export type SummalyPlugin = _SummalyPlugin;
 
 export type SummalyOptions = {
 	/**
