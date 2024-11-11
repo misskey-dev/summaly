@@ -4,8 +4,9 @@ import { readFileSync } from 'node:fs';
 import got, * as Got from 'got';
 import * as cheerio from 'cheerio';
 import PrivateIp from 'private-ip';
-import { StatusError } from './status-error.js';
-import { detectEncoding, toUtf8 } from './encoding.js';
+import { StatusError } from '@/utils/status-error.js';
+import { detectEncoding, toUtf8 } from '@/utils/encoding.js';
+import type { GeneralScrapingOptions } from '@/general.js';
 
 const _filename = fileURLToPath(import.meta.url);
 const _dirname = dirname(_filename);
@@ -36,23 +37,13 @@ export const DEFAULT_OPERATION_TIMEOUT = 60 * 1000;
 export const DEFAULT_MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
 export const DEFAULT_BOT_UA = `SummalyBot/${repo.version}`;
 
-export async function scpaping(
-	url: string,
-	opts?: {
-		lang?: string;
-		userAgent?: string;
-		responseTimeout?: number;
-		operationTimeout?: number;
-		contentLengthLimit?: number;
-		contentLengthRequired?: boolean;
-	},
-) {
-	const args: Omit<GotOptions, 'method'> = {
+export function getGotOptions(url: string, opts?: GeneralScrapingOptions): Omit<GotOptions, 'method'> {
+	return {
 		url,
 		headers: {
 			'accept': 'text/html,application/xhtml+xml',
 			'user-agent': opts?.userAgent ?? DEFAULT_BOT_UA,
-			'accept-language': opts?.lang,
+			'accept-language': opts?.lang ?? undefined,
 		},
 		typeFilter: /^(text\/html|application\/xhtml\+xml)/,
 		responseTimeout: opts?.responseTimeout,
@@ -60,6 +51,13 @@ export async function scpaping(
 		contentLengthLimit: opts?.contentLengthLimit,
 		contentLengthRequired: opts?.contentLengthRequired,
 	};
+}
+
+export async function scpaping(
+	url: string,
+	opts?: GeneralScrapingOptions,
+) {
+	const args = getGotOptions(url, opts);
 
 	const headResponse = await getResponse({
 		...args,
