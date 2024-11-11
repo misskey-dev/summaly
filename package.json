@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "eslint": "eslint",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent=false --verbose false",
     "serve": "fastify start ./built/index.js"
@@ -37,6 +37,7 @@
     "fastify": "^5.1.0",
     "fastify-cli": "^7.0.1",
     "jest": "^29.7.0",
+    "tsc-alias": "^1.8.10",
     "typescript": "5.6.3"
   },
   "dependencies": {
