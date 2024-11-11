@@ -110,7 +110,7 @@ export async function head(url: string) {
 	});
 }
 
-async function getResponse(args: GotOptions) {
+export async function getResponse(args: GotOptions) {
 	const timeout = args.responseTimeout ?? DEFAULT_RESPONSE_TIMEOUT;
 	const operationTimeout = args.operationTimeout ?? DEFAULT_OPERATION_TIMEOUT;
 
