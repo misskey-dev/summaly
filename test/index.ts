@@ -12,7 +12,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
-import { expect, test, describe, beforeEach, afterEach } from '@jest/globals';
+import { expect, test, describe, beforeEach, afterEach, xtest } from '@jest/globals';
 import fastify, { type FastifyInstance } from 'fastify';
 import { summaly } from '../src/index.js';
 import { StatusError } from '../src/utils/status-error.js';
@@ -35,6 +35,15 @@ const host = `http://localhost:${port}`;
 process.on('unhandledRejection', console.dir);
 
 let app: FastifyInstance | null = null;
+
+function skippableTest(name: string, fn: () => void) {
+	if (process.env.SKIP_NETWORK_TEST === 'true') {
+		console.log(`[SKIP] ${name}`);
+		xtest(name, fn);
+	} else {
+		test(name, fn);
+	}
+}
 
 afterEach(async () => {
 	if (app) {
@@ -76,7 +85,7 @@ test('basic', async () => {
 	});
 });
 
-test('Stage Bye Stage', async () => {
+skippableTest('Stage Bye Stage', async () => {
 	// If this test fails, you must rewrite the result data and the example in README.md.
 
 	const summary = await summaly('https://www.youtube.com/watch?v=NMIEAhH_fTU');

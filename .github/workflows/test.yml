@@ -31,4 +31,4 @@ jobs:
           pnpm build
       - name: Test
         run: |
-          pnpm test
+          SKIP_NETWORK_TEST=true pnpm test
