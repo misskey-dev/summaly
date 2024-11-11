@@ -1,4 +1,4 @@
-import { parseGeneral, type GeneralScrapingOptions } from '@/general.js';
+import { general, type GeneralScrapingOptions } from '@/general.js';
 import Summary from '@/summary.js';
 
 export function test(url: URL): boolean {
@@ -12,5 +12,5 @@ export async function summarize(url: URL, opts?: GeneralScrapingOptions): Promis
 	// Web版に強制リダイレクトすることでbranch.ioの独自ページが開くのを防ぐ
 	url.searchParams.append('$web_only', 'true');
 
-	return await parseGeneral(url, opts);
+	return await general(url, opts);
 }

@@ -138,7 +138,7 @@ export type GeneralScrapingOptions = {
 	contentLengthRequired?: boolean;
 }
 
-export async function parseGeneral(_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> {
+export async function general(_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> {
 	let lang = opts?.lang;
 	if (lang && !lang.match(/^[\w-]+(\s*,\s*[\w-]+)*$/)) lang = null;
 
@@ -152,6 +152,12 @@ export async function parseGeneral(_url: URL | string, opts?: GeneralScrapingOpt
 		contentLengthLimit: opts?.contentLengthLimit,
 		contentLengthRequired: opts?.contentLengthRequired,
 	});
+
+	return await parseGeneral(url, res);
+}
+
+export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<typeof scpaping>>): Promise<Summary | null> {
+	const url = typeof _url === 'string' ? new URL(_url) : _url;
 	const $ = res.$;
 	const twitterCard =
 		$('meta[name="twitter:card"]').attr('content') ||
