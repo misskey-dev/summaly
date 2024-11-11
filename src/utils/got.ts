@@ -4,9 +4,9 @@ import { readFileSync } from 'node:fs';
 import got, * as Got from 'got';
 import * as cheerio from 'cheerio';
 import PrivateIp from 'private-ip';
+import type { GeneralScrapingOptions } from '@/general.js';
 import { StatusError } from '@/utils/status-error.js';
 import { detectEncoding, toUtf8 } from '@/utils/encoding.js';
-import type { GeneralScrapingOptions } from '@/general.js';
 
 const _filename = fileURLToPath(import.meta.url);
 const _dirname = dirname(_filename);
