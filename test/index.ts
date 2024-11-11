@@ -531,6 +531,56 @@ describe('sensitive', () => {
 		await app.listen({ port });
 		expect((await summaly(host)).sensitive).toBe(true);
 	});
+
+	test('meta rating adult', async () => {
+		app = fastify();
+		app.get('/', (request, reply) => {
+			const content = fs.readFileSync(_dirname + '/htmls/meta-adult-sensitive.html');
+			reply.header('content-length', content.length);
+			reply.header('content-type', 'text/html');
+			return reply.send(content);
+		});
+		await app.listen({ port });
+		expect((await summaly(host)).sensitive).toBe(true);
+	});
+
+	test('meta rating rta', async () => {
+		app = fastify();
+		app.get('/', (request, reply) => {
+			const content = fs.readFileSync(_dirname + '/htmls/meta-rta-sensitive.html');
+			reply.header('content-length', content.length);
+			reply.header('content-type', 'text/html');
+			return reply.send(content);
+		});
+		await app.listen({ port });
+		expect((await summaly(host)).sensitive).toBe(true);
+	});
+
+	test('HTTP Header rating adult', async () => {
+		app = fastify();
+		app.get('/', (request, reply) => {
+			const content = fs.readFileSync(_dirname + '/htmls/basic.html');
+			reply.header('content-length', content.length);
+			reply.header('content-type', 'text/html');
+			reply.header('rating', 'adult');
+			return reply.send(content);
+		});
+		await app.listen({ port });
+		expect((await summaly(host)).sensitive).toBe(true);
+	});
+
+	test('HTTP Header rating rta', async () => {
+		app = fastify();
+		app.get('/', (request, reply) => {
+			const content = fs.readFileSync(_dirname + '/htmls/basic.html');
+			reply.header('content-length', content.length);
+			reply.header('content-type', 'text/html');
+			reply.header('rating', 'RTA-5042-1996-1400-1577-RTA');
+			return reply.send(content);
+		});
+		await app.listen({ port });
+		expect((await summaly(host)).sensitive).toBe(true);
+	});
 });
 
 describe('UserAgent', () => {
