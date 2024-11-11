@@ -79,7 +79,9 @@ test('basic', async () => {
 test('Stage Bye Stage', async () => {
 	// If this test fails, you must rewrite the result data and the example in README.md.
 
-	const summary = await summaly('https://www.youtube.com/watch?v=NMIEAhH_fTU');
+	const summary = await summaly('https://www.youtube.com/watch?v=NMIEAhH_fTU', {
+		userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+	});
 	expect(summary).toEqual(
 		{
 			'title': '【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)',
