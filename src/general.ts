@@ -156,6 +156,18 @@ export async function general(_url: URL | string, opts?: GeneralScrapingOptions)
 	return await parseGeneral(url, res);
 }
 
+function headerEqualValueContains(search: string, headerValue: string | string[] | undefined) {
+	if (!headerValue) {
+		return false;
+	}
+
+	if (Array.isArray(headerValue)) {
+		return headerValue.some(value => value.toLowerCase() === search.toLowerCase());
+	}
+
+	return headerValue.toLowerCase() === search.toLowerCase();
+}
+
 export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<typeof scpaping>>): Promise<Summary | null> {
 	const url = typeof _url === 'string' ? new URL(_url) : _url;
 	const $ = res.$;
@@ -241,7 +253,11 @@ export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<t
 
 	// https://developer.mixi.co.jp/connect/mixi_plugin/mixi_check/spec_mixi_check/#toc-18-
 	const sensitive =
-		$('meta[property=\'mixi:content-rating\']').attr('content') === '1';
+		$('meta[property=\'mixi:content-rating\']').attr('content') === '1' ||
+		headerEqualValueContains('adult', res.response.headers.rating) ||
+		headerEqualValueContains('RTA-5042-1996-1400-1577-RTA', res.response.headers.rating) ||
+		$('meta[name=\'rating\']').attr('content') === 'adult' ||
+		$('meta[name=\'rating\']').attr('content')?.toUpperCase() === 'RTA-5042-1996-1400-1577-RTA';
 
 	const find = async (path: string) => {
 		const target = new URL(path, url.href);

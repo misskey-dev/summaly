@@ -1,5 +1,6 @@
 (unreleased)
 ------------------
+* センシティブフラグの判定を `<meta property="rating">` および `rating` ヘッダでも行うように
 * Bluesky（bsky.app）のプレビューに対応
 * 依存関係の更新
 * eslintの設定を更新
