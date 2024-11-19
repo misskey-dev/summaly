@@ -11,6 +11,9 @@ importers:
       cheerio:
         specifier: 1.0.0
         version: 1.0.0
+      encoding-japanese:
+        specifier: ^2.2.0
+        version: 2.2.0
       escape-regexp:
         specifier: 0.0.1
         version: 0.0.1
@@ -48,6 +51,9 @@ importers:
       '@types/debug':
         specifier: 4.1.12
         version: 4.1.12
+      '@types/encoding-japanese':
+        specifier: ^2.2.1
+        version: 2.2.1
       '@types/escape-regexp':
         specifier: ^0.0.3
         version: 0.0.3
@@ -573,6 +579,9 @@ packages:
   '@types/debug@4.1.12':
     resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
 
+  '@types/encoding-japanese@2.2.1':
+    resolution: {integrity: sha512-6jjepuTusvySxMLP7W6usamlbgf0F4sIDvm7EzYePjLHY7zWUv4yz2PLUnu0vuNVtXOTLu2cRdFcDg40J5Owsw==}
+
   '@types/escape-regexp@0.0.3':
     resolution: {integrity: sha512-FQMYUxaf1dVeWLUzJFSvfdDugfOpDyM13p67QfyMdagxSkBa689opkr/q9uR/VWyrWrl0jAyQaSPKxX9MpAXFw==}
 
@@ -1050,6 +1059,10 @@ packages:
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
+
+  encoding-japanese@2.2.0:
+    resolution: {integrity: sha512-EuJWwlHPZ1LbADuKTClvHtwbaFn4rOD+dRAbWysqEOXRc2Uui0hJInNJrsdH0c+OhJA4nrCBdSkW4DD5YxAo6A==}
+    engines: {node: '>=8.10.0'}
 
   encoding-sniffer@0.2.0:
     resolution: {integrity: sha512-ju7Wq1kg04I3HtiYIOrUrdfdDvkyO9s5XM8QAj/bN61Yo/Vb4vgJxy5vi4Yxk01gWHbrofpPtpxM8bKger9jhg==}
@@ -3100,6 +3113,8 @@ snapshots:
     dependencies:
       '@types/ms': 0.7.34
 
+  '@types/encoding-japanese@2.2.1': {}
+
   '@types/escape-regexp@0.0.3': {}
 
   '@types/estree@1.0.6': {}
@@ -3655,6 +3670,8 @@ snapshots:
   emittery@0.13.1: {}
 
   emoji-regex@8.0.0: {}
+
+  encoding-japanese@2.2.0: {}
 
   encoding-sniffer@0.2.0:
     dependencies:
