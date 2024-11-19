@@ -27,6 +27,7 @@
     "@swc/jest": "^0.2.37",
     "@types/cheerio": "0.22.35",
     "@types/debug": "4.1.12",
+    "@types/encoding-japanese": "^2.2.1",
     "@types/escape-regexp": "^0.0.3",
     "@types/node": "22.9.0",
     "@typescript-eslint/eslint-plugin": "^7.17.0",
@@ -42,6 +43,7 @@
   },
   "dependencies": {
     "cheerio": "1.0.0",
+    "encoding-japanese": "^2.2.0",
     "escape-regexp": "0.0.1",
     "got": "^14.4.4",
     "html-entities": "2.5.2",

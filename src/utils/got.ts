@@ -77,7 +77,7 @@ export async function scpaping(
 		method: 'GET',
 	});
 
-	const encoding = detectEncoding(response.rawBody);
+	const encoding = detectEncoding(response);
 	const body = toUtf8(response.rawBody, encoding);
 	const $ = cheerio.load(body);
 
