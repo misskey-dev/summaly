@@ -152,7 +152,7 @@ export default function (fastify: FastifyInstance, options: SummalyOptions, done
 			});
 		}
 
-		reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=86400, stale-if-error=43200');
+		reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=43200, immutable');
 
 		try {
 			const summary = await summaly(url, {
