@@ -136,7 +136,7 @@ export type GeneralScrapingOptions = {
 	operationTimeout?: number;
 	contentLengthLimit?: number;
 	contentLengthRequired?: boolean;
-}
+};
 
 export async function general(_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> {
 	let lang = opts?.lang;

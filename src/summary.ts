@@ -42,7 +42,7 @@ type Summary = {
 	/**
 	* The @ handle of a fediverse user (https://blog.joinmastodon.org/2024/07/highlighting-journalism-on-mastodon/)
 	*/
- 	fediverseCreator: string | null;
+	fediverseCreator: string | null;
 };
 
 export type SummalyResult = Summary & {
