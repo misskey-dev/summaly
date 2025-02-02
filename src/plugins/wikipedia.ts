@@ -43,5 +43,6 @@ export async function summarize(url: URL): Promise<summary> {
 		},
 		sitename: 'Wikipedia',
 		activityPub: null,
+		fediverseCreator: null,
 	};
 }

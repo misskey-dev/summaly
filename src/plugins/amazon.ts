@@ -55,5 +55,6 @@ export async function summarize(url: URL): Promise<summary> {
 		},
 		sitename: 'Amazon',
 		activityPub: null,
+		fediverseCreator: null,
 	};
 }
