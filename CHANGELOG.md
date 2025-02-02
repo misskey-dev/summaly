@@ -1,4 +1,4 @@
-(unreleased)
+5.2.0 / 2025/02/xx
 ------------------
 * センシティブフラグの判定を `<meta property="rating">` および `rating` ヘッダでも行うように
 * Bluesky（bsky.app）のプレビューに対応
