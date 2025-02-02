@@ -251,6 +251,9 @@ export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<t
 	const activityPub =
 		$('link[rel="alternate"][type="application/activity+json"]').attr('href') || null;
 
+	const fediverseCreator: string | null = 
+		$('meta[name=\'fediverse:creator\']').attr('content') || null;
+
 	// https://developer.mixi.co.jp/connect/mixi_plugin/mixi_check/spec_mixi_check/#toc-18-
 	const sensitive =
 		$('meta[property=\'mixi:content-rating\']').attr('content') === '1' ||
@@ -299,5 +302,6 @@ export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<t
 		sitename: siteName || null,
 		sensitive,
 		activityPub,
+		fediverseCreator,
 	};
 }

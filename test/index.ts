@@ -73,6 +73,7 @@ test('basic', async () => {
 		sensitive: false,
 		url: host + '/',
 		activityPub: null,
+		fediverseCreator: null,
 	});
 });
 
@@ -102,6 +103,7 @@ test('Stage Bye Stage', async () => {
 			'sitename': 'YouTube',
 			'sensitive': false,
 			'activityPub': null,
+			'fediverseCreator': null,
 			'url': 'https://www.youtube.com/watch?v=NMIEAhH_fTU',
 		},
 	);
@@ -504,6 +506,36 @@ describe('ActivityPub', () => {
 
 		const summary = await summaly(host);
 		expect(summary.activityPub).toBe(null);
+	});
+});
+
+describe('Fediverse Creator', () => {
+	test('Basic', async () => {
+		app = fastify();
+		app.get('*', (request, reply) => {
+			const content = fs.readFileSync(_dirname + '/htmls/fediverse-creator.html');
+			reply.header('content-length', content.length);
+			reply.header('content-type', 'text/html');
+			return reply.send(content);
+		});
+		await app.listen({ port });
+
+		const summary = await summaly(host);
+		expect(summary.fediverseCreator).toBe('@test@example.com');
+	});
+
+	test('Null', async () => {
+		app = fastify();
+		app.get('*', (request, reply) => {
+			const content = fs.readFileSync(_dirname + '/htmls/basic.html');
+			reply.header('content-length', content.length);
+			reply.header('content-type', 'text/html');
+			return reply.send(content);
+		});
+		await app.listen({ port });
+
+		const summary = await summaly(host);
+		expect(summary.fediverseCreator).toBeNull();
 	});
 });
 
