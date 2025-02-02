@@ -28,7 +28,7 @@ export type GotOptions = {
 	operationTimeout?: number;
 	contentLengthLimit?: number;
 	contentLengthRequired?: boolean;
-}
+};
 
 const repo = JSON.parse(readFileSync(`${_dirname}/../../package.json`, 'utf8'));
 
