@@ -85,15 +85,16 @@ A Promise of an Object that contains properties below:
 
 | Property        | Type               | Description                                                |
 |:----------------|:-------------------|:-----------------------------------------------------------|
-| **title**       | *string* \| *null* | The title of the web page                                  |
-| **icon**        | *string* \| *null* | The url of the icon of the web page                        |
-| **description** | *string* \| *null* | The description of the web page                            |
-| **thumbnail**   | *string* \| *null* | The url of the thumbnail of the web page                   |
-| **sitename**    | *string* \| *null* | The name of the web site                                   |
-| **player**      | *Player*           | The player of the web page                                 |
-| **sensitive**   | *boolean*          | Whether the url is sensitive                               |
-| **activityPub** | *string* \| *null* | The url of the ActivityPub representation of that web page |
-| **url**         | *string*           | The url of the web page                                    |
+| **title**            | *string* \| *null* | The title of the web page                                  |
+| **icon**             | *string* \| *null* | The url of the icon of the web page                        |
+| **description**      | *string* \| *null* | The description of the web page                            |
+| **thumbnail**        | *string* \| *null* | The url of the thumbnail of the web page                   |
+| **sitename**         | *string* \| *null* | The name of the web site                                   |
+| **player**           | *Player*           | The player of the web page                                 |
+| **sensitive**        | *boolean*          | Whether the url is sensitive                               |
+| **activityPub**      | *string* \| *null* | The url of the ActivityPub representation of that web page |
+| **fediverseCreator** | *string* \| *null* | The pages fediverse handle                                 |
+| **url**              | *string*           | The url of the web page                                    |
 
 #### Summary
 
