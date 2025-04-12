@@ -104,7 +104,7 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 					},
 				})
 				.then(res => res.url);
-		} catch (e) {
+		} catch (err) {
 			actualUrl = url;
 		}
 	}
