@@ -14,8 +14,8 @@ import { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
 import { expect, test, describe, beforeEach, afterEach } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
-import { summaly } from '../src/index.js';
-import { StatusError } from '../src/utils/status-error.js';
+import { summaly } from '@/index.js';
+import { StatusError } from '@/utils/status-error.js';
 
 const _filename = fileURLToPath(import.meta.url);
 const _dirname = dirname(_filename);
