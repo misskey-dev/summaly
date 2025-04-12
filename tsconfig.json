@@ -43,10 +43,10 @@
 	},
 	"compileOnSave": false,
 	"include": [
-		"./src/**/*"
+		"./src/**/*",
+		"./test/**/*"
 	],
 	"exclude": [
 		"node_modules",
-		"test/**/*"
 	]
 }
