@@ -12,7 +12,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
-import { expect, test, describe, beforeEach, afterEach, xtest } from '@jest/globals';
+import { expect, test, describe, beforeEach, afterEach } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
 import { summaly } from '../src/index.js';
 import { StatusError } from '../src/utils/status-error.js';
@@ -39,7 +39,7 @@ let app: FastifyInstance | null = null;
 function skippableTest(name: string, fn: () => void) {
 	if (process.env.SKIP_NETWORK_TEST === 'true') {
 		console.log(`[SKIP] ${name}`);
-		xtest(name, fn);
+		test.skip(name, fn);
 	} else {
 		test(name, fn);
 	}
