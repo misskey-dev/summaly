@@ -127,6 +127,7 @@ export async function getResponse(args: GotOptions) {
 			send: timeout,
 			request: operationTimeout,	// whole operation timeout
 		},
+		followRedirect: args.followRedirects,
 		agent,
 		http2: false,
 		retry: {

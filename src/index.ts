@@ -119,6 +119,7 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 		lang: opts.lang,
 		userAgent: opts.userAgent,
 		responseTimeout: opts.responseTimeout,
+		followRedirects: opts.followRedirects,
 		operationTimeout: opts.operationTimeout,
 		contentLengthLimit: opts.contentLengthLimit,
 		contentLengthRequired: opts.contentLengthRequired,
