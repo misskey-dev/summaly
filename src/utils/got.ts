@@ -24,6 +24,7 @@ export type GotOptions = {
 	body?: string;
 	headers: Record<string, string | undefined>;
 	typeFilter?: RegExp;
+	followRedirects?: boolean;
 	responseTimeout?: number;
 	operationTimeout?: number;
 	contentLengthLimit?: number;
@@ -46,6 +47,7 @@ export function getGotOptions(url: string, opts?: GeneralScrapingOptions): Omit<
 			'accept-language': opts?.lang ?? undefined,
 		},
 		typeFilter: /^(text\/html|application\/xhtml\+xml)/,
+		followRedirects: opts?.followRedirects,
 		responseTimeout: opts?.responseTimeout,
 		operationTimeout: opts?.operationTimeout,
 		contentLengthLimit: opts?.contentLengthLimit,
@@ -114,6 +116,7 @@ export async function getResponse(args: GotOptions) {
 			send: timeout,
 			request: operationTimeout,	// whole operation timeout
 		},
+		followRedirect: args.followRedirects,
 		agent,
 		http2: false,
 		retry: {

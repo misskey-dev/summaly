@@ -132,6 +132,7 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 export type GeneralScrapingOptions = {
 	lang?: string | null;
 	userAgent?: string;
+	followRedirects?: boolean;
 	responseTimeout?: number;
 	operationTimeout?: number;
 	contentLengthLimit?: number;
@@ -147,6 +148,7 @@ export async function general(_url: URL | string, opts?: GeneralScrapingOptions)
 	const res = await scpaping(url.href, {
 		lang: lang || undefined,
 		userAgent: opts?.userAgent,
+		followRedirects: opts?.followRedirects,
 		responseTimeout: opts?.responseTimeout,
 		operationTimeout: opts?.operationTimeout,
 		contentLengthLimit: opts?.contentLengthLimit,
@@ -251,7 +253,7 @@ export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<t
 	const activityPub =
 		$('link[rel="alternate"][type="application/activity+json"]').attr('href') || null;
 
-	const fediverseCreator: string | null = 
+	const fediverseCreator: string | null =
 		$('meta[name=\'fediverse:creator\']').attr('content') || null;
 
 	// https://developer.mixi.co.jp/connect/mixi_plugin/mixi_check/spec_mixi_check/#toc-18-
