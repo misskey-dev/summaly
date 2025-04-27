@@ -45,6 +45,11 @@ function skippableTest(name: string, fn: () => void) {
 	}
 }
 
+beforeEach(() => {
+	// Allow private IPs by default, since a lot of the tests rely on old behvior
+	process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
+});
+
 afterEach(async () => {
 	if (app) {
 		await app.close();
@@ -93,7 +98,7 @@ skippableTest('Stage Bye Stage', async () => {
 	expect(summary).toEqual(
 		{
 			'title': '【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)',
-			'icon': 'https://www.youtube.com/s/desktop/711fd789/img/logos/favicon.ico',
+			'icon': 'https://www.youtube.com/s/desktop/78bc1359/img/logos/favicon.ico',
 			'description': 'Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売予定THE IDOLM@STER CINDERELLA GIRLS CG STAR...',
 			'thumbnail': 'https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg',
 			'player': {

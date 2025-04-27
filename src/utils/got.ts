@@ -59,17 +59,6 @@ export async function scpaping(
 ) {
 	const args = getGotOptions(url, opts);
 
-	const headResponse = await getResponse({
-		...args,
-		method: 'HEAD',
-	});
-
-	// SUMMALY_ALLOW_PRIVATE_IPはテスト用
-	const allowPrivateIp = process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
-	if (!allowPrivateIp && headResponse.ip && PrivateIp(headResponse.ip)) {
-		throw new StatusError(`Private IP rejected ${headResponse.ip}`, 400, 'Private IP Rejected');
-	}
-
 	const response = await getResponse({
 		...args,
 		method: 'GET',
@@ -133,6 +122,14 @@ export async function getResponse(args: GotOptions) {
 	});
 
 	const res = await receiveResponse({ req, opts: args });
+
+	// SUMMALY_ALLOW_PRIVATE_IPはテスト用
+	// TODO: Try moving this to receiveResponse- ATM `got` doesn't provide a means
+	// to check the IP/response header data while streaming the response...
+	const allowPrivateIp = process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
+	if (!allowPrivateIp && res.ip && PrivateIp(res.ip)) {
+		throw new StatusError(`Private IP rejected ${res.ip}`, 400, 'Private IP Rejected');
+	}
 
 	// Check html
 	const contentType = res.headers['content-type'];
