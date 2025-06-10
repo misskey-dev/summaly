@@ -8,7 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import { SummalyResult } from '@/summary.js';
 import { SummalyPlugin as _SummalyPlugin } from '@/iplugin.js';
 import { general, type GeneralScrapingOptions } from '@/general.js';
-import { DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, agent, setAgent } from '@/utils/got.js';
+import { DEFAULT_BOT_UA, DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, agent, setAgent } from '@/utils/got.js';
 import { plugins as builtinPlugins } from '@/plugins/index.js';
 
 export type SummalyPlugin = _SummalyPlugin;
@@ -88,6 +88,11 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 			const operationTimeout = opts.operationTimeout ?? DEFAULT_OPERATION_TIMEOUT;
 			actualUrl = await got
 				.head(url, {
+					headers: {
+						accept: 'text/html,application/xhtml+xml',
+						'user-agent': opts.userAgent ?? DEFAULT_BOT_UA,
+						'accept-language': opts.lang ?? undefined,
+					},
 					timeout: {
 						lookup: timeout,
 						connect: timeout,
