@@ -24,6 +24,7 @@ export type GotOptions = {
 	body?: string;
 	headers: Record<string, string | undefined>;
 	typeFilter?: RegExp;
+	followRedirects?: boolean;
 	responseTimeout?: number;
 	operationTimeout?: number;
 	contentLengthLimit?: number;
@@ -46,6 +47,7 @@ export function getGotOptions(url: string, opts?: GeneralScrapingOptions): Omit<
 			'accept-language': opts?.lang ?? undefined,
 		},
 		typeFilter: /^(text\/html|application\/xhtml\+xml)/,
+		followRedirects: opts?.followRedirects,
 		responseTimeout: opts?.responseTimeout,
 		operationTimeout: opts?.operationTimeout,
 		contentLengthLimit: opts?.contentLengthLimit,
@@ -58,17 +60,6 @@ export async function scpaping(
 	opts?: GeneralScrapingOptions,
 ) {
 	const args = getGotOptions(url, opts);
-
-	const headResponse = await getResponse({
-		...args,
-		method: 'HEAD',
-	});
-
-	// SUMMALY_ALLOW_PRIVATE_IPはテスト用
-	const allowPrivateIp = process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
-	if (!allowPrivateIp && headResponse.ip && PrivateIp(headResponse.ip)) {
-		throw new StatusError(`Private IP rejected ${headResponse.ip}`, 400, 'Private IP Rejected');
-	}
 
 	const response = await getResponse({
 		...args,
@@ -125,6 +116,7 @@ export async function getResponse(args: GotOptions) {
 			send: timeout,
 			request: operationTimeout,	// whole operation timeout
 		},
+		followRedirect: args.followRedirects,
 		agent,
 		http2: false,
 		retry: {
@@ -133,6 +125,14 @@ export async function getResponse(args: GotOptions) {
 	});
 
 	const res = await receiveResponse({ req, opts: args });
+
+	// SUMMALY_ALLOW_PRIVATE_IPはテスト用
+	// TODO: Try moving this to receiveResponse- ATM `got` doesn't provide a means
+	// to check the IP/response header data while streaming the response...
+	const allowPrivateIp = process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
+	if (!allowPrivateIp && res.ip && PrivateIp(res.ip)) {
+		throw new StatusError(`Private IP rejected ${res.ip}`, 400, 'Private IP Rejected');
+	}
 
 	// Check html
 	const contentType = res.headers['content-type'];
