@@ -10,7 +10,7 @@ export default [ // eslint-disable-line import/no-default-export
 			'**/node_modules',
 			'src/@types/package.json.d.ts',
 			'built',
-			'jest.config.js',
+			'vitest.config.ts',
 			'test',
 		],
 	},

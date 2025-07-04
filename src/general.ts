@@ -72,7 +72,7 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 			// Allow only HTTPS for best security
 			return null;
 		}
-	} catch (e) {
+	} catch {
 		return null;
 	}
 
@@ -269,7 +269,7 @@ export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<t
 		try {
 			await head(target.href);
 			return target;
-		} catch (e) {
+		} catch {
 			return null;
 		}
 	};
