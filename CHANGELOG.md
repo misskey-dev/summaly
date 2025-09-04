@@ -18,6 +18,7 @@
 5.2.0 / 2025/02/05
 ------------------
 * センシティブフラグの判定を `<meta property="rating">` および `rating` ヘッダでも行うように
+* 内蔵サーバー：レスポンスに`Cache-Control`ヘッダを含むように
 * Bluesky（bsky.app）のプレビューに対応
 * `fediverse:creator` のパースに対応
 * 依存関係の更新
