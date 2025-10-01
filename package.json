@@ -1,6 +1,6 @@
 {
   "name": "@misskey-dev/summaly",
-  "version": "5.2.3",
+  "version": "5.2.4",
   "description": "Get web page's summary",
   "author": "syuilo <syuilotan@yahoo.co.jp>",
   "license": "MIT",
@@ -9,7 +9,7 @@
   "main": "./built/index.js",
   "type": "module",
   "types": "./built/index.d.ts",
-  "packageManager": "pnpm@9.12.3",
+  "packageManager": "pnpm@9.15.9",
   "files": [
     "built",
     "LICENSE"
