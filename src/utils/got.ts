@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import got, * as Got from 'got';
 import * as cheerio from 'cheerio';
-import { parse, IPv4 } from 'ipaddr.js';
+import { parse } from 'ipaddr.js';
+import type { IPv4, IPv6 } from 'ipaddr.js';
 import type { GeneralScrapingOptions } from '@/general.js';
 import { StatusError } from '@/utils/status-error.js';
 import { detectEncoding, toUtf8 } from '@/utils/encoding.js';
@@ -131,14 +132,14 @@ export async function getResponse(args: GotOptions) {
 	// to check the IP/response header data while streaming the response...
 	const allowPrivateIp = process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
 	if (!allowPrivateIp && res.ip != null) {
-		let ip;
+		let ip: IPv4 | IPv6;
 		try {
 			ip = parse(res.ip);
 		} catch {
 			throw new StatusError(`Invalid IP ${res.ip}`, 500, 'Invalid IP');
 		}
 		if (ip.kind() === 'ipv6' && ip.range() === 'ipv4Mapped') {
-			ip = new IPv4(ip.toByteArray().slice(12, 16));
+			ip = (ip as IPv6).toIPv4Address();
 		}
 		if (ip.range() !== 'unicast') {
 			throw new StatusError(`Private IP rejected ${res.ip}`, 400, 'Private IP Rejected');
