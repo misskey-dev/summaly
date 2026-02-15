@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import got, * as Got from 'got';
 import * as cheerio from 'cheerio';
-import PrivateIp from 'private-ip';
+import { parse, IPv4 } from 'ipaddr.js';
 import type { GeneralScrapingOptions } from '@/general.js';
 import { StatusError } from '@/utils/status-error.js';
 import { detectEncoding, toUtf8 } from '@/utils/encoding.js';
@@ -130,8 +130,14 @@ export async function getResponse(args: GotOptions) {
 	// TODO: Try moving this to receiveResponse- ATM `got` doesn't provide a means
 	// to check the IP/response header data while streaming the response...
 	const allowPrivateIp = process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
-	if (!allowPrivateIp && res.ip && PrivateIp(res.ip)) {
-		throw new StatusError(`Private IP rejected ${res.ip}`, 400, 'Private IP Rejected');
+	if (!allowPrivateIp && res.ip != null) {
+		let ip = parse(res.ip);
+		if (ip.kind() === 'ipv6' && ip.range() === 'ipv4Mapped') {
+			ip = new IPv4(ip.toByteArray().slice(12, 16));
+		}
+		if (ip.range() !== 'unicast') {
+			throw new StatusError(`Private IP rejected ${res.ip}`, 400, 'Private IP Rejected');
+		}
 	}
 
 	// Check html
