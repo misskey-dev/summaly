@@ -138,7 +138,7 @@ export async function getResponse(args: GotOptions) {
 		} catch {
 			throw new StatusError(`Invalid IP ${res.ip}`, 500, 'Invalid IP');
 		}
-		if (ip.kind() === 'ipv6' && ip.range() === 'ipv4Mapped') {
+		if (ip.kind() === 'ipv6' && (ip as IPv6).isIPv4MappedAddress()) {
 			ip = (ip as IPv6).toIPv4Address();
 		}
 		if (ip.range() !== 'unicast') {
