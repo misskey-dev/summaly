@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import got, * as Got from 'got';
 import * as cheerio from 'cheerio';
-import { parse } from 'ipaddr.js';
+import ipaddr from 'ipaddr.js';
 import type { IPv4, IPv6 } from 'ipaddr.js';
 import type { GeneralScrapingOptions } from '@/general.js';
 import { StatusError } from '@/utils/status-error.js';
@@ -137,7 +137,7 @@ export async function getResponse(args: GotOptions) {
 	if (!allowPrivateIp && res.ip != null) {
 		let ip: IPv4 | IPv6;
 		try {
-			ip = parse(res.ip);
+			ip = ipaddr.parse(res.ip);
 		} catch {
 			throw new StatusError(`Invalid IP ${res.ip}`, 500, 'Invalid IP');
 		}
