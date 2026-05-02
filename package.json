@@ -29,8 +29,8 @@
     "@typescript-eslint/parser": "8.59.1",
     "eslint": "9.39.2",
     "eslint-plugin-import": "2.32.0",
-		"fastify": "5.8.5",
-  	"fastify-cli": "8.0.0",
+    "fastify": "5.8.5",
+    "fastify-cli": "8.0.0",
     "rolldown": "1.0.0-rc.18",
     "tsdown": "0.21.10",
     "typescript": "6.0.3",
@@ -45,7 +45,7 @@
     "iconv-lite": "0.7.2",
     "ipaddr.js": "2.3.0"
   },
-	"optionalDependencies": {
-		"fastify": "5.8.5"
-	}
+  "optionalDependencies": {
+    "fastify": "5.8.5"
+  }
 }
