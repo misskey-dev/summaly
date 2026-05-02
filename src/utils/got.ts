@@ -1,6 +1,3 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
 import got, * as Got from 'got';
 import * as cheerio from 'cheerio';
 import ipaddr from 'ipaddr.js';
@@ -8,9 +5,6 @@ import type { IPv4, IPv6 } from 'ipaddr.js';
 import type { GeneralScrapingOptions } from '@/general.js';
 import { StatusError } from '@/utils/status-error.js';
 import { detectEncoding, toUtf8 } from '@/utils/encoding.js';
-
-const _filename = fileURLToPath(import.meta.url);
-const _dirname = dirname(_filename);
 
 export let agent: Got.Agents = {};
 
@@ -32,12 +26,10 @@ export type GotOptions = {
 	contentLengthRequired?: boolean;
 };
 
-const repo = JSON.parse(readFileSync(`${_dirname}/../../package.json`, 'utf8'));
-
 export const DEFAULT_RESPONSE_TIMEOUT = 20 * 1000;
 export const DEFAULT_OPERATION_TIMEOUT = 60 * 1000;
 export const DEFAULT_MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
-export const DEFAULT_BOT_UA = `SummalyBot/${repo.version}`;
+export const DEFAULT_BOT_UA = `SummalyBot/${_VERSION_}`;
 
 export function getGotOptions(url: string, opts?: GeneralScrapingOptions): Omit<GotOptions, 'method'> {
 	return {

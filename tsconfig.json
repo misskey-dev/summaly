@@ -9,9 +9,9 @@
 		"noFallthroughCasesInSwitch": true,
 		"declaration": true,
 		"sourceMap": false,
-		"target": "es2021",
-		"module": "nodenext",
-		"moduleResolution": "nodenext",
+		"target": "esnext",
+		"module": "esnext",
+		"moduleResolution": "bundler",
 		"allowSyntheticDefaultImports": true,
 		"removeComments": false,
 		"noLib": false,
@@ -23,7 +23,6 @@
 		"emitDecoratorMetadata": true,
 		"resolveJsonModule": true,
 		"isolatedModules": true,
-		"rootDir": "./src",
 		"paths": {
 			"@/*": [
 				"./src/*"
@@ -43,6 +42,7 @@
 	},
 	"compileOnSave": false,
 	"include": [
+		"./tsdown.config.ts",
 		"./src/**/*"
 	],
 	"exclude": [
