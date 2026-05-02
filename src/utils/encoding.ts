@@ -1,5 +1,5 @@
 import * as iconv from 'iconv-lite';
-import * as jschardet from 'jschardet';
+import { detect } from 'chardet';
 
 const regCharset = new RegExp(/charset\s*=\s*["']?([\w-]+)/, 'i');
 
@@ -8,18 +8,17 @@ const regCharset = new RegExp(/charset\s*=\s*["']?([\w-]+)/, 'i');
  * @param body Body in Buffer
  * @returns encoding
  */
-export function detectEncoding(body: Buffer): string {
+export function detectEncoding(body: Uint8Array): string {
 	// By detection
-	const detected = jschardet.detect(body, { minimumThreshold: 0.99 });
+	const detected = detect(body);
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	if (detected) {
-		const candicate = detected.encoding;
-		const encoding = toEncoding(candicate);
+		const encoding = toEncoding(detected);
 		if (encoding != null) return encoding;
 	}
 
 	// From meta
-	const matchMeta = body.toString('ascii').match(regCharset);
+	const matchMeta = body.toString().match(regCharset);
 	if (matchMeta) {
 		const candicate = matchMeta[1];
 		const encoding = toEncoding(candicate);
@@ -29,7 +28,7 @@ export function detectEncoding(body: Buffer): string {
 	return 'utf-8';
 }
 
-export function toUtf8(body: Buffer, encoding: string): string {
+export function toUtf8(body: Uint8Array, encoding: string): string {
 	return iconv.decode(body, encoding);
 }
 

@@ -104,6 +104,8 @@ export async function getResponse(args: GotOptions) {
 	const timeout = args.responseTimeout ?? DEFAULT_RESPONSE_TIMEOUT;
 	const operationTimeout = args.operationTimeout ?? DEFAULT_OPERATION_TIMEOUT;
 
+	const abort = new AbortController();
+
 	const req = got<string>(args.url, {
 		method: args.method,
 		headers: args.headers,
@@ -123,9 +125,10 @@ export async function getResponse(args: GotOptions) {
 		retry: {
 			limit: 0,
 		},
+		signal: abort.signal,
 	});
 
-	const res = await receiveResponse({ req, opts: args });
+	const res = await receiveResponse({ req, opts: args, abort });
 
 	// SUMMALY_ALLOW_PRIVATE_IPはテスト用
 	// TODO: Try moving this to receiveResponse- ATM `got` doesn't provide a means
@@ -170,8 +173,9 @@ export async function getResponse(args: GotOptions) {
 }
 
 async function receiveResponse<T>(args: {
-	req: Got.CancelableRequest<Got.Response<T>>,
+	req: Got.RequestPromise<Got.Response<T>>,
 	opts: GotOptions,
+	abort: AbortController,
 }) {
 	const req = args.req;
 	const maxSize = args.opts.contentLengthLimit ?? DEFAULT_MAX_RESPONSE_SIZE;
@@ -179,12 +183,17 @@ async function receiveResponse<T>(args: {
 	// 受信中のデータでサイズチェック
 	req.on('downloadProgress', (progress: Got.Progress) => {
 		if (progress.transferred > maxSize && progress.percent !== 1) {
-			req.cancel(`maxSize exceeded (${progress.transferred} > ${maxSize}) on response`);
+			args.abort.abort(`maxSize exceeded (${progress.transferred} > ${maxSize}) on response`);
 		}
 	});
 
 	// 応答取得 with ステータスコードエラーの整形
 	const res = await req.catch(e => {
+		const abortReason = args.abort.signal.reason;
+		if (args.abort.signal.aborted && typeof abortReason === 'string' && abortReason.length > 0) {
+			throw new Error(abortReason);
+		}
+
 		if (e instanceof Got.HTTPError) {
 			throw new StatusError(`${e.response.statusCode} ${e.response.statusMessage}`, e.response.statusCode, e.response.statusMessage);
 		} else {

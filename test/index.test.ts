@@ -9,6 +9,7 @@
 import fs, { readdirSync } from 'node:fs';
 import process from 'node:process';
 import { dirname } from 'node:path';
+import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
@@ -697,6 +698,22 @@ describe('local tests', () => {
 			await app.listen({ port });
 
 			await expect(summaly(host, { contentLengthLimit: content.byteLength - 1 })).rejects.toThrow();
+		});
+
+		test('content-lengthなしのストリーム受信中に上限を超えるとエラーになること', async () => {
+			const chunk = Buffer.alloc(32, 'a');
+
+			app = fastify();
+			app.get('/', (request, reply) => {
+				reply.header('content-type', 'text/html');
+				return reply.send(Readable.from((async function* () {
+					yield chunk;
+					yield chunk;
+				})()));
+			});
+			await app.listen({ port });
+
+			await expect(summaly(host, { contentLengthLimit: 16 })).rejects.toThrow(/maxSize exceeded \(\d+ > 16\) on response/);
 		});
 	});
 
