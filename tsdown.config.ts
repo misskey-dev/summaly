@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'tsdown';
-import { replacePlugin } from 'rolldown/plugins';
 
 export default defineConfig({
 	entry: './src/index.ts',
@@ -11,9 +10,7 @@ export default defineConfig({
 		skipNodeModulesBundle: true,
 	},
 	outDir: './built',
-	plugins: [
-		replacePlugin({
-			_VERSION_: JSON.stringify(JSON.parse(readFileSync('./package.json', 'utf-8')).version),
-		}),
-	],
+	define: {
+		_VERSION_: JSON.stringify(JSON.parse(readFileSync('./package.json', 'utf-8')).version),
+	},
 });
