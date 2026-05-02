@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs';
 import { defineConfig } from 'tsdown';
 import { replacePlugin } from 'rolldown/plugins';
 
-
-
 export default defineConfig({
 	entry: './src/index.ts',
 	outExtensions: (_) => ({ js: '.js', dts: '.d.ts' }),
