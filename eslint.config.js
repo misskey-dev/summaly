@@ -11,6 +11,7 @@ export default [ // eslint-disable-line import/no-default-export
 			'src/@types/package.json.d.ts',
 			'built',
 			'vitest.config.ts',
+			'tsdown.config.ts',
 			'test',
 		],
 	},
@@ -21,7 +22,7 @@ export default [ // eslint-disable-line import/no-default-export
 				parser: tsParser,
 				project: ['./tsconfig.json', './test/tsconfig.json'],
 				sourceType: 'module',
-				tsConfigRootDir: import.meta.dirname,	
+				tsConfigRootDir: import.meta.dirname,
 			},
 		},
 		rules: {
