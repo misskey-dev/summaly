@@ -23,10 +23,10 @@
 		"emitDecoratorMetadata": true,
 		"resolveJsonModule": true,
 		"isolatedModules": true,
-		"baseUrl": "./../",
+		"rootDir": "../",
 		"paths": {
 			"@/*": [
-				"./src/*"
+				"../src/*"
 			]
 		},
 		"outDir": "./built",
