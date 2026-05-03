@@ -33,7 +33,7 @@ export function toUtf8(body: Uint8Array, encoding: string): string {
 	try {
 		const decoder = encoding === 'utf-8' ? utf8TextDecoder : new TextDecoder(encoding, { fatal: true });
 		return decoder.decode(body);
-	} catch (e) {
+	} catch {
 		// フォールバック
 		return utf8TextDecoder.decode(body);
 	}
