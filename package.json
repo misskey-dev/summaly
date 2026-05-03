@@ -41,7 +41,6 @@
     "escape-regexp": "0.0.1",
     "got": "15.0.3",
     "html-entities": "2.6.0",
-    "iconv-lite": "0.7.2",
     "ipaddr.js": "2.3.0"
   },
   "optionalDependencies": {

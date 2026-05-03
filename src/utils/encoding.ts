@@ -1,4 +1,3 @@
-import * as iconv from 'iconv-lite';
 import { detect } from 'chardet';
 
 const regCharset = new RegExp(/charset\s*=\s*["']?([\w-]+)/, 'i');
@@ -13,30 +12,28 @@ export function detectEncoding(body: Uint8Array): string {
 	const detected = detect(body);
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	if (detected) {
-		const encoding = toEncoding(detected);
-		if (encoding != null) return encoding;
+		return detected.toLowerCase();
 	}
 
 	// From meta
 	const matchMeta = body.toString().match(regCharset);
 	if (matchMeta) {
 		const candicate = matchMeta[1];
-		const encoding = toEncoding(candicate);
-		if (encoding != null) return encoding;
+		if (candicate) {
+			return candicate.toLowerCase();
+		}
 	}
 
 	return 'utf-8';
 }
 
 export function toUtf8(body: Uint8Array, encoding: string): string {
-	return iconv.decode(body, encoding);
-}
-
-function toEncoding(candicate: string): string | null {
-	if (iconv.encodingExists(candicate)) {
-		if (['shift_jis', 'shift-jis', 'windows-31j', 'x-sjis'].includes(candicate.toLowerCase())) return 'cp932';
-		return candicate;
-	} else {
-		return null;
+	try {
+		const decoder = new TextDecoder(encoding, { fatal: true });
+		return decoder.decode(body);
+	} catch (e) {
+		// フォールバック
+		const decoder = new TextDecoder('utf-8', { fatal: false });
+		return decoder.decode(body);
 	}
 }
