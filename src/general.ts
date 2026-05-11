@@ -206,6 +206,11 @@ export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<t
 
 	image = image ? (new URL(image, url.href)).href : null;
 
+	const thumbnailStyle =
+		twitterCard === 'summary_large_image' ? 'summary_large_image' :
+		twitterCard === 'summary' ? 'summary' :
+		null;
+
 	const playerUrl =
 		(twitterCard !== 'summary_large_image' && $('meta[name="twitter:player"]').attr('content')) ||
 		(twitterCard !== 'summary_large_image' && $('meta[property="twitter:player"]').attr('content')) ||
@@ -295,6 +300,7 @@ export async function parseGeneral(_url: URL | string, res: Awaited<ReturnType<t
 		icon: icon?.href || null,
 		description: description || null,
 		thumbnail: image || null,
+		thumbnailStyle,
 		player: oEmbed ?? {
 			url: playerUrl || null,
 			width: Number.isNaN(playerWidth) ? null : playerWidth,

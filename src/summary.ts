@@ -20,6 +20,11 @@ type Summary = {
 	thumbnail: string | null;
 
 	/**
+	 * The display style of the thumbnail of that web page
+	 */
+	thumbnailStyle: 'summary' | 'summary_large_image' | null;
+
+	/**
 	 * The name of site of that web page
 	 */
 	sitename: string | null;
@@ -38,7 +43,7 @@ type Summary = {
 	 * The url of the ActivityPub representation of that web page
 	 */
 	activityPub: string | null;
-	
+
 	/**
 	* The @ handle of a fediverse user (https://blog.joinmastodon.org/2024/07/highlighting-journalism-on-mastodon/)
 	*/
