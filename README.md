@@ -89,6 +89,7 @@ A Promise of an Object that contains properties below:
 | **icon**             | *string* \| *null* | The url of the icon of the web page                        |
 | **description**      | *string* \| *null* | The description of the web page                            |
 | **thumbnail**        | *string* \| *null* | The url of the thumbnail of the web page                   |
+| **thumbnailStyle**   | *"summary"* \| *"summary_large_image"* \| *null* | The display style of the thumbnail                         |
 | **sitename**         | *string* \| *null* | The name of the web site                                   |
 | **player**           | *Player*           | The player of the web page                                 |
 | **sensitive**        | *boolean*          | Whether the url is sensitive                               |
@@ -135,9 +136,10 @@ will be ... ↓
 ```json
 {
 	"title": "【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)",
-	"icon": "https://www.youtube.com/s/desktop/711fd789/img/logos/favicon.ico",
+	"icon": "https://www.youtube.com/s/desktop/14cba078/img/favicon.ico",
 	"description": "Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売予定THE IDOLM@STER CINDERELLA GIRLS CG STAR...",
 	"thumbnail": "https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg",
+	"thumbnailStyle": null,
 	"player": {
 		"url": "https://www.youtube.com/embed/NMIEAhH_fTU?feature=oembed",
 		"width": 200,
@@ -154,6 +156,7 @@ will be ... ↓
 	"sitename": "YouTube",
 	"sensitive": false,
 	"activityPub": null,
+	"fediverseCreator": null,
 	"url": "https://www.youtube.com/watch?v=NMIEAhH_fTU"
 }
 ```

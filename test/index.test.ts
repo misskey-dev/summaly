@@ -61,9 +61,10 @@ describe('network tests', () => {
 		expect(summary).toEqual(
 			{
 				'title': '【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)',
-				'icon': 'https://www.youtube.com/s/desktop/78bc1359/img/logos/favicon.ico',
+				'icon': 'https://www.youtube.com/s/desktop/14cba078/img/favicon.ico',
 				'description': 'Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売予定THE IDOLM@STER CINDERELLA GIRLS CG STAR...',
 				'thumbnail': 'https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg',
+				'thumbnailStyle': null,
 				'player': {
 					'url': 'https://www.youtube.com/embed/NMIEAhH_fTU?feature=oembed',
 					'width': 200,
@@ -128,6 +129,7 @@ describe('local tests', () => {
 			icon: null,
 			description: null,
 			thumbnail: null,
+			thumbnailStyle: null,
 			player: {
 				url: null,
 				width: null,
@@ -335,6 +337,25 @@ describe('local tests', () => {
 
 			const summary = await summaly(host);
 			expect(summary.thumbnail).toBe('https://himasaku.net/himasaku.png');
+		});
+
+		test.each([
+			['missing', 'basic.html', null],
+			['summary', 'twitter-card-summary.html', 'summary'],
+			['summary_large_image', 'twitter-card-summary-large-image.html', 'summary_large_image'],
+			['unsupported', 'twitter-card-player.html', null],
+		])('thumbnailStyle: %s', async (_label, html, expected) => {
+			app = fastify();
+			app.get('/', (request, reply) => {
+				const content = fs.readFileSync(_dirname + `/htmls/${html}`);
+				reply.header('content-length', content.length);
+				reply.header('content-type', 'text/html');
+				return reply.send(content);
+			});
+			await app.listen({ port });
+
+			const summary = await summaly(host);
+			expect(summary.thumbnailStyle).toBe(expected);
 		});
 
 		test('Player detection - PeerTube:video => video', async () => {
