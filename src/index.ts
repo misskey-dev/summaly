@@ -160,6 +160,8 @@ export default function (fastify: FastifyInstance, options: SummalyOptions, done
 			});
 		}
 
+		reply.header('Cache-Control', 'public, max-age=86400, stale-while-revalidate=43200');
+
 		try {
 			const summary = await summaly(url, {
 				lang: req.query.lang as string,
