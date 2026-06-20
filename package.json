@@ -9,7 +9,7 @@
   "main": "./built/index.js",
   "type": "module",
   "types": "./built/index.d.ts",
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@11.6.0",
   "files": [
     "built",
     "LICENSE"
@@ -25,21 +25,21 @@
     "@types/debug": "4.1.13",
     "@types/escape-regexp": "0.0.3",
     "@types/node": "24.10.13",
-    "@typescript-eslint/eslint-plugin": "8.59.1",
-    "@typescript-eslint/parser": "8.59.1",
+    "@typescript-eslint/eslint-plugin": "8.61.0",
+    "@typescript-eslint/parser": "8.61.0",
     "eslint": "9.39.2",
     "eslint-plugin-import": "2.32.0",
     "fastify": "5.8.5",
     "fastify-cli": "8.0.0",
-    "tsdown": "0.21.10",
+    "tsdown": "0.22.2",
     "typescript": "6.0.3",
-    "vitest": "4.1.5"
+    "vitest": "4.1.8"
   },
   "dependencies": {
     "chardet": "2.1.1",
     "cheerio": "1.2.0",
     "escape-regexp": "0.0.1",
-    "got": "15.0.3",
+    "got": "15.0.5",
     "html-entities": "2.6.0",
     "ipaddr.js": "2.4.0"
   },
