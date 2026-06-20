@@ -72,7 +72,7 @@ export const summalyDefaultOptions = {
 	plugins: [],
 } as SummalyOptions;
 
-export const version = _VERSION_;
+export const version = _VERSION_ as string;
 
 /**
  * Summarize an web page
