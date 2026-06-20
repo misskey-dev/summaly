@@ -6,6 +6,8 @@ summaly
 [![][himawari-badge]][himasaku]
 [![][sakurako-badge]][himasaku]
 
+Get summary of web page.
+
 Installation
 ----------------------------------------------------------------
 ```
