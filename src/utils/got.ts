@@ -29,7 +29,7 @@ export type GotOptions = {
 export const DEFAULT_RESPONSE_TIMEOUT = 20 * 1000;
 export const DEFAULT_OPERATION_TIMEOUT = 60 * 1000;
 export const DEFAULT_MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
-export const DEFAULT_BOT_UA = `SummalyBot/${_VERSION_}`;
+export const DEFAULT_BOT_UA = `SummalyBot/${_VERSION_} (+https://github.com/misskey-dev/summaly/blob/master/README.md)`;
 
 export function getGotOptions(url: string, opts?: GeneralScrapingOptions): Omit<GotOptions, 'method'> {
 	return {
