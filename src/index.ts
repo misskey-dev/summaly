@@ -72,6 +72,8 @@ export const summalyDefaultOptions = {
 	plugins: [],
 } as SummalyOptions;
 
+export const version = _VERSION_;
+
 /**
  * Summarize an web page
  */
