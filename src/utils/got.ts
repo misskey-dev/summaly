@@ -1,4 +1,11 @@
-import got, * as Got from 'got';
+import got from 'got';
+import { HTTPError as GotHTTPError } from 'got';
+import type {
+	Agents as GotAgents,
+	Response as GotResponse,
+	Progress as GotProgress,
+	RequestPromise as GotRequestPromise,
+} from 'got';
 import * as cheerio from 'cheerio';
 import ipaddr from 'ipaddr.js';
 import type { IPv4, IPv6 } from 'ipaddr.js';
@@ -6,9 +13,9 @@ import type { GeneralScrapingOptions } from '@/general.js';
 import { StatusError } from '@/utils/status-error.js';
 import { detectEncoding, toUtf8 } from '@/utils/encoding.js';
 
-export let agent: Got.Agents = {};
+export let agent: GotAgents = {};
 
-export function setAgent(_agent: Got.Agents) {
+export function setAgent(_agent: GotAgents) {
 	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 	agent = _agent || {};
 }
@@ -165,7 +172,7 @@ export async function getResponse(args: GotOptions) {
 }
 
 async function receiveResponse<T>(args: {
-	req: Got.RequestPromise<Got.Response<T>>,
+	req: GotRequestPromise<GotResponse<T>>,
 	opts: GotOptions,
 	abort: AbortController,
 }) {
@@ -173,7 +180,7 @@ async function receiveResponse<T>(args: {
 	const maxSize = args.opts.contentLengthLimit ?? DEFAULT_MAX_RESPONSE_SIZE;
 
 	// 受信中のデータでサイズチェック
-	req.on('downloadProgress', (progress: Got.Progress) => {
+	req.on('downloadProgress', (progress: GotProgress) => {
 		if (progress.transferred > maxSize && progress.percent !== 1) {
 			args.abort.abort(`maxSize exceeded (${progress.transferred} > ${maxSize}) on response`);
 		}
@@ -186,7 +193,7 @@ async function receiveResponse<T>(args: {
 			throw new Error(abortReason);
 		}
 
-		if (e instanceof Got.HTTPError) {
+		if (e instanceof GotHTTPError) {
 			throw new StatusError(`${e.response.statusCode} ${e.response.statusMessage}`, e.response.statusCode, e.response.statusMessage);
 		} else {
 			throw e;
