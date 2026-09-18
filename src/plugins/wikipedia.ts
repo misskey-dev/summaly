@@ -4,7 +4,7 @@ import { clip } from '@/utils/clip.js';
 
 export function test(url: URL): boolean {
 	if (!url.hostname) return false;
-	return /\.wikipedia\.org$/.test(url.hostname);
+	return url.hostname.endsWith('.wikipedia.org');
 }
 
 export async function summarize(url: URL): Promise<summary> {
@@ -27,6 +27,7 @@ export async function summarize(url: URL): Promise<summary> {
 		icon: 'https://wikipedia.org/static/favicon/wikipedia.ico',
 		description: clip(info.extract, 300),
 		thumbnail: `https://wikipedia.org/static/images/project-logos/${lang}wiki.png`,
+		thumbnailStyle: 'summary',
 		player: {
 			url: null,
 			width: null,

@@ -3,7 +3,8 @@
  * https://github.com/misskey-dev/summaly
  */
 
-import got, { type Agents as GotAgents } from 'got';
+import got from 'got';
+import type { Agents as GotAgents } from 'got';
 import type { FastifyInstance } from 'fastify';
 import { SummalyResult as _SummalyResult } from '@/summary.js';
 import { SummalyPlugin as _SummalyPlugin } from '@/iplugin.js';

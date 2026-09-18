@@ -7,7 +7,7 @@ export default defineConfig({
 	tsconfig: true,
 	dts: true,
 	deps: {
-		skipNodeModulesBundle: true,
+		neverBundle: true,
 	},
 	outDir: './built',
 	define: {

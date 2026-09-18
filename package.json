@@ -1,52 +1,51 @@
 {
   "name": "@misskey-dev/summaly",
-  "version": "5.5.1",
+  "version": "5.5.2",
   "description": "Get web page's summary",
   "author": "syuilo <syuilotan@yahoo.co.jp>",
   "license": "MIT",
   "repository": {
-		"type": "git",
-		"url": "https://github.com/misskey-dev/summaly.git"
-	},
+    "type": "git",
+    "url": "https://github.com/misskey-dev/summaly.git"
+  },
   "bugs": "https://github.com/misskey-dev/summaly/issues",
   "main": "./built/index.js",
   "type": "module",
   "types": "./built/index.d.ts",
-  "packageManager": "pnpm@11.6.0",
+  "packageManager": "pnpm@12.4.2",
   "files": [
     "built",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsdown",
-    "eslint": "eslint",
+    "oxlint": "oxlint",
     "test": "vitest run ./test/index.test.ts",
     "serve": "fastify start ./built/index.js"
   },
   "devDependencies": {
-    "@misskey-dev/eslint-plugin": "2.1.0",
+    "@misskey-dev/oxlint-fmt-config": "0.1.1",
+    "@stylistic/eslint-plugin": "5.10.0",
     "@types/debug": "4.1.13",
     "@types/escape-regexp": "0.0.3",
-    "@types/node": "24.10.13",
-    "@typescript-eslint/eslint-plugin": "8.61.0",
-    "@typescript-eslint/parser": "8.61.0",
-    "eslint": "9.39.2",
-    "eslint-plugin-import": "2.32.0",
-    "fastify": "5.8.5",
-    "fastify-cli": "8.0.0",
-    "tsdown": "0.22.2",
-    "typescript": "6.0.3",
-    "vitest": "4.1.8"
+    "@types/node": "26.5.1",
+    "fastify": "5.12.3",
+    "fastify-cli": "8.0.1",
+    "oxlint": "1.83.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "tsdown": "0.23.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.0"
   },
   "dependencies": {
-    "chardet": "2.1.1",
+    "chardet": "2.2.0",
     "cheerio": "1.2.0",
     "escape-regexp": "0.0.1",
-    "got": "15.0.5",
+    "got": "16.0.0",
     "html-entities": "2.6.0",
-    "ipaddr.js": "2.4.0"
+    "ipaddr.js": "2.5.0"
   },
   "optionalDependencies": {
-    "fastify": "5.8.5"
+    "fastify": "5.12.3"
   }
 }
