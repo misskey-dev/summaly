@@ -25,6 +25,6 @@ jobs:
         run: |
           corepack enable
           pnpm i --frozen-lockfile
-      - name: eslint
+      - name: lint
         run: |
-          pnpm eslint
+          pnpm oxlint

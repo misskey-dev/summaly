@@ -1,9 +1,0 @@
-/node_modules
-/src
-/test
-.gitignore
-npm-debug.log
-gulpfile.js
-tsconfig.json
-.eslintrc.cjs
-.editorconfig
