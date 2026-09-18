@@ -4,7 +4,7 @@ import { clip } from '@/utils/clip.js';
 
 export function test(url: URL): boolean {
 	if (!url.hostname) return false;
-	return /\.wikipedia\.org$/.test(url.hostname);
+	return url.hostname.endsWith('.wikipedia.org');
 }
 
 export async function summarize(url: URL): Promise<summary> {
