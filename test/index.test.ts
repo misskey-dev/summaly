@@ -15,7 +15,7 @@ import { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
 import { expect, test, describe, beforeEach, afterEach } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
-import { summaly } from '@/index.js';
+import { summaly, summalyDefaultOptions } from '@/index.js';
 import { StatusError } from '@/utils/status-error.js';
 
 const _filename = fileURLToPath(import.meta.url);
@@ -707,6 +707,25 @@ describe('local tests', () => {
 			await summaly(host, { userAgent: 'test-ua' });
 
 			expect(ua).toBe('test-ua');
+		});
+	});
+
+	describe('options', () => {
+		test('指定したオプションが以降の呼び出しに引き継がれないこと', async () => {
+			const content = fs.readFileSync(_dirname + '/htmls/basic.html');
+			const defaults = { ...summalyDefaultOptions };
+
+			app = fastify();
+			app.get('/', (request, reply) => {
+				reply.header('content-length', content.byteLength);
+				reply.header('content-type', 'text/html');
+				return reply.send(content);
+			});
+			await app.listen({ port });
+
+			await expect(summaly(host, { contentLengthLimit: content.byteLength - 1, userAgent: 'test-ua' })).rejects.toThrow();
+			expect(summalyDefaultOptions).toEqual(defaults);
+			expect(await summaly(host)).toBeDefined();
 		});
 	});
 
