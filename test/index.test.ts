@@ -233,6 +233,24 @@ describe('local tests', () => {
 			}
 		});
 
+		test('リダイレクト解決のためのHEADリクエストでもprivate ipが弾かれ、リダイレクト先へ到達しないこと', async () => {
+			await app?.close();
+
+			let redirectedHeadCount = 0;
+			app = fastify({ exposeHeadRoutes: false });
+			app.head('/', (request, reply) => reply.redirect('/redirected', 302));
+			app.head('/redirected', (request, reply) => {
+				redirectedHeadCount++;
+				return reply.status(200).send();
+			});
+			app.get('*', (request, reply) => reply.status(404).send());
+			await app.listen({ port });
+
+			const summary = await summaly(host).catch((e: StatusError) => e);
+			expect(summary).toBeInstanceOf(StatusError);
+			expect(redirectedHeadCount).toBe(0);
+		});
+
 		afterEach(() => {
 			process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
 		});
@@ -689,6 +707,61 @@ describe('local tests', () => {
 			await summaly(host, { userAgent: 'test-ua' });
 
 			expect(ua).toBe('test-ua');
+		});
+	});
+
+	describe('content-type filter', () => {
+		test('HTML以外のコンテンツは本文を受信せずに即座にエラーになること', async () => {
+			app = fastify();
+			app.get('/', (request, reply) => {
+				let closed = false;
+				reply.raw.on('close', () => { closed = true; });
+				reply.header('content-type', 'application/pdf');
+				// 終わらないストリームを返し、本文の受信を待たずに打ち切られることを確認する
+				return reply.send(Readable.from((async function* () {
+					yield Buffer.from('%PDF-1.7\n');
+					while (!closed) {
+						await new Promise(resolve => setTimeout(resolve, 10));
+						yield Buffer.alloc(1024, 'a');
+					}
+				})()));
+			});
+			await app.listen({ port });
+
+			await expect(summaly(host)).rejects.toThrow(/Rejected by type filter application\/pdf/);
+		}, 3000);
+
+		test('content-typeが返されない場合はエラーになること', async () => {
+			app = fastify();
+			app.get('/', (request, reply) => {
+				reply.removeHeader('content-type');
+				return reply.send(Readable.from((async function* () {
+					yield Buffer.from('hello');
+				})()));
+			});
+			await app.listen({ port });
+
+			await expect(summaly(host)).rejects.toThrow(/Rejected by type filter/);
+		});
+
+		test('リダイレクト応答のcontent-typeでは弾かれないこと', async () => {
+			const content = fs.readFileSync(_dirname + '/htmls/og-title.html');
+
+			// HEADでの事前のリダイレクト解決をさせず、GET時にリダイレクトを辿らせる
+			app = fastify({ exposeHeadRoutes: false });
+			app.get('/', (request, reply) => {
+				reply.header('content-type', 'application/octet-stream');
+				return reply.redirect('/html', 302);
+			});
+			app.get('/html', (request, reply) => {
+				reply.header('content-length', content.byteLength);
+				reply.header('content-type', 'text/html');
+				return reply.send(content);
+			});
+			await app.listen({ port });
+
+			const summary = await summaly(host);
+			expect(summary.title).toBe('Strawberry Pasta');
 		});
 	});
 
