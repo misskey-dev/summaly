@@ -1,3 +1,4 @@
+import type { ClientRequest, IncomingMessage } from 'node:http';
 import got from 'got';
 import { HTTPError as GotHTTPError } from 'got';
 import type {
@@ -125,27 +126,19 @@ export async function getResponse(args: GotOptions) {
 			limit: 0,
 		},
 		signal: abort.signal,
+		hooks: {
+			// 応答ヘッダ受信時点のチェックでabortしても、gotはリダイレクト先へのリクエストを発行してしまうため、ここで止める
+			beforeRedirect: [() => {
+				abort.signal.throwIfAborted();
+			}],
+		},
 	});
 
 	const res = await receiveResponse({ req, opts: args, abort });
 
-	// SUMMALY_ALLOW_PRIVATE_IPはテスト用
-	// TODO: Try moving this to receiveResponse- ATM `got` doesn't provide a means
-	// to check the IP/response header data while streaming the response...
-	const allowPrivateIp = process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
-	if (!allowPrivateIp && res.ip != null) {
-		let ip: IPv4 | IPv6;
-		try {
-			ip = ipaddr.parse(res.ip);
-		} catch {
-			throw new StatusError(`Invalid IP ${res.ip}`, 500, 'Invalid IP');
-		}
-		if (ip.kind() === 'ipv6' && (ip as IPv6).isIPv4MappedAddress()) {
-			ip = (ip as IPv6).toIPv4Address();
-		}
-		if (ip.range() !== 'unicast') {
-			throw new StatusError(`Private IP rejected ${res.ip}`, 400, 'Private IP Rejected');
-		}
+	// 念のため最終応答に対しても同じチェックを行う（通常はreceiveResponse内で弾かれている）
+	if (!isPrivateIpAllowed() && res.ip != null) {
+		assertPublicIp(res.ip);
 	}
 
 	// Check html
@@ -171,6 +164,28 @@ export async function getResponse(args: GotOptions) {
 	return res;
 }
 
+function isPrivateIpAllowed() {
+	// SUMMALY_ALLOW_PRIVATE_IPはテスト用
+	// agentが指定されている場合、接続先はagent(プロキシ等)になり実際の宛先IPを検査できないため、
+	// 宛先の制限はagent側に任せる
+	return process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
+}
+
+function assertPublicIp(rawIp: string) {
+	let ip: IPv4 | IPv6;
+	try {
+		ip = ipaddr.parse(rawIp);
+	} catch {
+		throw new StatusError(`Invalid IP ${rawIp}`, 500, 'Invalid IP');
+	}
+	if (ip.kind() === 'ipv6' && (ip as IPv6).isIPv4MappedAddress()) {
+		ip = (ip as IPv6).toIPv4Address();
+	}
+	if (ip.range() !== 'unicast') {
+		throw new StatusError(`Private IP rejected ${rawIp}`, 400, 'Private IP Rejected');
+	}
+}
+
 async function receiveResponse<T>(args: {
 	req: GotRequestPromise<GotResponse<T>>,
 	opts: GotOptions,
@@ -178,6 +193,30 @@ async function receiveResponse<T>(args: {
 }) {
 	const req = args.req;
 	const maxSize = args.opts.contentLengthLimit ?? DEFAULT_MAX_RESPONSE_SIZE;
+
+	const allowPrivateIp = isPrivateIpAllowed();
+
+	req.on('request', (clientRequest: ClientRequest) => {
+		clientRequest.prependOnceListener('response', (res: IncomingMessage) => {
+			try {
+				const ip = res.socket.remoteAddress;
+				if (!allowPrivateIp && ip != null) {
+					assertPublicIp(ip);
+				}
+
+				// リダイレクトやエラー応答はここでは判定しない（ステータスコードによるエラーを優先する）
+				const statusCode = res.statusCode ?? 0;
+				if (statusCode < 200 || statusCode >= 300) return;
+
+				const contentType = res.headers['content-type'];
+				if (args.opts.typeFilter && !contentType?.match(args.opts.typeFilter)) {
+					throw new Error(`Rejected by type filter ${contentType}`);
+				}
+			} catch (e) {
+				args.abort.abort(e);
+			}
+		});
+	});
 
 	// 受信中のデータでサイズチェック
 	req.on('downloadProgress', (progress: GotProgress) => {
@@ -189,8 +228,13 @@ async function receiveResponse<T>(args: {
 	// 応答取得 with ステータスコードエラーの整形
 	const res = await req.catch(e => {
 		const abortReason = args.abort.signal.reason;
-		if (args.abort.signal.aborted && typeof abortReason === 'string' && abortReason.length > 0) {
-			throw new Error(abortReason);
+		if (args.abort.signal.aborted) {
+			if (abortReason instanceof Error) {
+				throw abortReason;
+			}
+			if (typeof abortReason === 'string' && abortReason.length > 0) {
+				throw new Error(abortReason);
+			}
 		}
 
 		if (e instanceof GotHTTPError) {

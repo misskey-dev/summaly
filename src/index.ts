@@ -3,13 +3,12 @@
  * https://github.com/misskey-dev/summaly
  */
 
-import got from 'got';
 import type { Agents as GotAgents } from 'got';
 import type { FastifyInstance } from 'fastify';
 import { SummalyResult as _SummalyResult } from '@/summary.js';
 import { SummalyPlugin as _SummalyPlugin } from '@/iplugin.js';
 import { general, type GeneralScrapingOptions } from '@/general.js';
-import { DEFAULT_BOT_UA, DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, agent, setAgent } from '@/utils/got.js';
+import { DEFAULT_BOT_UA, getResponse, setAgent } from '@/utils/got.js';
 import { plugins as builtinPlugins } from '@/plugins/index.js';
 
 export type SummalyResult = _SummalyResult;
@@ -91,32 +90,22 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 	let actualUrl = url;
 	if (opts.followRedirects) {
 		// .catch(() => url)にすればいいけど、jestにtrace-redirectを食わせるのが面倒なのでtry-catch
+		// 各種チェックを通すため、getResponse経由でリダイレクトを解決する
 		try {
-			const timeout = opts.responseTimeout ?? DEFAULT_RESPONSE_TIMEOUT;
-			const operationTimeout = opts.operationTimeout ?? DEFAULT_OPERATION_TIMEOUT;
-			actualUrl = await got
-				.head(url, {
-					headers: {
-						accept: 'text/html,application/xhtml+xml',
-						'user-agent': opts.userAgent ?? DEFAULT_BOT_UA,
-						'accept-language': opts.lang ?? undefined,
-					},
-					timeout: {
-						lookup: timeout,
-						connect: timeout,
-						secureConnect: timeout,
-						socket: timeout, // read timeout
-						response: timeout,
-						send: timeout,
-						request: operationTimeout, // whole operation timeout
-					},
-					agent,
-					http2: false,
-					retry: {
-						limit: 0,
-					},
-				})
-				.then(res => res.url);
+			const res = await getResponse({
+				url,
+				method: 'HEAD',
+				headers: {
+					accept: 'text/html,application/xhtml+xml',
+					'user-agent': opts.userAgent ?? DEFAULT_BOT_UA,
+					'accept-language': opts.lang ?? undefined,
+				},
+				followRedirects: true,
+				responseTimeout: opts.responseTimeout,
+				operationTimeout: opts.operationTimeout,
+				contentLengthLimit: opts.contentLengthLimit,
+			});
+			actualUrl = res.url;
 		} catch {
 			actualUrl = url;
 		}
