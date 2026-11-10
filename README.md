@@ -38,10 +38,38 @@ Run the server:
 ```
 git clone https://github.com/misskey-dev/summaly.git
 cd summaly
-NODE_ENV=development npm install
-npm run build
-npm run serve
+pnpm install
+pnpm build
+pnpm serve
 ```
+
+`pnpm serve` runs `node built/server.js`, so you can also start the built server directly:
+
+```
+SUMMALY_HOST=127.0.0.1 SUMMALY_PORT=3000 SUMMALY_LANG=ja-JP node built/server.js
+```
+
+The server serves `GET /` and takes the `url` (required) and `lang` query parameters, e.g. `http://localhost:3000/?url=https://example.com/&lang=ja-JP`.
+
+The server is configured with the following environment variables.
+Unset or empty variables are ignored, and the default value is used.
+Invalid values (e.g. `SUMMALY_PORT=abc`) make the server exit with an error.
+
+| Environment variable                | Maps to (SummalyOptions)    | Type                                           | Default                                       |
+|:------------------------------------|:----------------------------|:-----------------------------------------------|:----------------------------------------------|
+| **SUMMALY_HOST**                    | (listen address)            | *string*                                       | `localhost`                                   |
+| **SUMMALY_PORT**                    | (listen port)               | *integer* (0-65535)                            | `3000`                                        |
+| **SUMMALY_LANG**                    | `lang`                      | *string*                                       | the `lang` query parameter of the request     |
+| **SUMMALY_USER_AGENT**              | `userAgent`                 | *string*                                       | `SummalyBot/[version] (+[Link to README file in GitHub])` |
+| **SUMMALY_FOLLOW_REDIRECTS**        | `followRedirects`           | *boolean* (`true` / `false` / `1` / `0`)       | `false`                                       |
+| **SUMMALY_RESPONSE_TIMEOUT**        | `responseTimeout`           | *integer* (milliseconds, 0-2147483647)         | `20000`                                       |
+| **SUMMALY_OPERATION_TIMEOUT**       | `operationTimeout`          | *integer* (milliseconds, 0-2147483647)         | `60000`                                       |
+| **SUMMALY_CONTENT_LENGTH_LIMIT**    | `contentLengthLimit`        | *integer* (bytes)                              | `10485760`                                    |
+| **SUMMALY_CONTENT_LENGTH_REQUIRED** | `contentLengthRequired`     | *boolean* (`true` / `false` / `1` / `0`)       | `false`                                       |
+
+* The server listens on `localhost` by default. Since summaly fetches arbitrary URLs given by clients, be careful when exposing it to other hosts (e.g. `SUMMALY_HOST=0.0.0.0`).
+* `SUMMALY_LANG` and `SUMMALY_FOLLOW_REDIRECTS` take precedence over the per-request behavior of the Fastify plugin (the `lang` query parameter and `followRedirects: false`).
+* `plugins` and `agent` cannot be configured with environment variables. Register the Fastify plugin in your own server to use them.
 
 #### opts (SummalyOptions)
 
