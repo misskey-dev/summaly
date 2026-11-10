@@ -1,3 +1,8 @@
 saveExact: true
 allowBuilds:
   esbuild: true
+# 公開から7日経っていないバージョンは解決しない（Renovate の minimumReleaseAge と揃える）
+minimumReleaseAge: 10080
+# 7日未満のバージョンしか条件を満たせない場合（脆弱性修正の完全一致指定や、その間接依存など）は
+# エラーにせず minimumReleaseAgeExclude に追加して通す
+minimumReleaseAgeStrict: false
