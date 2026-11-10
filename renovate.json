@@ -17,16 +17,10 @@
 			"groupName": "non-major dependencies"
 		},
 		{
-			"description": "マイナーアップデートはまとめて1つのPRにする（0.x を除く）",
+			"description": "マイナーアップデートはまとめて1つのPRにする（0.x は破壊的変更がありうるので個別PRにする）",
 			"matchUpdateTypes": ["minor"],
 			"matchCurrentVersion": "!/^v?0\\./",
 			"groupName": "non-major dependencies"
-		},
-		{
-			"description": "0.x のマイナーアップデートは破壊的変更とみなし、グループ化せずダッシュボードで承認したときだけPRを作る",
-			"matchUpdateTypes": ["minor"],
-			"matchCurrentVersion": "/^v?0\\./",
-			"dependencyDashboardApproval": true
 		},
 		{
 			"description": "メジャーアップデートはグループ化せず、ダッシュボードで承認したときだけPRを作る",
@@ -34,14 +28,9 @@
 			"dependencyDashboardApproval": true
 		},
 		{
-			"description": "同時に上げないと壊れる lint 関連のパッケージ（oxlint-fmt-config が oxlint / oxlint-tsgolint / @stylistic/eslint-plugin を peerDependencies に持つ）",
-			"matchPackageNames": [
-				"oxlint",
-				"oxlint-tsgolint",
-				"@misskey-dev/oxlint-fmt-config",
-				"@stylistic/eslint-plugin"
-			],
-			"groupName": "oxlint toolchain"
+			"description": "@misskey-dev/oxlint-fmt-config の peerDependencies で完全固定されているため、fmt-config の更新に合わせて手動で上げる",
+			"matchPackageNames": ["@stylistic/eslint-plugin"],
+			"enabled": false
 		},
 		{
 			"description": "lockfile maintenance と digest 固定にはリリース日時がないので minimumReleaseAge を外す（間接依存の待機は pnpm-workspace.yaml の minimumReleaseAge で担保）",
