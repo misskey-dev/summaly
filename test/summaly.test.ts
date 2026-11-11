@@ -351,6 +351,41 @@ describe('chiramiss additions', () => {
 		]);
 	});
 
+	test('npm のパッケージページは HEAD が 403 でも投稿された URL のまま npm プロバイダに渡り、registry から要約する', async () => {
+		const body = Buffer.from(JSON.stringify({ name: 'misskey-js', description: 'Misskey SDK for JavaScript' }));
+		const requests: string[] = [];
+		const server = await serve((req, res) => {
+			requests.push(`${req.method} ${req.headers.host}${req.url}`);
+			if (req.headers.host === 'npmjs.com') {
+				res.writeHead(301, { location: `https://www.npmjs.com${req.url}` }).end();
+			} else if (req.headers.host === 'www.npmjs.com') {
+				// www.npmjs.com answers bots with a Cloudflare challenge.
+				res.writeHead(403, { 'content-type': 'text/html' }).end();
+			} else if (req.url === '/misskey-js/latest') {
+				res.writeHead(200, { 'content-type': 'application/json', 'content-length': body.byteLength }).end(body);
+			} else {
+				res.writeHead(404).end();
+			}
+		});
+		const agents = loopbackAgents(Number(new URL(server).port));
+
+		cleanups.push(() => agents.destroy());
+
+		const summary = await summarize('https://npmjs.com/package/misskey-js', { agent: { http: agents.http, https: agents.https } });
+
+		expect(summary).toMatchObject({
+			title: 'misskey-js',
+			description: 'Misskey SDK for JavaScript',
+			sitename: 'npm',
+			url: 'https://npmjs.com/package/misskey-js',
+		});
+		expect(requests).toEqual([
+			'HEAD npmjs.com/package/misskey-js',
+			'HEAD www.npmjs.com/package/misskey-js',
+			'GET registry.npmjs.org/misskey-js/latest',
+		]);
+	});
+
 	test('設定の違う agent を並行に渡しても互いに干渉しない', async () => {
 		const pageA = Buffer.from('<html><head><title>A</title></head></html>');
 		const pageB = Buffer.from('<html><head><title>B</title></head></html>');

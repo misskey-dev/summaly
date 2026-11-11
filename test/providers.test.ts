@@ -6,6 +6,7 @@ import { amazon } from '@/providers/amazon.js';
 import { bluesky } from '@/providers/bluesky.js';
 import { branchioDeeplinks } from '@/providers/branchio-deeplinks.js';
 import { builtinProviders } from '@/providers/index.js';
+import { npm } from '@/providers/npm.js';
 import { nvd } from '@/providers/nvd.js';
 import { fromPlugin } from '@/providers/provider.js';
 import { wikipedia } from '@/providers/wikipedia.js';
@@ -109,12 +110,48 @@ describe('test()', () => {
 	test.each(nvdCases)('nvd: %s → %s', (url, expected) => {
 		expect(nvd.test(new URL(url))).toBe(expected);
 	});
+
+	const npmCases: [string, boolean][] = [
+		['https://www.npmjs.com/package/misskey-js', true],
+		['https://npmjs.com/package/misskey-js', true],
+		['https://www.npmjs.org/package/misskey-js', true],
+		['https://npmjs.org/package/misskey-js', true],
+		['http://www.npmjs.com/package/misskey-js', true],
+		['https://www.npmjs.com/package/misskey-js/', true],
+		['https://www.npmjs.com/package/misskey-js?activeTab=versions#readme', true],
+		['https://www.npmjs.com/package/@types/node', true],
+		['https://www.npmjs.com/package/misskey-js/v/2024.10.0', true],
+		['https://www.npmjs.com/package/@types/node/v/20.0.0-beta.1+build.5/', true],
+		['https://www.npmjs.com/package/JSONStream', true],
+		['https://www.npmjs.com/', false],
+		['https://www.npmjs.com/package/', false],
+		['https://www.npmjs.com/package/@types', false],
+		['https://www.npmjs.com/package/@types/', false],
+		['https://www.npmjs.com/package/.bin', false],
+		['https://www.npmjs.com/package/@types/.bin', false],
+		['https://www.npmjs.com/package/@.x/node', false],
+		['https://www.npmjs.com/package/misskey-js/v/.1', false],
+		['https://www.npmjs.com/package/misskey-js/v/', false],
+		['https://www.npmjs.com/package/misskey-js/v/1.0.0/x', false],
+		['https://www.npmjs.com/package/misskey-js/dependencies', false],
+		['https://www.npmjs.com/search?q=misskey-js', false],
+		['https://www.npmjs.com/~syuilo', false],
+		['https://www.npmjs.com/misskey-js', false],
+		['https://docs.npmjs.com/package/misskey-js', false],
+		['https://registry.npmjs.org/misskey-js', false],
+		['https://evilnpmjs.com/package/misskey-js', false],
+		['https://www.npmjs.com.example.com/package/misskey-js', false],
+	];
+
+	test.each(npmCases)('npm: %s → %s', (url, expected) => {
+		expect(npm.test(new URL(url))).toBe(expected);
+	});
 });
 
 describe('builtinProviders', () => {
-	test('本家と同じ順の 4 つ (amazon, bluesky, wikipedia, branchio) の後に chiramiss 独自の nvd', () => {
-		expect(builtinProviders).toEqual([amazon, bluesky, wikipedia, branchioDeeplinks, nvd]);
-		expect(builtinProviders.map(p => p.name)).toEqual(['amazon', 'bluesky', 'wikipedia', 'branchio-deeplinks', 'nvd']);
+	test('本家と同じ順の 4 つ (amazon, bluesky, wikipedia, branchio) の後に chiramiss 独自の nvd, npm', () => {
+		expect(builtinProviders).toEqual([amazon, bluesky, wikipedia, branchioDeeplinks, nvd, npm]);
+		expect(builtinProviders.map(p => p.name)).toEqual(['amazon', 'bluesky', 'wikipedia', 'branchio-deeplinks', 'nvd', 'npm']);
 	});
 });
 
@@ -349,6 +386,87 @@ describe('nvd', () => {
 
 		await expect(nvd.summarize(ctx, new URL('https://nvd.nist.gov/vuln/detail/CVE-2026-16478'))).rejects.toBeInstanceOf(StatusError);
 		expect(received.map(r => r.host)).toEqual(['services.nvd.nist.gov']);
+	});
+});
+
+describe('npm', () => {
+	const json = (body: unknown) => (_req: http.IncomingMessage, res: http.ServerResponse) => send(res, JSON.stringify(body), 'application/json');
+
+	test('registry の latest を ctx の transport で 1 回だけ取得し、パッケージ名と説明から要約する', async () => {
+		const { ctx, received } = await loopback(json({ name: 'misskey-js', version: '2026.11.0', description: 'Misskey SDK for JavaScript' }));
+
+		const summary = await npm.summarize(ctx, new URL('https://www.npmjs.com/package/misskey-js?activeTab=readme'));
+
+		expect(summary).toEqual({
+			title: 'misskey-js',
+			icon: 'https://docs.npmjs.com/favicon-32x32.png',
+			description: 'Misskey SDK for JavaScript',
+			thumbnail: null,
+			thumbnailStyle: null,
+			player: { url: null, width: null, height: null, allow: [] },
+			sitename: 'npm',
+			activityPub: null,
+			fediverseCreator: null,
+		});
+		expect(received).toHaveLength(1);
+		expect(received[0]).toMatchObject({ method: 'GET', host: 'registry.npmjs.org', url: '/misskey-js/latest' });
+		expect(received[0].headers['user-agent']).toBe(ctx.options.userAgent);
+	});
+
+	test('scoped のパッケージは / を %2f にして registry に渡す', async () => {
+		const { ctx, received } = await loopback(json({ description: 'TypeScript definitions for node' }));
+
+		const summary = await npm.summarize(ctx, new URL('https://www.npmjs.com/package/@types/node'));
+
+		expect(summary?.title).toBe('@types/node');
+		expect(received.map(r => r.url)).toEqual(['/@types%2fnode/latest']);
+	});
+
+	test('バージョンを指定したページはそのバージョンを取得し、title を name@version にする', async () => {
+		const { ctx, received } = await loopback(json({ description: 'TypeScript definitions for node' }));
+
+		const summary = await npm.summarize(ctx, new URL('https://www.npmjs.com/package/@types/node/v/20.0.0-beta.1+build.5'));
+
+		expect(summary?.title).toBe('@types/node@20.0.0-beta.1+build.5');
+		expect(received.map(r => r.url)).toEqual(['/@types%2fnode/20.0.0-beta.1%2Bbuild.5']);
+	});
+
+	test('パッケージ名の大文字・小文字はそのまま渡す', async () => {
+		const { ctx, received } = await loopback(json({ description: 'rawStream.pipe(JSONStream.parse()).pipe(streamOfObjects)' }));
+
+		await npm.summarize(ctx, new URL('https://npmjs.com/package/JSONStream/'));
+
+		expect(received.map(r => r.url)).toEqual(['/JSONStream/latest']);
+	});
+
+	test('description は 1 行にまとめて 300 文字で切る。ないか空か文字列でなければ null', async () => {
+		const long = await npm.summarize((await loopback(json({ description: `first\n\n  second ${'a'.repeat(300)}` }))).ctx, new URL('https://www.npmjs.com/package/x'));
+		const none = await npm.summarize((await loopback(json({ name: 'x' }))).ctx, new URL('https://www.npmjs.com/package/x'));
+		const blank = await npm.summarize((await loopback(json({ description: ' \n ' }))).ctx, new URL('https://www.npmjs.com/package/x'));
+		const notString = await npm.summarize((await loopback(json({ description: ['a'] }))).ctx, new URL('https://www.npmjs.com/package/x'));
+		const nullBody = await npm.summarize((await loopback(json(null))).ctx, new URL('https://www.npmjs.com/package/x'));
+
+		expect(long?.description).toBe(`first second ${'a'.repeat(287)}...`);
+		expect(none?.description).toBeNull();
+		expect(blank?.description).toBeNull();
+		expect(notString?.description).toBeNull();
+		expect(nullBody?.description).toBeNull();
+	});
+
+	test('パッケージやバージョンがなく registry が 404 なら StatusError で失敗し、汎用の抽出には戻らない', async () => {
+		const { ctx, received } = await loopback((_req, res) => {
+			res.writeHead(404, { 'content-type': 'application/json' }).end('"Not Found"');
+		});
+
+		await expect(npm.summarize(ctx, new URL('https://www.npmjs.com/package/does-not-exist'))).rejects.toBeInstanceOf(StatusError);
+		expect(received.map(r => `${r.host}${r.url}`)).toEqual(['registry.npmjs.org/does-not-exist/latest']);
+	});
+
+	test('一致しない URL を渡されたら例外', async () => {
+		const { ctx, received } = await loopback(json({}));
+
+		await expect(npm.summarize(ctx, new URL('https://www.npmjs.com/search?q=x'))).rejects.toThrow('not an npm package URL');
+		expect(received).toHaveLength(0);
 	});
 });
 

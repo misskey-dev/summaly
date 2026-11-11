@@ -2,6 +2,7 @@
 import { amazon } from './amazon.js';
 import { bluesky } from './bluesky.js';
 import { branchioDeeplinks } from './branchio-deeplinks.js';
+import { npm } from './npm.js';
 import { nvd } from './nvd.js';
 import type { Provider } from './provider.js';
 import { wikipedia } from './wikipedia.js';
@@ -15,4 +16,5 @@ export const builtinProviders: Provider[] = [
 	wikipedia,
 	branchioDeeplinks,
 	nvd,
+	npm,
 ];
