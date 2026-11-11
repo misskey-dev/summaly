@@ -45,40 +45,48 @@ function settle(entry: CacheEntry): SummaryResult {
 }
 
 /**
+ * Runs `task` and turns its outcome into a CacheEntry. Cloned before storing: a value structuredClone cannot copy
+ * (e.g. a function from a plugin) becomes an error entry here instead of an 'ok' entry that would throw on every cache hit.
+ */
+async function runTask(task: () => Promise<SummaryResult>): Promise<CacheEntry> {
+	try {
+		return { kind: 'ok', value: structuredClone(await task()) };
+	} catch (error) {
+		return { kind: 'error', error: serializeError(error) };
+	}
+}
+
+/**
  * Runs `task` at most once per key at a time and caches the outcome, failures included.
  * Order: cache lookup → `task` through the coordinator → a structuredClone copy stored in the cache → a separate copy for each caller.
  * Every caller, including the one whose call ran `task`, gets its result or error rebuilt from the same CacheEntry.
+ * `key` is called only when there is a cache or a coordinator to use it (building it hashes every option).
  */
 export async function runCoalesced(
 	deps: CoalesceDeps,
-	key: string,
+	key: () => string,
 	task: () => Promise<SummaryResult>,
 ): Promise<SummaryResult> {
 	const { cache, coordinator } = deps;
+	if (cache === null && coordinator === null) return settle(await runTask(task));
+	const requestKey = key();
 
-	const cached = await cache?.get(key);
+	const cached = await cache?.get(requestKey);
 	if (cached !== undefined) return settle(cached);
 
 	const execute = async (): Promise<CacheEntry> => {
 		// With a coordinator, check again: a task for this key may have finished between the lookup above
 		// and getting the slot. Without one there is no slot to wait for, so the lookup above is enough.
 		if (coordinator !== null) {
-			const latest = await cache?.get(key);
+			const latest = await cache?.get(requestKey);
 			if (latest !== undefined) return latest;
 		}
 
-		let entry: CacheEntry;
-		try {
-			// Clone before storing: a value structuredClone cannot copy (e.g. a function from a plugin)
-			// becomes an error entry here instead of an 'ok' entry that would throw on every cache hit.
-			entry = { kind: 'ok', value: structuredClone(await task()) };
-		} catch (error) {
-			entry = { kind: 'error', error: serializeError(error) };
-		}
+		const entry = await runTask(task);
 		const ttl = entry.kind === 'ok' ? deps.cacheTtl : deps.errorCacheTtl;
-		if (cache !== null && ttl > 0) await cache.set(key, entry, ttl);
+		if (cache !== null && ttl > 0) await cache.set(requestKey, entry, ttl);
 		return entry;
 	};
 
-	return settle(coordinator === null ? await execute() : await coordinator.run(key, execute));
+	return settle(coordinator === null ? await execute() : await coordinator.run(requestKey, execute));
 }

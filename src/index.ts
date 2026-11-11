@@ -77,7 +77,7 @@ export function createSummarizer(base: SummarizeOptions = {}): (url: string, opt
 			cacheTtl: options.cacheTtl ?? base.cacheTtl ?? DEFAULT_CACHE_TTL,
 			errorCacheTtl: options.errorCacheTtl ?? base.errorCacheTtl ?? DEFAULT_ERROR_CACHE_TTL,
 		};
-		return runCoalesced(deps, buildRequestKey(url, opts), () => summarizeUncached(url, opts));
+		return runCoalesced(deps, () => buildRequestKey(url, opts), () => summarizeUncached(url, opts));
 	};
 }
 

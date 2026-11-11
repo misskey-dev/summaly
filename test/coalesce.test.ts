@@ -484,8 +484,8 @@ describe('runCoalesced', () => {
 			throw failure;
 		};
 
-		const first = await runCoalesced(deps, 'k', task).catch((e: unknown) => e);
-		const second = await runCoalesced(deps, 'k', task).catch((e: unknown) => e);
+		const first = await runCoalesced(deps, () => 'k', task).catch((e: unknown) => e);
+		const second = await runCoalesced(deps, () => 'k', task).catch((e: unknown) => e);
 
 		expect(calls).toBe(1);
 		for (const error of [first, second]) {
@@ -499,7 +499,7 @@ describe('runCoalesced', () => {
 		const cache = new JsonCache();
 		const deps = { cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
 
-		const thrown = await runCoalesced(deps, 'k', async () => {
+		const thrown = await runCoalesced(deps, () => 'k', async () => {
 			throw new StatusError('x'.repeat(5000), 500, 'Internal Server Error');
 		}).catch((e: unknown) => e) as StatusError;
 
@@ -511,10 +511,25 @@ describe('runCoalesced', () => {
 		expect(thrown.statusCode).toBe(500);
 	});
 
+	// The key (canonical serialization + SHA-256) is only read by the cache and the coordinator.
+	test('キャッシュも coordinator もなければ key を作らない', async () => {
+		const key = vi.fn(() => 'k');
+		const deps = { cache: null, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
+		const value = await runCoalesced(deps, key, async () => result);
+		expect(value).toEqual(result);
+		expect(value).not.toBe(result);
+		await expect(runCoalesced(deps, key, async () => {
+			throw new StatusError('gone', 410, 'Gone');
+		})).rejects.toMatchObject({ message: 'gone', statusCode: 410 });
+		// A value structuredClone cannot copy still becomes an error.
+		await expect(runCoalesced(deps, key, async () => ({ ...result, extra: () => {} }))).rejects.toThrow();
+		expect(key).not.toHaveBeenCalled();
+	});
+
 	test('TTL が 0 なら保存しない', async () => {
 		const cache = new JsonCache();
-		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, 'ok', async () => result);
-		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, 'ng', async () => {
+		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, () => 'ok', async () => result);
+		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, () => 'ng', async () => {
 			throw new Error('x');
 		}).catch(() => {});
 
