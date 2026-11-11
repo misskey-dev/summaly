@@ -15,6 +15,8 @@ export const version: string = VERSION;
 export { InProcessCoordinator } from '@/coalesce/in-process-coordinator.js';
 export { MemorySummaryCache } from '@/coalesce/memory-cache.js';
 export { StatusError } from '@/http/status-error.js';
+export { default } from '@/fastify-plugin.js';
+export type { FastifyLike } from '@/fastify-plugin.js';
 
 export type {
 	GeneralScrapingOptions,
