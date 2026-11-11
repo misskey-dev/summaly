@@ -71,6 +71,31 @@ Invalid values (e.g. `SUMMALY_PORT=abc`) make the server exit with an error.
 * `SUMMALY_LANG` and `SUMMALY_FOLLOW_REDIRECTS` take precedence over the per-request behavior of the Fastify plugin (the `lang` query parameter and `followRedirects: false`).
 * `plugins` and `agent` cannot be configured with environment variables. Register the Fastify plugin in your own server to use them.
 
+Run the server with Docker:
+
+```
+git clone https://github.com/misskey-dev/summaly.git
+cd summaly
+docker build -t summaly .
+docker run --rm -p 127.0.0.1:3000:3000 -e SUMMALY_LANG=ja-JP summaly
+```
+
+The environment variables above can be passed with `-e`.
+In the image, `SUMMALY_HOST` defaults to `0.0.0.0` so that the server is reachable through a published port, and the server runs as the non-root `node` user.
+Publish the port only where needed (e.g. `127.0.0.1:3000:3000` as above), or do not publish it and access the server from other containers on the same network.
+
+With Docker Compose, put the following in your own `compose.yaml`, e.g. next to the cloned `summaly` directory.
+Other services in the same Compose project can access the server at `http://summaly:3000/`.
+
+```yaml
+services:
+  summaly:
+    build: ./summaly # path to the cloned repository, relative to compose.yaml
+    restart: unless-stopped
+    environment:
+      SUMMALY_LANG: ja-JP
+```
+
 #### opts (SummalyOptions)
 
 | Property                  | Type                   | Description                                                                                                                                                                         | Default                |

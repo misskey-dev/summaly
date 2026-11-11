@@ -1,0 +1,9 @@
+# Only send the files needed to build the image
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.json
+!tsdown.config.ts
+!src
+!LICENSE

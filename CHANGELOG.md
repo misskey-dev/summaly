@@ -5,6 +5,8 @@
   * `pnpm serve` (`node built/server.js`) で起動します。指定できる環境変数については README.md を参照してください
   * デフォルトでは `localhost:3000` でリッスンします
 * サーバーの起動に fastify-cli を使用しないように
+* Dockerfile を追加
+  * `docker build` でスタンドアロンサーバーのイメージをビルドできます。起動方法は README.md を参照してください
 
 5.5.2 / 2026/09/18
 ------------------
