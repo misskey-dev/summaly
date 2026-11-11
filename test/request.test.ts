@@ -429,6 +429,75 @@ describe('fetchResponse', () => {
 		expect(hits).toBe(0);
 	});
 
+	const gzipPage = zlib.gzipSync(Buffer.from(HTML.repeat(200)));
+
+	test.each([
+		['content-length 付き', { 'content-length': String(HTML.length * 2) }, Buffer.from(HTML)],
+		['chunked', {}, Buffer.from(HTML)],
+		['gzip・content-length 付き', { 'content-encoding': 'gzip', 'content-length': String(gzipPage.length) }, gzipPage.subarray(0, gzipPage.length >> 1)],
+		['gzip・chunked', { 'content-encoding': 'gzip' }, gzipPage.subarray(0, gzipPage.length >> 1)],
+	] as const)('本文の途中で切断されたらエラーになる (%s)', async (_name, headers, partial) => {
+		const server = await serve((req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html', ...headers });
+			res.write(partial, () => setTimeout(() => req.socket.destroy(), 10));
+		});
+		const e = await fetchResponse(localTransport(), request(server.url)).catch(e => e);
+		expect(e).toBeInstanceOf(Error);
+		expect(e.code === 'ECONNRESET' || e.code === 'ERR_STREAM_PREMATURE_CLOSE').toBe(true);
+	});
+
+	test('gzip の本文が壊れていたらエラーになり、展開器を破棄する', async () => {
+		const inner: zlib.Unzip[] = [];
+		const createUnzip = zlib.createUnzip;
+		vi.spyOn(zlib, 'createUnzip').mockImplementation(options => {
+			const stream = createUnzip(options);
+			inner.push(stream);
+			return stream;
+		});
+		const corrupt = Buffer.concat([gzipPage.subarray(0, 20), Buffer.alloc(200, 0xff)]);
+		const server = await serve((_req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' });
+			// Not ended: the client must drop the response itself.
+			res.write(corrupt);
+		});
+		const e = await fetchResponse(localTransport(), request(server.url)).catch(e => e);
+		expect(e).toBeInstanceOf(Error);
+		expect(e.code).toMatch(/^Z_/);
+		expect(inner).toHaveLength(1);
+		expect(inner[0].destroyed).toBe(true);
+	});
+
+	test('受信量の上限で打ち切ったら、展開器と応答を破棄する', async () => {
+		const inner: zlib.Unzip[] = [];
+		const createUnzip = zlib.createUnzip;
+		vi.spyOn(zlib, 'createUnzip').mockImplementation(options => {
+			const stream = createUnzip(options);
+			inner.push(stream);
+			return stream;
+		});
+		let serverSocket: net.Socket | undefined;
+		const server = await serve((req, res) => {
+			serverSocket = req.socket;
+			res.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' });
+			res.write(gzipPage);
+		});
+		await expect(fetchResponse(localTransport(), request(server.url, { contentLengthLimit: 100 })))
+			.rejects.toThrow(/^maxSize exceeded \(\d+ > 100\) on response$/);
+		expect(inner.every(stream => stream.destroyed)).toBe(true);
+		await vi.waitFor(() => expect(serverSocket?.destroyed).toBe(true), { timeout: 1000, interval: 10 });
+	});
+
+	test('空の本文（content-length: 0、gzip でも）は空として返す', async () => {
+		const server = await serve((req, res) => {
+			const headers: http.OutgoingHttpHeaders = { 'content-type': 'text/html', 'content-length': '0' };
+			if (req.url === '/gz') headers['content-encoding'] = 'gzip';
+			res.writeHead(200, headers);
+			res.end();
+		});
+		expect((await fetchResponse(localTransport(), request(server.url))).body.length).toBe(0);
+		expect((await fetchResponse(localTransport(), request(new URL('/gz', server.url).href))).body.length).toBe(0);
+	});
+
 	test('受信が止まったら responseTimeout でエラーになる', async () => {
 		const server = await serve((_req, res) => {
 			res.writeHead(200, { 'content-type': 'text/html' });
