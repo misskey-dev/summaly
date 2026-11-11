@@ -114,6 +114,11 @@ function createGuardedAgents(guard: AddressGuard): { http: http.Agent; https: ht
 	// keepAlive: a socket goes back to the pool only after a complete response, and the pool lives as long as the
 	// transport (one call); Transport#close destroys it. A response dropped early (error, size limit, timeout)
 	// destroys its socket, so it never returns to the pool.
+	// Accepted risk, shared by every keep-alive client: a non-compliant server that sends a body after a HEAD response
+	// (or past Content-Length) in a later segment can have those bytes read as the next response on the reused socket.
+	// Node destroys an idle pooled socket that receives data, and sendRequest sends again when the bytes break the
+	// response (HPE_*), but bytes that happen to parse as a body go unnoticed. Not reusing after a HEAD would give up
+	// most of the gain (HEAD for the final URL, then the page).
 	return {
 		http: new http.Agent({ keepAlive: true, lookup }),
 		https: new https.Agent({ keepAlive: true, lookup }),
