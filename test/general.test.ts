@@ -2,7 +2,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import type net from 'node:net';
-import { afterEach, describe, expect, test } from 'vitest';
+import { Parser } from 'htmlparser2';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createScrapeContext } from '@/context.js';
 import { scrapeGeneral } from '@/extract/general.js';
 import { pickDescription, pickImage, pickSiteName, pickTitle } from '@/extract/fields.js';
@@ -19,6 +20,7 @@ type Handler = (req: http.IncomingMessage, res: http.ServerResponse, origin: str
 const servers: TestServer[] = [];
 
 afterEach(async () => {
+	vi.restoreAllMocks();
 	await Promise.all(servers.splice(0).map(s => s.close()));
 });
 
@@ -314,15 +316,34 @@ describe('local tests', () => {
 			expect(summary.player.allow).toStrictEqual(['autoplay']);
 		});
 
-		const setUpServerWithAllow = (allow: string) => serve({
+		const setUpServerWithHtml = (html: string) => serve({
 			'/': fixture('htmls/oembed.html'),
 			'/oembed.json': (_req, res) => sendBody(res, JSON.stringify({
 				version: '1.0',
 				type: 'rich',
-				html: `<iframe src='https://example.com/' allow='${allow}'></iframe>`,
+				html,
 				width: 500,
 				height: 300,
 			}), 'application/json'),
+		});
+		const setUpServerWithAllow = (allow: string) => setUpServerWithHtml(`<iframe src='https://example.com/' allow='${allow}'></iframe>`);
+
+		test('markup nested two deep after the iframe is still accepted', async () => {
+			const host = await setUpServerWithHtml('<iframe src=\'https://example.com/\'></iframe><p><b>x</b></p></iframe>');
+			const summary = await summarize(host);
+
+			expect(summary.player.url).toBe('https://example.com/');
+		});
+
+		test('deeply nested markup is rejected without blocking the event loop', async () => {
+			// Parsing every level takes quadratic time in htmlparser2's element stack; the iframe alone would be accepted.
+			const host = await setUpServerWithHtml(`<iframe src='https://example.com/'></iframe>${'<b>'.repeat(200_000)}</iframe>`);
+			const opened = vi.spyOn(Parser.prototype, 'onopentagname');
+			const summary = await summarize(host);
+
+			expect(summary.player.url).toBe(null);
+			// Parsing stops just past the depth limit instead of reading every <b> (the page itself adds a few tags).
+			expect(opened.mock.calls.length).toBeLessThan(1_000);
 		});
 
 		test('whitespace around the separators of allow is dropped', async () => {

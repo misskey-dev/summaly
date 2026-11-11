@@ -126,6 +126,23 @@ describe('parseHead', () => {
 		expect(withBroken.links).toEqual(plain.links);
 	});
 
+	test('入れ子が深すぎるとそこで読むのをやめ、それまでに読んだものを返す', () => {
+		const opened = vi.spyOn(Parser.prototype, 'onopentagname');
+		// Reading all of it would take quadratic time in htmlparser2's element stack.
+		const h = parseHead(`<meta name="a" content="1">${'<b>'.repeat(200_000)}<title>Late</title>`);
+
+		expect(h.meta('name:a')).toBe('1');
+		expect(h.title).toBeNull();
+		// meta, then <b> up to one past the limit.
+		expect(opened.mock.calls.length).toBeLessThanOrEqual(1 + 128 + 1);
+	});
+
+	test('上限ちょうどの深さ（128）の title は読み、それより深いものは読まない', () => {
+		// The title itself is the 128th open element.
+		expect(parseHead(`${'<div>'.repeat(127)}<title>Deep</title>`).title).toBe('Deep');
+		expect(parseHead(`${'<div>'.repeat(128)}<title>Deep</title>`).title).toBeNull();
+	});
+
 	test('エンティティはデコードしない', () => {
 		const h = parseHead('<head><title>A &amp; B</title><meta property="og:title" content="&lt;x&gt; &quot;q&quot;"></head>');
 

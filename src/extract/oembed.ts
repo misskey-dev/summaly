@@ -1,11 +1,16 @@
 // Derived from misskey-dev/summaly (MIT)
-import { DomUtils, parseDocument } from 'htmlparser2';
+import { Parser } from 'htmlparser2';
 import { type ScrapeContext, fetchSubresource } from '@/context.js';
 import type { HeadInfo } from '@/html/head.js';
 import type { Player } from '@/types.js';
 import { linkHref } from './fields.js';
 
 const MAX_HEIGHT = 1024;
+// An accepted html is a top-level iframe (depth 1, since htmlparser2 reads its content as raw text),
+// possibly followed by stray markup that the old DOM-based check let through; one extra level is kept for
+// that. Anything deeper is rejected without parsing the rest: htmlparser2 makes each tag cost as much as
+// the current nesting depth, so unbounded nesting would take quadratic time.
+const MAX_HTML_DEPTH = 2;
 
 // TODO (from upstream): only the basic syntax of `allow` is supported.
 const SAFE_PERMISSIONS = [
@@ -78,22 +83,12 @@ function toPlayer(body: OEmbed): Player | null {
 		return null;
 	}
 
-	const document = parseDocument(body.html);
-	const iframes = DomUtils.getElementsByTagName('iframe', document);
+	const attrs = findTopLevelIframe(body.html);
 
-	if (iframes.length !== 1) {
-		// Somehow we either have multiple iframes or none
+	if (!attrs) {
 		return null;
 	}
 
-	const iframe = iframes[0];
-
-	if (iframe.parent !== document) {
-		// Should be at the top level (upstream: only the body and html elements as the parents)
-		return null;
-	}
-
-	const attrs = iframe.attribs;
 	const url = attrs['src'];
 
 	if (!url) {
@@ -156,4 +151,50 @@ function toPlayer(body: OEmbed): Player | null {
 		height,
 		allow: allowedPermissions,
 	};
+}
+
+/**
+ * Attributes of the iframe when html has exactly one and it is at the top level (upstream: only the body
+ * and html elements as the parents); null otherwise, or when html nests deeper than MAX_HTML_DEPTH.
+ */
+function findTopLevelIframe(html: string): Record<string, string> | null {
+	// Kept in an object: the parser callbacks change these during parser.write(), which plain `let`
+	// narrowing would not see after it.
+	const state: { depth: number; tooDeep: boolean; iframes: number; topLevel: Record<string, string> | null } = {
+		depth: 0,
+		tooDeep: false,
+		iframes: 0,
+		topLevel: null,
+	};
+	const parser = new Parser({
+		onopentag(name, attrs) {
+			state.depth++;
+			if (state.depth > MAX_HTML_DEPTH) {
+				state.tooDeep = true;
+				parser.pause();
+
+				return;
+			}
+			if (name === 'iframe') {
+				state.iframes++;
+				if (state.depth === 1) {
+					state.topLevel = attrs;
+				}
+			}
+		},
+		onclosetag() {
+			state.depth--;
+		},
+	});
+
+	// While paused, end() does not resume: the rest stays untokenized.
+	parser.write(html);
+	parser.end();
+
+	if (state.tooDeep || state.iframes !== 1) {
+		// Too deeply nested, or somehow we either have multiple iframes or none
+		return null;
+	}
+
+	return state.topLevel;
 }

@@ -11,9 +11,16 @@ export type HeadInfo = {
 };
 
 /**
+ * これより深い入れ子に達したら読むのをやめる。htmlparser2 はタグ 1 つごとに現在の深さに比例する手間がかかるため、
+ * 深さに上限がないと入れ子の深いページで二次時間になる。実際のページはこれよりずっと浅い。
+ */
+const MAX_DEPTH = 128;
+
+/**
  * `</head>` か `<body>` に達するまでだけ読む軽量パーサ。
  * `<title>` が head の外にしかない場合に備え、head の後も title が取れるまでは title だけを探す。
  * head が終わり title も取れた時点でトークナイズを止め、残りの本文は読まない。
+ * 入れ子が MAX_DEPTH を超えた時点でも止め、それまでに読めたものだけを返す。
  */
 export function parseHead(html: string): HeadInfo {
 	const metas = new Map<string, string>();
@@ -23,6 +30,7 @@ export function parseHead(html: string): HeadInfo {
 	const state: { title: string | null; headDone: boolean } = { title: null, headDone: false };
 	let inTitle = false;
 	let titleText = '';
+	let depth = 0;
 	// Nothing after this point can change the result. pause() stops the tokenizer right after the current
 	// tag, even in the middle of the string written, so the rest of the page is never tokenized.
 	const stopIfDone = () => {
@@ -34,6 +42,12 @@ export function parseHead(html: string): HeadInfo {
 	const parser = new Parser({
 		// htmlparser2 types attribs as always present; an attribute that is not on the tag is undefined.
 		onopentag(name, attrs: Record<string, string | undefined>) {
+			depth++;
+			if (depth > MAX_DEPTH) {
+				parser.pause();
+
+				return;
+			}
 			if (name === 'title') {
 				if (state.title === null) {
 					inTitle = true;
@@ -81,6 +95,7 @@ export function parseHead(html: string): HeadInfo {
 			}
 		},
 		onclosetag(name) {
+			depth--;
 			if (name === 'title' && inTitle) {
 				inTitle = false;
 				state.title = titleText;
