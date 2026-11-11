@@ -181,18 +181,21 @@ describe('loadServerConfig', () => {
 			NO_PROXY: '',
 			no_proxy: '',
 		});
+
 		expect(config).toEqual({ host: 'localhost', port: 3000, summarizeOptions: {} });
 		expect(Object.keys(config.summarizeOptions)).toEqual([]);
 	});
 
 	test('undefined は未設定として扱われる', () => {
 		const config = loadServerConfig({ SUMMALY_LANG: undefined, SUMMALY_PORT: undefined, HTTPS_PROXY: undefined });
+
 		expect(config).toEqual({ host: 'localhost', port: 3000, summarizeOptions: {} });
 		expect(Object.keys(config.summarizeOptions)).toEqual([]);
 	});
 
 	test('渡された env を変更しない', () => {
 		const env = { SUMMALY_PORT: '8080', SUMMALY_LANG: '' };
+
 		loadServerConfig(env);
 		expect(env).toEqual({ SUMMALY_PORT: '8080', SUMMALY_LANG: '' });
 	});
@@ -213,11 +216,13 @@ describe('loadServerConfig', () => {
 		}
 	});
 
-	test.each(['192.168.010.0/24', '010.0.0.0/8', '0x7f.1/32', '127.1/8', '0x7f000001/32', '2130706433/32', '10.0.0.0/8,192.168.010.0/24'])
-		('SUMMALY_ALLOWED_PRIVATE_NETWORKS の正規でない IPv4 CIDR %s はエラー', value => {
-			expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value })).toThrow(ServerConfigError);
-			expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value })).toThrow(`Invalid value for SUMMALY_ALLOWED_PRIVATE_NETWORKS: ${JSON.stringify(value)}`);
-		});
+	test.each([
+		'192.168.010.0/24', '010.0.0.0/8', '0x7f.1/32', '127.1/8', '0x7f000001/32', '2130706433/32',
+		'10.0.0.0/8,192.168.010.0/24',
+	])('SUMMALY_ALLOWED_PRIVATE_NETWORKS の正規でない IPv4 CIDR %s はエラー', value => {
+		expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value })).toThrow(ServerConfigError);
+		expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value })).toThrow(`Invalid value for SUMMALY_ALLOWED_PRIVATE_NETWORKS: ${JSON.stringify(value)}`);
+	});
 
 	test.each([
 		['::ffff:192.168.0.0/112', '192.168.0.0/16'],
@@ -234,6 +239,7 @@ describe('loadServerConfig', () => {
 
 	test('SUMMALY_ALLOWED_PRIVATE_NETWORKS の正規の IPv4 / IPv6 CIDR は受け付ける', () => {
 		const value = '0.0.0.0/0,10.0.0.0/8,192.168.10.0/24,::/0,::1/128,fd00::/8,2001:db8::/32';
+
 		expect(loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value }).summarizeOptions).toEqual({
 			allowedPrivateNetworks: value.split(','),
 		});
@@ -304,6 +310,7 @@ describe('loadServerConfig', () => {
 			['ftp://user:secret@proxy.example', '"ftp://***@proxy.example"'],
 		])('エラーメッセージに認証情報を含めない (%j)', (value, shown) => {
 			let message = '';
+
 			try {
 				loadServerConfig({ HTTPS_PROXY: value });
 			} catch (err) {
@@ -391,6 +398,7 @@ describe('CHIRAMISS_* と SUMMALY_*', () => {
 			...c.expected,
 			summarizeOptions: { ...config.summarizeOptions, ...c.expected.summarizeOptions },
 		}), defaults);
+
 		expect(loadServerConfig(env)).toEqual(expected);
 	});
 });

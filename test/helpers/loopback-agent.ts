@@ -10,9 +10,12 @@ import net from 'node:net';
 export function loopbackAgents(port: number): { http: http.Agent; https: https.Agent; destroy(): void } {
 	const connect = () => net.connect(port, '127.0.0.1');
 	const httpAgent = new http.Agent();
+
 	httpAgent.createConnection = connect as typeof httpAgent.createConnection;
 	const httpsAgent = new https.Agent();
+
 	httpsAgent.createConnection = connect as typeof httpsAgent.createConnection;
+
 	return {
 		http: httpAgent,
 		https: httpsAgent,

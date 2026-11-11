@@ -17,6 +17,7 @@ declare const summalyDefaultUserAgent: string;
 
 export async function fetchSummary(url: string, lang?: string): Promise<SummalyResult> {
 	const { summaly } = await import('../../built/index.js');
+
 	return summaly(url, {
 		followRedirects: meta.urlPreviewAllowRedirect,
 		lang: lang ?? 'ja-JP',

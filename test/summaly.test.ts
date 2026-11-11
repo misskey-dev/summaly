@@ -24,22 +24,31 @@ const ALLOW_PRIVATE_IP_VARS = ['CHIRAMISS_ALLOW_PRIVATE_IP', 'SUMMALY_ALLOW_PRIV
 const originalAllowPrivateIp = ALLOW_PRIVATE_IP_VARS.map(name => [name, process.env[name]] as const);
 
 beforeEach(() => {
-	for (const name of ALLOW_PRIVATE_IP_VARS) delete process.env[name];
+	for (const name of ALLOW_PRIVATE_IP_VARS) {
+		delete process.env[name];
+	}
 });
 
 afterEach(async () => {
 	for (const [name, value] of originalAllowPrivateIp) {
-		if (value === undefined) delete process.env[name];
-		else process.env[name] = value;
+		if (value === undefined) {
+			delete process.env[name];
+		} else {
+			process.env[name] = value;
+		}
 	}
-	for (const cleanup of cleanups.splice(0)) cleanup();
+	for (const cleanup of cleanups.splice(0)) {
+		cleanup();
+	}
 	await Promise.all(servers.splice(0).map(s => s.close()));
 });
 
 /** Starts a test server on an ephemeral port and returns its origin such as `http://127.0.0.1:12345`. */
 async function serve(handler: Handler, host?: string): Promise<string> {
 	const server = await startTestServer(handler, host);
+
 	servers.push(server);
+
 	return server.url.replace(/\/$/, '');
 }
 
@@ -50,8 +59,11 @@ function fixture(path: string): Buffer {
 /** Like the upstream fastify `app.get('/')` routes: `/` (GET and HEAD) gets `handler`, anything else is 404. */
 function onlyRoot(handler: Handler): Handler {
 	return (req, res) => {
-		if (new URL(req.url ?? '/', 'http://localhost').pathname === '/') handler(req, res);
-		else res.writeHead(404).end();
+		if (new URL(req.url ?? '/', 'http://localhost').pathname === '/') {
+			handler(req, res);
+		} else {
+			res.writeHead(404).end();
+		}
 	};
 }
 
@@ -63,7 +75,9 @@ function sendWithLength(res: http.ServerResponse, content: Buffer) {
 /** Sends the body without content-length (chunked), like upstream's `reply.send(stream)`. */
 function sendStream(res: http.ServerResponse, chunks: Buffer[]) {
 	res.writeHead(200, { 'content-type': 'text/html' });
-	for (const chunk of chunks) res.write(chunk);
+	for (const chunk of chunks) {
+		res.write(chunk);
+	}
 	res.end();
 }
 
@@ -72,11 +86,14 @@ function hookedAgent(): { agent: http.Agent; ports: number[] } {
 	const agent = new http.Agent();
 	const ports: number[] = [];
 	const original = agent.createConnection.bind(agent);
+
 	agent.createConnection = ((...args: Parameters<typeof original>) => {
 		ports.push(Number(args[0].port));
+
 		return original(...args);
 	}) as typeof agent.createConnection;
 	cleanups.push(() => agent.destroy());
+
 	return { agent, ports };
 }
 
@@ -104,11 +121,13 @@ describe('local tests', () => {
 		beforeEach(async () => {
 			process.env.SUMMALY_ALLOW_PRIVATE_IP = 'false';
 			const content = fixture('htmls/og-title.html');
+
 			host = await serve((_req, res) => sendWithLength(res, content));
 		});
 
 		test('private ipなサーバーの情報を取得できない', async () => {
 			const summary = await summarize(host).catch((e: StatusError) => e);
+
 			if (summary instanceof StatusError) {
 				expect(summary.name).toBe('StatusError');
 			} else {
@@ -121,16 +140,19 @@ describe('local tests', () => {
 				http: new httpAgent({ keepAlive: true }),
 				https: new httpsAgent({ keepAlive: true }),
 			};
+
 			cleanups.push(() => {
 				agent.http.destroy();
 				agent.https.destroy();
 			});
 			const summary = await summarize(host, { agent });
+
 			expect(summary.title).toBe('Strawberry Pasta');
 		});
 
 		test('agentが空のオブジェクトの場合はprivate ipを許可しない', async () => {
 			const summary = await summarize(host, { agent: {} }).catch((e: StatusError) => e);
+
 			if (summary instanceof StatusError) {
 				expect(summary.name).toBe('StatusError');
 			} else {
@@ -148,6 +170,7 @@ describe('local tests', () => {
 				ua = req.headers['user-agent'];
 				sendWithLength(res, content);
 			}));
+
 			await summarize(host, { userAgent: 'test-ua', allowedPrivateNetworks });
 
 			expect(ua).toBe('test-ua');
@@ -269,6 +292,7 @@ describe('chiramiss additions', () => {
 			}
 		});
 		const agents = loopbackAgents(Number(new URL(server).port));
+
 		cleanups.push(() => agents.destroy());
 
 		const summary = await summarize('https://www.amazon.co.jp/dp/OLD', {
@@ -374,6 +398,7 @@ describe('chiramiss additions', () => {
 			test: () => true,
 			summarize: async (url, opts) => {
 				calls.push({ url: url.href, opts });
+
 				return { ...pluginSummary };
 			},
 		};
@@ -382,6 +407,7 @@ describe('chiramiss additions', () => {
 		// the caller's raw values merged over defaultSummarizeOptions, so unset keys stay undefined and lang is not validated.
 		const host = await serve(onlyRoot((_req, res) => sendWithLength(res, Buffer.from('<html></html>'))));
 		const custom = await summarize(host, { plugins: [plugin], lang: 'not a valid lang!', allowedPrivateNetworks });
+
 		expect(custom).toEqual({ ...pluginSummary, url: `${host}/` });
 		expect(calls).toHaveLength(1);
 		expect(calls[0].url).toBe(`${host}/`);
@@ -407,6 +433,7 @@ describe('chiramiss additions', () => {
 			contentLengthRequired: true,
 			allowedPrivateNetworks,
 		});
+
 		expect(given).toEqual({ ...pluginSummary, url: host });
 		expect(calls).toHaveLength(2);
 		expect(calls[1].opts).toStrictEqual({
@@ -426,8 +453,10 @@ describe('chiramiss additions', () => {
 			res.end(wikiBody);
 		});
 		const agents = loopbackAgents(Number(new URL(wiki).port));
+
 		cleanups.push(() => agents.destroy());
 		const builtin = await summarize('https://ja.wikipedia.org/wiki/Wiki', { plugins: [plugin], agent: { http: agents.http, https: agents.https } });
+
 		expect(builtin).toMatchObject({ title: 'Wiki', description: 'text', sitename: 'Wikipedia', url: 'https://ja.wikipedia.org/wiki/Wiki' });
 		expect(calls).toHaveLength(2);
 	});

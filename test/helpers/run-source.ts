@@ -25,6 +25,7 @@ export function runSourceScript(body: string, args: string[] = []): Promise<Sour
 		${body}
 		process.stderr.write('\\n__script_done__\\n');
 	`;
+
 	return new Promise((resolve, reject) => {
 		const child = spawn(process.execPath, ['--input-type=module', '--no-warnings', '-e', script, ...args], {
 			stdio: ['ignore', 'pipe', 'pipe'],
@@ -32,16 +33,20 @@ export function runSourceScript(body: string, args: string[] = []): Promise<Sour
 		let stdout = '';
 		let stderr = '';
 		let doneAt: number | undefined;
+
 		child.stdout.on('data', (chunk: Buffer) => {
 			stdout += chunk.toString();
 		});
 		child.stderr.on('data', (chunk: Buffer) => {
 			stderr += chunk.toString();
-			if (doneAt === undefined && stderr.includes('__script_done__')) doneAt = Date.now();
+			if (doneAt === undefined && stderr.includes('__script_done__')) {
+				doneAt = Date.now();
+			}
 		});
 		child.on('error', reject);
 		child.on('close', code => {
 			const exitDelay = doneAt === undefined ? Number.NaN : Date.now() - doneAt;
+
 			resolve({ code, stdout, stderr: stderr.replace('\n__script_done__\n', ''), exitDelay });
 		});
 	});

@@ -42,14 +42,18 @@ describe('cleanupTitle', () => {
 
 	describe('RegExp.escape がない環境（Node 22）', () => {
 		const original = Object.getOwnPropertyDescriptor(RegExp, 'escape');
+
 		afterEach(() => {
-			if (original) Object.defineProperty(RegExp, 'escape', original);
+			if (original) {
+				Object.defineProperty(RegExp, 'escape', original);
+			}
 		});
 
 		test('サイト名の正規表現の記号は文字どおりに扱う', () => {
 			Object.defineProperty(RegExp, 'escape', { value: undefined, configurable: true, writable: true });
 
 			const siteName = 'a.b (c)*+?^$ [d]{2}|e\\f/g-h';
+
 			expect(cleanupTitle(`Page - ${siteName}`, siteName)).toBe('Page');
 			expect(cleanupTitle('Page - aXb', 'a.b')).toBe('Page - aXb');
 			expect(cleanupTitle('Page - ab', 'a*b')).toBe('Page - ab');

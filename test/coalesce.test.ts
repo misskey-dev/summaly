@@ -28,10 +28,15 @@ const originalAllowPrivateIp = ALLOW_PRIVATE_IP_VARS.map(name => [name, process.
 
 afterEach(async () => {
 	for (const [name, value] of originalAllowPrivateIp) {
-		if (value === undefined) delete process.env[name];
-		else process.env[name] = value;
+		if (value === undefined) {
+			delete process.env[name];
+		} else {
+			process.env[name] = value;
+		}
 	}
-	for (const cleanup of cleanups.splice(0)) cleanup();
+	for (const cleanup of cleanups.splice(0)) {
+		cleanup();
+	}
 	await Promise.all(servers.splice(0).map(s => s.close()));
 });
 
@@ -49,7 +54,9 @@ const PAGE = Buffer.from([
 async function countingServer(opts: { delayMs?: number; status?: number } = {}): Promise<{ url: string; gets: () => number }> {
 	let gets = 0;
 	const server = await startTestServer((req, res) => {
-		if (req.method === 'GET') gets++;
+		if (req.method === 'GET') {
+			gets++;
+		}
 		setTimeout(() => {
 			if (new URL(req.url ?? '/', 'http://localhost').pathname !== '/') {
 				res.writeHead(404).end();
@@ -61,13 +68,17 @@ async function countingServer(opts: { delayMs?: number; status?: number } = {}):
 			}
 		}, opts.delayMs ?? 0);
 	});
+
 	servers.push(server);
+
 	return { url: server.url, gets: () => gets };
 }
 
 function newAgent(): http.Agent {
 	const agent = new http.Agent();
+
 	cleanups.push(() => agent.destroy());
+
 	return agent;
 }
 
@@ -76,13 +87,16 @@ function recordingCache(): SummaryCache & { gets: () => number; storedKinds: Cac
 	const inner = new MemorySummaryCache();
 	let gets = 0;
 	const storedKinds: CacheEntry['kind'][] = [];
+
 	return {
 		get: key => {
 			gets++;
+
 			return inner.get(key);
 		},
 		set: (key, entry, ttlMs) => {
 			storedKinds.push(entry.kind);
+
 			return inner.set(key, entry, ttlMs);
 		},
 		gets: () => gets,
@@ -93,10 +107,12 @@ function recordingCache(): SummaryCache & { gets: () => number; storedKinds: Cac
 /** A plugin that answers for `hostname` with a fixed summary plus `extra` fields, and counts its calls. */
 function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): SummaryPlugin & { calls: () => number } {
 	let calls = 0;
+
 	return {
 		test: url => url.hostname === hostname,
 		summarize: async () => {
 			calls++;
+
 			return {
 				title: 't',
 				icon: null,
@@ -117,13 +133,16 @@ function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): Sum
 /** Estimated bytes of one entry, as MemorySummaryCache accounts it. */
 async function sizeOf(key: string, entry: CacheEntry): Promise<number> {
 	const cache = new MemorySummaryCache();
+
 	await cache.set(key, entry, 60_000);
+
 	return cache.estimatedBytes;
 }
 
 /** A cache that returns `entry` for every key and records what is stored. */
 function brokenCache(entry: unknown): SummaryCache & { stored: CacheEntry[] } {
 	const stored: CacheEntry[] = [];
+
 	return {
 		get: async () => entry as CacheEntry,
 		set: async (_key, value) => {
@@ -142,7 +161,9 @@ describe('coalescing and caching', () => {
 
 		expect(server.gets()).toBe(1);
 		expect(results[0].title).toBe('Coalesced');
-		for (const result of results) expect(result).toEqual(results[0]);
+		for (const result of results) {
+			expect(result).toEqual(results[0]);
+		}
 		// Each caller gets its own copy.
 		expect(new Set(results).size).toBe(10);
 	});
@@ -196,14 +217,17 @@ describe('coalescing and caching', () => {
 			summarize(server.url).catch((e: unknown) => e),
 			summarize(server.url).catch((e: unknown) => e),
 		]);
+
 		expect(server.gets()).toBe(1);
 		const first = concurrent[0] as StatusError;
+
 		expect(first).toBeInstanceOf(StatusError);
 		expect(first.statusCode).toBe(404);
 		expect(concurrent[1]).toBeInstanceOf(StatusError);
 		expect(concurrent[1]).toMatchObject({ name: first.name, message: first.message, statusCode: 404 });
 
 		const cached = await summarize(server.url).catch((e: unknown) => e);
+
 		expect(server.gets()).toBe(1);
 		expect(cached).toBeInstanceOf(StatusError);
 		expect(cached).toMatchObject({ name: 'StatusError', message: first.message, statusCode: 404, isPermanentError: true });
@@ -219,6 +243,7 @@ describe('coalescing and caching', () => {
 
 		const [a, b] = await Promise.all([summarize(server.url), summarize(server.url)]);
 		const original = structuredClone(b);
+
 		expect(original.thumbnail).not.toBeNull();
 
 		// The host app replaces icon and thumbnail on the result it receives.
@@ -228,6 +253,7 @@ describe('coalescing and caching', () => {
 		expect(b).toEqual(original);
 
 		const hit = await summarize(server.url);
+
 		expect(server.gets()).toBe(1);
 		expect(hit).toEqual(original);
 
@@ -241,6 +267,7 @@ describe('coalescing and caching', () => {
 		const server = await countingServer({ delayMs: 50 });
 
 		const disabled = createSummarizer({ allowedPrivateNetworks, cache: false, coordinator: false });
+
 		await Promise.all([disabled(server.url), disabled(server.url), disabled(server.url)]);
 		await disabled(server.url);
 		expect(server.gets()).toBe(4);
@@ -248,6 +275,7 @@ describe('coalescing and caching', () => {
 		// The same options per call disable them on an instance that has them enabled.
 		const enabled = createSummarizer({ allowedPrivateNetworks });
 		const off = { cache: false, coordinator: false } as const;
+
 		await Promise.all([enabled(server.url, off), enabled(server.url, off)]);
 		await enabled(server.url, off);
 		expect(server.gets()).toBe(7);
@@ -257,12 +285,14 @@ describe('coalescing and caching', () => {
 		const server = await countingServer({ delayMs: 50 });
 
 		const coordinatorOnly = createSummarizer({ allowedPrivateNetworks, cache: false });
+
 		await Promise.all([coordinatorOnly(server.url), coordinatorOnly(server.url)]);
 		expect(server.gets()).toBe(1);
 		await coordinatorOnly(server.url);
 		expect(server.gets()).toBe(2);
 
 		const cacheOnly = createSummarizer({ allowedPrivateNetworks, coordinator: false });
+
 		await cacheOnly(server.url);
 		await cacheOnly(server.url);
 		expect(server.gets()).toBe(3);
@@ -301,7 +331,10 @@ describe('coalescing and caching', () => {
 	// as many summaries as the 1000 it kept before favicon checks were cached.
 	test('MemorySummaryCache は既定で 2000 件まで持つ', async () => {
 		const cache = new MemorySummaryCache();
-		for (let i = 0; i <= 2000; i++) await cache.set(`k${i}`, { kind: 'icon', href: null }, 60_000);
+
+		for (let i = 0; i <= 2000; i++) {
+			await cache.set(`k${i}`, { kind: 'icon', href: null }, 60_000);
+		}
 
 		expect(cache.size).toBe(2000);
 		expect(await cache.get('k0')).toBeUndefined();
@@ -357,7 +390,9 @@ describe('coalescing and caching', () => {
 			res.writeHead(200, { 'content-type': 'text/html', 'content-length': page.byteLength });
 			res.end(page);
 		});
+
 		servers.push(server);
+
 		return server;
 	}
 
@@ -387,6 +422,7 @@ describe('coalescing and caching', () => {
 
 		for (let i = 0; i < 20; i++) {
 			const result = await summarize(`${server.url}page/${i}`);
+
 			expect(result.thumbnail?.length).toBeGreaterThan(256 * 1024);
 			expect(cache.estimatedBytes).toBeLessThanOrEqual(maxBytes);
 		}
@@ -394,6 +430,7 @@ describe('coalescing and caching', () => {
 		expect(cache.size).toBeLessThan(20);
 		// The newest stays; the oldest went first.
 		const keyOf = (i: number) => buildRequestKey(`${server.url}page/${i}`, { ...defaultSummarizeOptions, allowedPrivateNetworks });
+
 		expect(await cache.get(keyOf(19))).toBeDefined();
 		expect(await cache.get(keyOf(0))).toBeUndefined();
 	});
@@ -427,11 +464,13 @@ describe('coalescing and caching', () => {
 
 		const fresh = await summarize(ok.url);
 		const fromCache = await summarize(ok.url);
+
 		expect(ok.gets()).toBe(1);
 		expect(fromCache).toEqual(fresh);
 
 		const freshError = await summarize(notFound.url).catch((e: unknown) => e) as StatusError;
 		const cachedError = await summarize(notFound.url).catch((e: unknown) => e) as StatusError;
+
 		expect(notFound.gets()).toBe(1);
 		expect(cachedError).toBeInstanceOf(StatusError);
 		expect(cachedError).toMatchObject({
@@ -518,6 +557,7 @@ describe('runCoalesced', () => {
 		}).catch((e: unknown) => e) as StatusError;
 
 		const stored = await cache.get('k');
+
 		expect(stored).toMatchObject({ kind: 'error', error: { statusCode: 500, statusMessage: 'Internal Server Error' } });
 		expect(stored?.kind === 'error' && stored.error.message).toBe('x'.repeat(1024));
 		// The caller whose call ran the task gets the same clipped error as later callers.
@@ -530,6 +570,7 @@ describe('runCoalesced', () => {
 		const key = vi.fn(() => 'k');
 		const deps = { cache: null, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
 		const value = await runCoalesced(deps, key, async () => result);
+
 		expect(value).toEqual(result);
 		expect(value).not.toBe(result);
 		await expect(runCoalesced(deps, key, async () => {
@@ -552,6 +593,7 @@ describe('runCoalesced', () => {
 		const task = async () => {
 			calls++;
 			await sleep(50);
+
 			return result;
 		};
 
@@ -559,6 +601,7 @@ describe('runCoalesced', () => {
 		const icons = await Promise.all([
 			runCoalescedIcon(deps, () => 'i', async () => {
 				await sleep(50);
+
 				return 'https://example.com/favicon.ico';
 			}),
 			runCoalescedIcon(deps, () => 'i', async () => 'https://example.com/other.ico'),
@@ -571,6 +614,7 @@ describe('runCoalesced', () => {
 
 	test('TTL が 0 なら保存しない', async () => {
 		const cache = new JsonCache();
+
 		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, () => 'ok', async () => result);
 		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, () => 'ng', async () => {
 			throw new Error('x');
@@ -596,6 +640,7 @@ describe('runCoalesced', () => {
 		let calls = 0;
 		const value = await runCoalesced({ cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 }, () => 'k', async () => {
 			calls++;
+
 			return result;
 		});
 
@@ -620,6 +665,7 @@ describe('runCoalesced', () => {
 		let calls = 0;
 		const href = await runCoalescedIcon({ cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 }, () => 'k', async () => {
 			calls++;
+
 			return 'https://example.com/favicon.ico';
 		});
 
@@ -637,6 +683,7 @@ describe('runCoalesced', () => {
 
 		expect(await runCoalescedIcon(deps, key, async () => {
 			calls++;
+
 			return null;
 		})).toBeNull();
 		expect(calls).toBe(1);
@@ -708,8 +755,11 @@ describe('buildRequestKey', () => {
 	});
 
 	test('SUMMALY_ALLOW_PRIVATE_IP が違えば key も違う', () => {
-		for (const name of ALLOW_PRIVATE_IP_VARS) delete process.env[name];
+		for (const name of ALLOW_PRIVATE_IP_VARS) {
+			delete process.env[name];
+		}
 		const unset = buildRequestKey(url, {});
+
 		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
 		const enabled = buildRequestKey(url, {});
 
@@ -717,7 +767,9 @@ describe('buildRequestKey', () => {
 	});
 
 	test('プライベート IP の許可はどちらの変数名で指定しても同じ key になり、CHIRAMISS_ALLOW_PRIVATE_IP が優先される', () => {
-		for (const name of ALLOW_PRIVATE_IP_VARS) delete process.env[name];
+		for (const name of ALLOW_PRIVATE_IP_VARS) {
+			delete process.env[name];
+		}
 		const unset = buildRequestKey(url, {});
 
 		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
@@ -741,9 +793,11 @@ describe('buildRequestKey', () => {
 		// so the first agent (or plugin) in each gets the same number.
 		vi.resetModules();
 		const first = await import('@/coalesce/key.js');
+
 		vi.resetModules();
 		const second = await import('@/coalesce/key.js');
 		const agents = [new http.Agent(), new http.Agent()];
+
 		cleanups.push(() => agents.forEach(a => a.destroy()));
 		const plugin = (): SummaryPlugin => ({ test: () => false, summarize: async () => null });
 
@@ -775,6 +829,7 @@ describe('buildIconKey', () => {
 
 	test('同じ URL と設定でも、要約のキーとは重ならない', () => {
 		const variants: SummarizeOptions[] = [{}, { ...defaultSummarizeOptions }, { allowedPrivateNetworks }, { userAgent: 'ua' }];
+
 		for (const opts of variants) {
 			expect(buildIconKey(url, opts)).not.toBe(buildRequestKey(url, opts));
 		}
@@ -782,6 +837,7 @@ describe('buildIconKey', () => {
 
 	test('HEAD の結果を変えうる設定が違えば key も違う', () => {
 		const agent = new http.Agent();
+
 		cleanups.push(() => agent.destroy());
 		const variants: SummarizeOptions[] = [
 			{},
@@ -803,8 +859,11 @@ describe('buildIconKey', () => {
 	});
 
 	test('プライベート IP 許可の環境変数が違えば key も違う', () => {
-		for (const name of ALLOW_PRIVATE_IP_VARS) delete process.env[name];
+		for (const name of ALLOW_PRIVATE_IP_VARS) {
+			delete process.env[name];
+		}
 		const unset = buildIconKey(url, {});
+
 		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
 
 		expect(buildIconKey(url, {})).not.toBe(unset);

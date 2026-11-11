@@ -24,15 +24,22 @@ const originalAllowPrivateIp = ALLOW_PRIVATE_IP_VARS.map(name => [name, process.
 
 beforeEach(() => {
 	// These tests decide for themselves whether the environment allows private IPs.
-	for (const name of ALLOW_PRIVATE_IP_VARS) delete process.env[name];
+	for (const name of ALLOW_PRIVATE_IP_VARS) {
+		delete process.env[name];
+	}
 });
 
 afterEach(async () => {
 	for (const [name, value] of originalAllowPrivateIp) {
-		if (value === undefined) delete process.env[name];
-		else process.env[name] = value;
+		if (value === undefined) {
+			delete process.env[name];
+		} else {
+			process.env[name] = value;
+		}
 	}
-	for (const cleanup of cleanups.splice(0)) cleanup();
+	for (const cleanup of cleanups.splice(0)) {
+		cleanup();
+	}
 	await Promise.all(servers.splice(0).map(s => s.close()));
 });
 
@@ -60,22 +67,32 @@ async function site(opts: {
 	let faviconHeads = 0;
 	const server = await startTestServer((req, res) => {
 		if (new URL(req.url ?? '/', 'http://localhost').pathname === '/favicon.png') {
-			if (req.method === 'HEAD') faviconHeads++;
+			if (req.method === 'HEAD') {
+				faviconHeads++;
+			}
 			setTimeout(() => res.writeHead(opts.faviconStatus ?? 200, { 'content-type': 'image/png' }).end(), opts.faviconDelayMs ?? 0);
+
 			return;
 		}
-		if (req.method === 'GET') opts.onPageGet?.();
+		if (req.method === 'GET') {
+			opts.onPageGet?.();
+		}
 		const page = Buffer.from(`<html><head><title>Page</title><link rel="icon" href="${opts.faviconHref ?? '/favicon.png'}"></head></html>`);
+
 		res.writeHead(200, { 'content-type': 'text/html', 'content-length': page.byteLength });
 		res.end(page);
 	}, opts.host);
+
 	servers.push(server);
+
 	return { url: server.url, favicon: `${server.url}favicon.png`, faviconHeads: () => faviconHeads };
 }
 
 function newAgent(): http.Agent {
 	const agent = new http.Agent();
+
 	cleanups.push(() => agent.destroy());
+
 	return agent;
 }
 
@@ -191,6 +208,7 @@ describe('favicon の確認結果のキャッシュ', () => {
 
 		expect(s.faviconHeads()).toBe(1);
 		const iconKey = buildIconKey(s.favicon, { ...defaultSummarizeOptions, allowedPrivateNetworks });
+
 		expect(JSON.parse(cache.stored.get(iconKey) ?? 'null')).toEqual({ kind: 'icon', href: s.favicon });
 	});
 
@@ -235,6 +253,7 @@ describe('favicon の確認結果のキャッシュ', () => {
 
 		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'true';
 		const allowed = await summarize(`${pages.url}a`);
+
 		delete process.env.CHIRAMISS_ALLOW_PRIVATE_IP;
 		const denied = await summarize(`${pages.url}b`);
 
@@ -264,7 +283,9 @@ describe('favicon の確認結果のキャッシュ', () => {
 		const pages = await site({
 			faviconHref: icons.favicon,
 			onPageGet: () => {
-				if (networks.length === 2) networks.pop();
+				if (networks.length === 2) {
+					networks.pop();
+				}
 			},
 		});
 		const summarize = createSummarizer({ allowedPrivateNetworks: networks });
@@ -280,6 +301,7 @@ describe('favicon の確認結果のキャッシュ', () => {
 		const icons = await site({ host: '127.0.0.2' });
 		const httpAgent = new http.Agent();
 		const httpsAgent = new https.Agent();
+
 		cleanups.push(() => httpAgent.destroy(), () => httpsAgent.destroy());
 		// Both agents supplied: the caller takes over private IP blocking, so the first call reaches 127.0.0.2.
 		const agent: { http?: http.Agent; https?: https.Agent } = { http: httpAgent, https: httpsAgent };
@@ -302,7 +324,9 @@ describe('favicon の確認結果のキャッシュ', () => {
 		const nested: [string, string][] = [];
 		const coordinator: InflightCoordinator = {
 			run: async (key, task) => {
-				for (const outer of running) nested.push([outer, key]);
+				for (const outer of running) {
+					nested.push([outer, key]);
+				}
 				running.push(key);
 				try {
 					return await inner.run(key, task);
@@ -326,6 +350,7 @@ describe('favicon の確認結果のキャッシュ', () => {
 		const pageUrl = `${s.url}a`;
 		const summaryKey = buildRequestKey(pageUrl, opts);
 		const iconKey = buildIconKey(s.favicon, opts);
+
 		await cache.set(summaryKey, { kind: 'icon', href: 'https://wrong.example/icon.png' }, 60_000);
 		await cache.set(iconKey, { kind: 'ok', value: { ...result, icon: 'https://wrong.example/icon.png' } }, 60_000);
 		const summarize = createSummarizer({ allowedPrivateNetworks, cache });
@@ -346,7 +371,10 @@ describe('favicon の確認結果のキャッシュ', () => {
 		const iconKey = buildIconKey(s.favicon, { ...defaultSummarizeOptions, allowedPrivateNetworks });
 		const cache: SummaryCache = {
 			get: async key => {
-				if (key === iconKey) throw new Error('cache is down');
+				if (key === iconKey) {
+					throw new Error('cache is down');
+				}
+
 				return inner.get(key);
 			},
 			set: (key, entry, ttlMs) => inner.set(key, entry, ttlMs),
@@ -386,7 +414,11 @@ describe('favicon の確認結果のキャッシュ', () => {
 			// Runs every task, but fails to hand back the favicon check's outcome.
 			run: async (_key, task) => {
 				const value = await task();
-				if ((value as { kind?: unknown }).kind === 'icon') throw new Error('coordinator is down');
+
+				if ((value as { kind?: unknown }).kind === 'icon') {
+					throw new Error('coordinator is down');
+				}
+
 				return value;
 			},
 		};
@@ -404,7 +436,9 @@ function failingIconSet(inner: SummaryCache): SummaryCache {
 	return {
 		get: key => inner.get(key),
 		set: async (key, entry, ttlMs) => {
-			if (entry.kind === 'icon') throw new Error('cache is down');
+			if (entry.kind === 'icon') {
+				throw new Error('cache is down');
+			}
 			await inner.set(key, entry, ttlMs);
 		},
 	};

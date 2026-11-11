@@ -45,21 +45,25 @@ describe('環境変数で設定したサーバーの動作', () => {
 			};
 			reply.header('content-length', content.byteLength);
 			reply.header('content-type', 'text/html');
+
 			return reply.send(content);
 		});
 		target.get('/redirect', (_request, reply) => {
 			reply.code(302);
 			reply.header('location', '/');
 			reply.header('content-type', 'text/html');
+
 			return reply.send('<html><head><title>Redirect Source</title></head><body></body></html>');
 		});
 		target.get('/large', (_request, reply) => {
 			reply.header('content-type', 'text/html');
+
 			return reply.send(Buffer.alloc(DEFAULT_MAX_RESPONSE_SIZE + 1, ' '));
 		});
 		target.get('/chunked', (_request, reply) => {
 			// A stream is sent without content-length
 			reply.header('content-type', 'text/html');
+
 			return reply.send(Readable.from([content]));
 		});
 		target.get('/silent', (_request, reply) => {
@@ -69,6 +73,7 @@ describe('環境変数で設定したサーバーの動作', () => {
 		target.get('/counted', (_request, reply) => {
 			countedHits++;
 			reply.header('content-type', 'text/html');
+
 			return reply.send(content);
 		});
 		await target.listen({ host: '127.0.0.1', port: 0 });
@@ -84,13 +89,16 @@ describe('環境変数で設定したサーバーの動作', () => {
 
 	async function createApp(env: NodeJS.ProcessEnv, deps?: Parameters<typeof buildApp>[1]): Promise<FastifyInstance> {
 		const instance = buildApp(loadServerConfig({ ...LOOPBACK_ENV, ...env }), deps);
+
 		await instance.ready();
+
 		return instance;
 	}
 
 	test('url が指定されていない場合は 400 になる', async () => {
 		app = await createApp({});
 		const res = await app.inject({ method: 'GET', url: '/' });
+
 		expect(res.statusCode).toBe(400);
 		expect(res.json()).toEqual({ error: 'url is required' });
 	});
@@ -137,6 +145,7 @@ describe('環境変数で設定したサーバーの動作', () => {
 	test('GET /healthz は 200 {status:"ok"}', async () => {
 		app = await createApp({});
 		const res = await app.inject({ method: 'GET', url: '/healthz' });
+
 		expect(res.statusCode).toBe(200);
 		expect(res.json()).toEqual({ status: 'ok' });
 	});
@@ -250,9 +259,11 @@ describe('環境変数で設定したサーバーの動作', () => {
 			const chunkedUrl = new URL('/chunked', targetUrl).href;
 
 			const byDefault = await app.inject({ method: 'GET', url: '/', query: { url: chunkedUrl } });
+
 			expect(byDefault.statusCode).toBe(200);
 
 			const required = await app.inject({ method: 'GET', url: '/', query: { url: chunkedUrl, contentLengthRequired: 'true' } });
+
 			expect(required.statusCode).toBe(500);
 		});
 	});
@@ -282,14 +293,17 @@ describe('環境変数で設定したサーバーの動作', () => {
 		const redirectUrl = new URL('/redirect', targetUrl).href;
 
 		const byDefault = await app.inject({ method: 'GET', url: '/', query: { url: redirectUrl } });
+
 		expect(byDefault.statusCode).toBe(200);
 		expect(byDefault.json()).toMatchObject({ title: 'Redirect Source', url: redirectUrl });
 
 		const disabled = await app.inject({ method: 'GET', url: '/', query: { url: redirectUrl, followRedirects: 'false' } });
+
 		expect(disabled.statusCode).toBe(200);
 		expect(disabled.json()).toMatchObject({ title: 'Redirect Source', url: redirectUrl });
 
 		const enabled = await app.inject({ method: 'GET', url: '/', query: { url: redirectUrl, followRedirects: 'true' } });
+
 		expect(enabled.statusCode).toBe(200);
 		expect(enabled.json()).toMatchObject({ title: 'KISS principle', url: targetUrl });
 	});
@@ -345,6 +359,7 @@ describe('環境変数で設定したサーバーの動作', () => {
 		const coordinator: InflightCoordinator = {
 			run: (_key, task) => {
 				runs++;
+
 				return task();
 			},
 		};
@@ -438,6 +453,7 @@ describe('resolveRequestOptions', () => {
 
 	test('環境変数があればそれが上限になる', () => {
 		const env = { responseTimeout: 500, operationTimeout: 800, contentLengthLimit: 100 };
+
 		expect(resolveRequestOptions({ responseTimeout: '501', operationTimeout: '0', contentLengthLimit: '1000' }, env))
 			.toEqual({ followRedirects: false, ...env });
 		expect(resolveRequestOptions({ responseTimeout: '499', operationTimeout: '1', contentLengthLimit: '100' }, env))
@@ -446,6 +462,7 @@ describe('resolveRequestOptions', () => {
 
 	test('環境変数のタイムアウトが 0 (無制限) なら、クエリの正の値はどれも適用される', () => {
 		const env = { responseTimeout: 0, operationTimeout: 0 };
+
 		expect(resolveRequestOptions({ responseTimeout: '1000', operationTimeout: '2000' }, env))
 			.toMatchObject({ responseTimeout: 1000, operationTimeout: 2000 });
 		expect(resolveRequestOptions({ responseTimeout: '2147483647', operationTimeout: '2147483647' }, env))
@@ -457,6 +474,7 @@ describe('resolveRequestOptions', () => {
 
 	test('環境変数のタイムアウトが 0 (無制限) のとき、クエリの 0 や不正な値では無制限のまま', () => {
 		const env = { responseTimeout: 0, operationTimeout: 0 };
+
 		expect(resolveRequestOptions({}, env)).toMatchObject(env);
 		expect(resolveRequestOptions({ responseTimeout: '0', operationTimeout: '0' }, env)).toMatchObject(env);
 		expect(resolveRequestOptions({ responseTimeout: '-1', operationTimeout: '2147483648' }, env)).toMatchObject(env);
@@ -472,6 +490,7 @@ describe('resolveRequestOptions', () => {
 
 	test('lang / userAgent / followRedirects は環境変数が優先、なければクエリ', () => {
 		const query = { lang: 'ja-JP', userAgent: 'query-ua', followRedirects: 'true' };
+
 		expect(resolveRequestOptions(query, {})).toMatchObject({ lang: 'ja-JP', userAgent: 'query-ua', followRedirects: true });
 		expect(resolveRequestOptions(query, { lang: 'en-US', userAgent: 'env-ua', followRedirects: false }))
 			.toMatchObject({ lang: 'en-US', userAgent: 'env-ua', followRedirects: false });
@@ -479,6 +498,7 @@ describe('resolveRequestOptions', () => {
 
 	test('その他の環境変数由来のオプションはそのまま渡す', () => {
 		const env = { allowedPrivateNetworks: ['10.0.0.0/8'], cacheTtl: 1000, proxy: { https: 'http://proxy.example:8080' } };
+
 		expect(resolveRequestOptions({}, env)).toMatchObject(env);
 	});
 });

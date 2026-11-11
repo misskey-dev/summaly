@@ -5,6 +5,7 @@ import { decodeHtml, detectEncoding } from '@/http/decode.js';
 
 vi.mock('chardet', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('chardet')>();
+
 	return { ...actual, detect: vi.fn(actual.detect) };
 });
 
@@ -44,6 +45,7 @@ describe('detectEncoding', () => {
 
 	test('<meta http-equiv="Content-Type" content="...; charset=..."> も読む', () => {
 		const html = ascii('<html><head><meta http-equiv="Content-Type" content="text/html; charset=EUC-JP"></head></html>');
+
 		expect(detectEncoding(html)).toBe('euc-jp');
 		expect(detectSpy).not.toHaveBeenCalled();
 	});
@@ -75,11 +77,13 @@ describe('detectEncoding', () => {
 
 	test('先頭 8KB より後ろにある meta は読まない', () => {
 		const html = ascii(`<html><head><script>${'x'.repeat(10 * 1024)}</script><meta charset="euc-jp"></head></html>`);
+
 		expect(detectEncoding(html)).toBe('utf-8');
 	});
 
 	test('手がかりがなければ chardet で先頭 16KB だけを判定する', () => {
 		const large = Buffer.concat([SJIS_HTML_WITHOUT_META, ascii(`<!-- ${'x'.repeat(200 * 1024)} -->`)]);
+
 		expect(detectEncoding(large)).toBe('shift_jis');
 		expect(detectSpy).toHaveBeenCalledTimes(1);
 		expect(detectSpy.mock.calls[0]![0].length).toBeLessThanOrEqual(16 * 1024);
@@ -87,12 +91,14 @@ describe('detectEncoding', () => {
 
 	test('先頭 16KB が ASCII だけでも、後ろに UTF-8 があれば utf-8 として読む', () => {
 		const html = Buffer.from(`<html><head><style>${'a{b:c}'.repeat(3000)}</style></head><body><p>日本語の本文</p></body></html>`);
+
 		expect(detectEncoding(html)).toBe('utf-8');
 		expect(decodeHtml(html)).toContain('日本語の本文');
 	});
 
 	test('先頭 16KB が ASCII だけで、後ろが UTF-8 でなければ全体で判定し直す', () => {
 		const html = Buffer.concat([ascii(`<html><head><style>${'a{b:c}'.repeat(3000)}</style></head>`), SJIS_HTML_WITHOUT_META]);
+
 		expect(decodeHtml(html)).toContain(SJIS_TITLE);
 	});
 

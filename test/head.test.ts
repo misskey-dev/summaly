@@ -10,6 +10,7 @@ afterEach(() => {
 describe('parseHead', () => {
 	test('og:title / name=description / link rel=icon を読む', () => {
 		const h = parseHead('<html><head><title>T</title><meta property="og:title" content="OG"><meta name="description" content="D"><link rel="icon" type="image/png" href="/i.png"><link rel="stylesheet" href="/a.css"></head><body></body></html>');
+
 		expect(h.title).toBe('T');
 		expect(h.meta('property:og:title')).toBe('OG');
 		expect(h.meta('name:description')).toBe('D');
@@ -22,6 +23,7 @@ describe('parseHead', () => {
 
 	test('rel のない link も読む（oEmbed の link は type だけのことがある）', () => {
 		const h = parseHead('<head><link type="application/json+oembed" href="/oembed.json"><link rel="icon"></head>');
+
 		expect(h.links).toEqual([
 			{ rel: null, type: 'application/json+oembed', href: '/oembed.json' },
 		]);
@@ -29,35 +31,41 @@ describe('parseHead', () => {
 
 	test('同じ meta が複数あれば最初のもの', () => {
 		const h = parseHead('<head><meta property="og:title" content="first"><meta property="og:title" content="second"></head>');
+
 		expect(h.meta('property:og:title')).toBe('first');
 	});
 
 	test('属性名は大文字小文字を区別せず、値は区別する', () => {
 		const h = parseHead('<head><META PROPERTY="og:Title" CONTENT="Abc"></head>');
+
 		expect(h.meta('property:og:Title')).toBe('Abc');
 		expect(h.meta('property:og:title')).toBeUndefined();
 	});
 
 	test('</head> 以降の meta は読まない', () => {
 		const h = parseHead('<head><meta property="og:title" content="in"></head><body><meta property="og:description" content="out"><meta property="og:title" content="body"></body>');
+
 		expect(h.meta('property:og:title')).toBe('in');
 		expect(h.meta('property:og:description')).toBeUndefined();
 	});
 
 	test('<body> の開始で止まる (</head> がなくても)', () => {
 		const h = parseHead('<head><meta name="a" content="1"><body><meta name="b" content="2">');
+
 		expect(h.meta('name:a')).toBe('1');
 		expect(h.meta('name:b')).toBeUndefined();
 	});
 
 	test('<head> タグのない HTML でも title と meta を読む', () => {
 		const h = parseHead('<title>T</title><meta name="description" content="D"><p>x</p>');
+
 		expect(h.title).toBe('T');
 		expect(h.meta('name:description')).toBe('D');
 	});
 
 	test('<title> が body 側にしかなくても読む', () => {
 		const h = parseHead('<head><meta name="a" content="1"></head><body><p>x</p><title>Late</title></body>');
+
 		expect(h.title).toBe('Late');
 		expect(h.meta('name:a')).toBe('1');
 	});
@@ -73,6 +81,7 @@ describe('parseHead', () => {
 	test('<head> 内の巨大な <script>（1MB）を挟んでも後続の meta を読む', () => {
 		const big = 'a'.repeat(1024 * 1024);
 		const h = parseHead(`<head><script>var x = "${big}";</script><meta property="og:title" content="after"></head>`);
+
 		expect(h.meta('property:og:title')).toBe('after');
 	});
 
@@ -81,6 +90,7 @@ describe('parseHead', () => {
 		// The whole page fits in the first chunk the parser is given.
 		const body = '<p>x</p>'.repeat(1000);
 		const h = parseHead(`<html><head><title>T</title><meta name="a" content="1"></head><body>${body}</body></html>`);
+
 		expect(h.title).toBe('T');
 		expect(h.meta('name:a')).toBe('1');
 		// html, head, title, meta, and body (where it stops); none of the <p> tags.
@@ -90,6 +100,7 @@ describe('parseHead', () => {
 	test('<body> の開始で止まるときも、その後ろはトークナイズしない', () => {
 		const opened = vi.spyOn(Parser.prototype, 'onopentagname');
 		const h = parseHead(`<title>T</title><body>${'<p>x</p>'.repeat(1000)}`);
+
 		expect(h.title).toBe('T');
 		expect(opened.mock.calls.length).toBeLessThanOrEqual(2);
 	});
@@ -97,6 +108,7 @@ describe('parseHead', () => {
 	test('title が body 側にしかなければ、title が閉じるまで読み、その後ろは読まない', () => {
 		const opened = vi.spyOn(Parser.prototype, 'onopentagname');
 		const h = parseHead(`<head><meta name="a" content="1"></head><body><p>x</p><title>Late</title>${'<p>y</p>'.repeat(1000)}</body>`);
+
 		expect(h.title).toBe('Late');
 		expect(h.meta('name:a')).toBe('1');
 		// head, meta, body, p, title
@@ -108,6 +120,7 @@ describe('parseHead', () => {
 		const broken = `<body>${'<div class="a" <p <<!-- <script>'.repeat(50000)}`;
 		const plain = parseHead(head);
 		const withBroken = parseHead(head + broken);
+
 		expect(withBroken.title).toBe(plain.title);
 		expect(withBroken.meta('property:og:title')).toBe('OG');
 		expect(withBroken.links).toEqual(plain.links);
@@ -115,6 +128,7 @@ describe('parseHead', () => {
 
 	test('エンティティはデコードしない', () => {
 		const h = parseHead('<head><title>A &amp; B</title><meta property="og:title" content="&lt;x&gt; &quot;q&quot;"></head>');
+
 		expect(h.title).toBe('A &amp; B');
 		expect(h.meta('property:og:title')).toBe('&lt;x&gt; &quot;q&quot;');
 	});

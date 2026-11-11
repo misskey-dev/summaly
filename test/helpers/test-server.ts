@@ -16,11 +16,13 @@ export function startTestServer(
 	host = '127.0.0.1',
 ): Promise<TestServer> {
 	const server = http.createServer(handler);
+
 	return new Promise((resolve, reject) => {
 		server.once('error', reject);
 		server.listen(0, host, () => {
 			const { port } = server.address() as AddressInfo;
 			const urlHost = host.includes(':') ? `[${host}]` : host;
+
 			resolve({
 				url: `http://${urlHost}:${port}/`,
 				close: () => new Promise<void>((done, fail) => {

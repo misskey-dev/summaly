@@ -29,6 +29,7 @@ export async function fetchSummary(url: string, lang?: string): Promise<SummaryR
 		contentLengthLimit: meta.urlPreviewMaximumContentLength,
 		contentLengthRequired: meta.urlPreviewRequireContentLength,
 	};
+
 	return summarize(url, options);
 }
 

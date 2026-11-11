@@ -16,8 +16,11 @@ type Received = { method: string; host: string; url: string; headers: http.Incom
 
 const servers: TestServer[] = [];
 const cleanups: (() => void)[] = [];
+
 afterEach(async () => {
-	for (const cleanup of cleanups.splice(0)) cleanup();
+	for (const cleanup of cleanups.splice(0)) {
+		cleanup();
+	}
 	await Promise.all(servers.splice(0).map(s => s.close()));
 });
 
@@ -31,14 +34,18 @@ async function loopback(handler: (req: http.IncomingMessage, res: http.ServerRes
 		received.push({ method: req.method ?? '', host: req.headers.host ?? '', url: req.url ?? '', headers: req.headers });
 		handler(req, res);
 	});
+
 	servers.push(server);
 	const agents = loopbackAgents(Number(new URL(server.url).port));
+
 	cleanups.push(() => agents.destroy());
+
 	return { ctx: createScrapeContext({ agent: { http: agents.http, https: agents.https } }), received };
 }
 
 function send(res: http.ServerResponse, body: string, contentType: string) {
 	const buf = Buffer.from(body);
+
 	res.writeHead(200, { 'content-type': contentType, 'content-length': buf.length });
 	res.end(buf);
 }
@@ -138,8 +145,11 @@ describe('bluesky', () => {
 	test('GET で取得して汎用の抽出を行う', async () => {
 		const page = '<html><head><title>Post</title><meta property="og:description" content="hello"></head></html>';
 		const { ctx, received } = await loopback((req, res) => {
-			if (req.url === '/') send(res, page, 'text/html');
-			else res.writeHead(404).end();
+			if (req.url === '/') {
+				send(res, page, 'text/html');
+			} else {
+				res.writeHead(404).end();
+			}
 		});
 
 		const summary = await bluesky.summarize(ctx, new URL('https://bsky.app/'));
@@ -176,6 +186,7 @@ describe('wikipedia', () => {
 
 	test('query.pages がなければ fetch failed', async () => {
 		const { ctx } = await loopback((_req, res) => send(res, '{}', 'application/json'));
+
 		await expect(wikipedia.summarize(ctx, new URL('https://en.wikipedia.org/wiki/X'))).rejects.toThrow('fetch failed');
 	});
 });
@@ -183,16 +194,21 @@ describe('wikipedia', () => {
 describe('branchio-deeplinks', () => {
 	test('$web_only=true を付けて汎用の抽出を行う', async () => {
 		const { ctx, received } = await loopback((req, res) => {
-			if (req.url?.startsWith('/abc')) send(res, '<html><head><title>Deep</title></head></html>', 'text/html');
-			else res.writeHead(404).end();
+			if (req.url?.startsWith('/abc')) {
+				send(res, '<html><head><title>Deep</title></head></html>', 'text/html');
+			} else {
+				res.writeHead(404).end();
+			}
 		});
 
 		const summary = await branchioDeeplinks.summarize(ctx, new URL('https://example.app.link/abc?foo=1'));
 
 		expect(summary?.title).toBe('Deep');
 		const page = received.find(r => r.url.startsWith('/abc'));
+
 		expect(page?.host).toBe('example.app.link');
 		const query = new URL(page?.url ?? '', 'https://example.app.link').searchParams;
+
 		expect(query.get('foo')).toBe('1');
 		expect(query.get('$web_only')).toBe('true');
 	});
@@ -205,6 +221,7 @@ describe('fromPlugin', () => {
 			test: url => url.hostname === 'custom.example',
 			summarize: async (url, opts) => {
 				received = { url, opts };
+
 				return null;
 			},
 		};
@@ -240,6 +257,7 @@ describe('fromPlugin', () => {
 			test: () => true,
 			summarize: async (_url, opts) => {
 				received = opts;
+
 				return null;
 			},
 		});

@@ -15,7 +15,9 @@ const SLOW_MS = 1000;
 const cleanups: (() => void | Promise<void>)[] = [];
 
 afterEach(async () => {
-	for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+	for (const cleanup of cleanups.splice(0).reverse()) {
+		await cleanup();
+	}
 });
 
 beforeAll(() => {
@@ -31,36 +33,49 @@ async function startSlowServer(): Promise<{ url: string; requested: Promise<void
 		onRequest();
 		setTimeout(() => res.writeHead(200, { 'content-type': 'text/html' }).end(PAGE), SLOW_MS);
 	});
+
 	await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
 	cleanups.push(() => new Promise<void>(resolve => {
 		server.close(() => resolve());
 		server.closeAllConnections();
 	}));
 	const { port } = server.address() as AddressInfo;
+
 	return { url: `http://127.0.0.1:${port}/`, requested };
 }
 
 /** Starts `node built/index.js` on a free port and resolves with its base URL once it is listening. */
 async function startServerProcess(): Promise<{ child: ChildProcess; url: string; exited: Promise<number | null> }> {
 	const env: NodeJS.ProcessEnv = { ...process.env, SUMMALY_HOST: '127.0.0.1', SUMMALY_PORT: '0', SUMMALY_ALLOWED_PRIVATE_NETWORKS: '127.0.0.0/8' };
-	for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy']) delete env[name];
+
+	for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy']) {
+		delete env[name];
+	}
 	const child = spawn(process.execPath, ['built/index.js'], { cwd: serverDir, env, stdio: ['ignore', 'pipe', 'inherit'] });
 	const exited = new Promise<number | null>(resolve => child.once('exit', code => resolve(code)));
+
 	cleanups.push(() => {
-		if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+		if (child.exitCode === null && child.signalCode === null) {
+			child.kill('SIGKILL');
+		}
 	});
 
 	const url = await new Promise<string>((resolve, reject) => {
 		let output = '';
+
 		child.stdout?.setEncoding('utf8');
 		child.stdout?.on('data', (chunk: string) => {
 			output += chunk;
 			// fastify's logger prints e.g. {"msg":"Server listening at http://127.0.0.1:12345"}
 			const match = /Server listening at (http:\/\/127\.0\.0\.1:\d+)/.exec(output);
-			if (match) resolve(match[1]);
+
+			if (match) {
+				resolve(match[1]);
+			}
 		});
 		child.once('exit', code => reject(new Error(`server exited early (${code}): ${output}`)));
 	});
+
 	return { child, url, exited };
 }
 
@@ -70,10 +85,12 @@ test('SIGTERM を受けても処理中の要求は 200 で完了し、keep-alive
 
 	// fetch keeps the connection alive, as the host app's HTTP client does.
 	const response = fetch(`${server.url}/?url=${encodeURIComponent(page.url)}`);
+
 	await page.requested;
 	server.child.kill('SIGTERM');
 
 	const res = await response;
+
 	expect(res.status).toBe(200);
 	expect(await res.json()).toMatchObject({ title: 'Slow page', url: page.url });
 	expect(await server.exited).toBe(0);

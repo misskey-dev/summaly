@@ -17,6 +17,7 @@ const SJIS_TITLE = 'シフトJISで書かれた日本語のページ';
 const HTML = '<!DOCTYPE html><html><head><title>hello</title></head><body>こんにちは</body></html>';
 
 const servers: TestServer[] = [];
+
 afterEach(async () => {
 	vi.restoreAllMocks();
 	await Promise.all(servers.splice(0).map(s => s.close()));
@@ -24,7 +25,9 @@ afterEach(async () => {
 
 async function serve(handler: http.RequestListener, host?: string): Promise<TestServer> {
 	const server = await startTestServer(handler, host);
+
 	servers.push(server);
+
 	return server;
 }
 
@@ -35,10 +38,13 @@ function hookedAgent(): { agent: http.Agent; calls: () => number } {
 	const agent = new http.Agent();
 	let calls = 0;
 	const original = agent.createConnection.bind(agent);
+
 	agent.createConnection = ((...args: Parameters<typeof original>) => {
 		calls++;
+
 		return original(...args);
 	}) as typeof agent.createConnection;
+
 	return { agent, calls: () => calls };
 }
 
@@ -59,12 +65,14 @@ function request(url: string, overrides: Partial<FetchRequest> = {}): FetchReque
 describe('createTransport', () => {
 	test('既定では guard を持つ', () => {
 		const t = createTransport({}, {});
+
 		expect(t.guard).not.toBeNull();
 		expect(t.agents).toEqual({});
 	});
 
 	test('既定では transport 専用の guard 付き agent を持つ', () => {
 		const t = createTransport({}, {});
+
 		expect(t.guardedAgents?.http).toBeInstanceOf(http.Agent);
 		expect(t.guardedAgents?.http).not.toBe(http.globalAgent);
 		expect(t.guardedAgents?.https).not.toBe(https.globalAgent);
@@ -75,6 +83,7 @@ describe('createTransport', () => {
 		const agent = new http.Agent();
 		const secureAgent = new https.Agent();
 		const t = createTransport({ agent: { http: agent, https: secureAgent }, proxy: { http: 'http://p:8080' } }, {});
+
 		expect(t.guard).toBeNull();
 		expect(t.guardedAgents).toBeNull();
 		expect(t.agents.http).toBe(agent);
@@ -85,6 +94,7 @@ describe('createTransport', () => {
 	test('片方の scheme だけ agent を渡すと、もう片方のために guard は残る', () => {
 		const agent = new http.Agent();
 		const t = createTransport({ agent: { http: agent }, proxy: { http: 'http://p:8080' } }, {});
+
 		expect(t.guard).not.toBeNull();
 		expect(t.guardedAgents).not.toBeNull();
 		expect(t.agents.http).toBe(agent);
@@ -93,6 +103,7 @@ describe('createTransport', () => {
 
 	test('中身が undefined の agent では guard は外れない', () => {
 		const t = createTransport({ agent: { http: undefined }, proxy: { http: 'http://p:8080' } }, {});
+
 		expect(t.guard).not.toBeNull();
 		expect(t.proxy).toEqual({ http: 'http://p:8080' });
 	});
@@ -115,6 +126,7 @@ describe('fetchResponse', () => {
 			res.end(HTML);
 		});
 		const result = await fetchResponse(localTransport(), request(server.url));
+
 		expect(result.statusCode).toBe(200);
 		expect(result.url).toBe(server.url);
 		expect(result.body.toString()).toBe(HTML);
@@ -127,6 +139,7 @@ describe('fetchResponse', () => {
 			received = req.headers;
 			res.end('ok');
 		});
+
 		await fetchResponse(localTransport(), request(server.url, { headers: { 'user-agent': 'TestBot/1.0', 'accept-language': undefined } }));
 		expect(received['user-agent']).toBe('TestBot/1.0');
 		expect(received['accept-language']).toBeUndefined();
@@ -144,6 +157,7 @@ describe('fetchResponse', () => {
 			res.end(compress(Buffer.from(HTML)));
 		});
 		const result = await fetchResponse(localTransport(), request(server.url));
+
 		expect(result.body.toString()).toBe(HTML);
 	});
 
@@ -153,6 +167,7 @@ describe('fetchResponse', () => {
 			res.end();
 		});
 		const result = await fetchResponse(localTransport(), request(server.url));
+
 		expect(result.body.length).toBe(0);
 	});
 
@@ -162,6 +177,7 @@ describe('fetchResponse', () => {
 			res.end(req.method === 'HEAD' ? undefined : zlib.gzipSync('x'));
 		});
 		const result = await fetchResponse(localTransport(), request(server.url, { method: 'HEAD' }));
+
 		expect(result.statusCode).toBe(200);
 		expect(result.body.length).toBe(0);
 	});
@@ -172,6 +188,7 @@ describe('fetchResponse', () => {
 			res.end(SJIS_HTML);
 		});
 		const result = await fetchResponse(localTransport(), request(server.url));
+
 		expect(decodeHtml(result.body, result.headers['content-type'])).toContain(SJIS_TITLE);
 	});
 
@@ -189,6 +206,7 @@ describe('fetchResponse', () => {
 			}
 		});
 		const result = await fetchResponse(localTransport(), request(new URL('/a', server.url).href));
+
 		expect(result.statusCode).toBe(200);
 		expect(result.url).toBe(new URL('/c?x=1', server.url).href);
 		expect(result.body.toString()).toBe('final:/c?x=1');
@@ -200,6 +218,7 @@ describe('fetchResponse', () => {
 			res.end();
 		});
 		const result = await fetchResponse(localTransport(), request(server.url, { followRedirects: false }));
+
 		expect(result.statusCode).toBe(302);
 		expect(result.url).toBe(server.url);
 		expect(result.headers.location).toBe('/next');
@@ -208,6 +227,7 @@ describe('fetchResponse', () => {
 	function redirectChain(length: number): http.RequestListener {
 		return (req, res) => {
 			const n = Number(req.url!.slice(1) || 0);
+
 			if (n < length) {
 				res.writeHead(302, { location: `/${n + 1}` });
 				res.end();
@@ -220,11 +240,13 @@ describe('fetchResponse', () => {
 	test('10 回までのリダイレクトはたどる', async () => {
 		const server = await serve(redirectChain(10));
 		const result = await fetchResponse(localTransport(), request(server.url));
+
 		expect(result.url).toBe(new URL('/10', server.url).href);
 	});
 
 	test('11 回目のリダイレクトでエラーになる', async () => {
 		const server = await serve(redirectChain(11));
+
 		await expect(fetchResponse(localTransport(), request(server.url))).rejects.toThrow('Redirected 10 times. Aborting.');
 	});
 
@@ -235,6 +257,7 @@ describe('fetchResponse', () => {
 			res.end('ok');
 		});
 		const e = await fetchResponse(createTransport({}, {}), request(server.url)).catch(e => e);
+
 		expect(e).toBeInstanceOf(StatusError);
 		expect(e.statusCode).toBe(400);
 		expect(hits).toBe(0);
@@ -257,6 +280,7 @@ describe('fetchResponse', () => {
 		});
 		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.2/32'] }, {});
 		const e = await fetchResponse(transport, request(origin.url)).catch(e => e);
+
 		expect(e).toBeInstanceOf(StatusError);
 		expect(e.statusCode).toBe(400);
 		expect(targetHits).toBe(0);
@@ -269,6 +293,7 @@ describe('fetchResponse', () => {
 			res.end();
 		});
 		const e = await fetchResponse(createTransport({ agent: { http: agent } }, {}), request(server.url)).catch(e => e);
+
 		agent.destroy();
 		// The http hop went through the caller's agent (guard handed off); the https hop is rejected before connecting.
 		expect(calls()).toBeGreaterThan(0);
@@ -283,6 +308,7 @@ describe('fetchResponse', () => {
 			sockets.add(req.socket);
 			res.end('ok');
 		});
+
 		// Leave a keep-alive socket in the process-wide pool, opened without the guarded lookup.
 		await new Promise<void>((resolve, reject) => {
 			http.get(server.url, { agent: http.globalAgent }, res => {
@@ -292,9 +318,11 @@ describe('fetchResponse', () => {
 		});
 		await new Promise(resolve => setImmediate(resolve));
 		const name = http.globalAgent.getName({ host: '127.0.0.1', port: Number(new URL(server.url).port) });
+
 		expect(http.globalAgent.freeSockets[name]?.length).toBe(1);
 
 		const result = await fetchResponse(localTransport(), request(server.url));
+
 		expect(result.body.toString()).toBe('ok');
 		expect(sockets.size).toBe(2);
 		expect(http.globalAgent.freeSockets[name]?.length).toBe(1);
@@ -306,6 +334,7 @@ describe('fetchResponse', () => {
 			res.end('not found');
 		});
 		const e = await fetchResponse(localTransport(), request(server.url)).catch(e => e);
+
 		expect(e).toBeInstanceOf(StatusError);
 		expect(e.statusCode).toBe(404);
 		expect(e.statusMessage).toBe('Not Found');
@@ -318,6 +347,7 @@ describe('fetchResponse', () => {
 			res.end();
 		});
 		const e = await fetchResponse(localTransport(), request(server.url)).catch(e => e);
+
 		expect(e).toBeInstanceOf(StatusError);
 		expect(e.statusCode).toBe(500);
 		expect(e.isPermanentError).toBe(false);
@@ -328,6 +358,7 @@ describe('fetchResponse', () => {
 			res.writeHead(200, { 'content-type': 'application/json' });
 			res.end('{}');
 		});
+
 		await expect(fetchResponse(localTransport(), request(server.url, { typeFilter: /^(text\/html|application\/xhtml\+xml)/ })))
 			.rejects.toThrow('Rejected by type filter application/json');
 	});
@@ -338,9 +369,11 @@ describe('fetchResponse', () => {
 			res.writeHead(200, { 'content-type': 'text/html', 'content-length': String(body.length) });
 			res.end(body);
 		});
+
 		await expect(fetchResponse(localTransport(), request(server.url, { contentLengthLimit: 99 })))
 			.rejects.toThrow('maxSize exceeded (100 > 99) on response');
 		const result = await fetchResponse(localTransport(), request(server.url, { contentLengthLimit: 100 }));
+
 		expect(result.body.toString()).toBe(body);
 	});
 
@@ -351,6 +384,7 @@ describe('fetchResponse', () => {
 			setTimeout(() => res.write('b'.repeat(60)), 20);
 			// never ends on its own; the client must abort
 		});
+
 		await expect(fetchResponse(localTransport(), request(server.url, { contentLengthLimit: 100 })))
 			.rejects.toThrow('maxSize exceeded (120 > 100) on response');
 	});
@@ -361,6 +395,7 @@ describe('fetchResponse', () => {
 			res.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip', 'content-length': String(compressed.length) });
 			res.end(compressed);
 		});
+
 		await expect(fetchResponse(localTransport(), request(server.url, { contentLengthLimit: 64 * 1024 })))
 			.rejects.toThrow(/^maxSize exceeded \(\d+ > 65536\) on response$/);
 	});
@@ -371,9 +406,11 @@ describe('fetchResponse', () => {
 			res.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' });
 			// Decompresses to nothing and never ends.
 			const timer = setInterval(() => res.write(chunk), 5);
+
 			res.on('close', () => clearInterval(timer));
 		});
 		const started = Date.now();
+
 		await expect(fetchResponse(localTransport(), request(server.url, { contentLengthLimit: 4096, operationTimeout: 3000 })))
 			.rejects.toThrow(/^maxSize exceeded \(\d+ > 4096\) on response$/);
 		expect(Date.now() - started).toBeLessThan(1000);
@@ -385,6 +422,7 @@ describe('fetchResponse', () => {
 			res.write('chunked');
 			res.end();
 		});
+
 		await expect(fetchResponse(localTransport(), request(server.url, { contentLengthRequired: true })))
 			.rejects.toThrow('content-length required');
 	});
@@ -394,6 +432,7 @@ describe('fetchResponse', () => {
 			// never respond
 		});
 		const started = Date.now();
+
 		await expect(fetchResponse(localTransport(), request(server.url, { operationTimeout: 200 })))
 			.rejects.toThrow("Timeout awaiting 'request' for 200ms");
 		expect(Date.now() - started).toBeLessThan(2000);
@@ -408,8 +447,10 @@ describe('fetchResponse', () => {
 	test('ホスト名でも接続時の名前解決を通って取得できる', async () => {
 		const server = await serve((_req, res) => res.end('ok'));
 		const url = new URL(server.url);
+
 		url.hostname = 'localhost';
 		const result = await fetchResponse(localTransport(), request(url.href));
+
 		expect(result.body.toString()).toBe('ok');
 	});
 
@@ -419,11 +460,14 @@ describe('fetchResponse', () => {
 			hits++;
 			res.end('secret');
 		});
+
 		// The pre-check sees a public address; the connect-time lookup then resolves localhost to loopback.
 		vi.spyOn(dns.promises, 'lookup').mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
 		const url = new URL(server.url);
+
 		url.hostname = 'localhost';
 		const e = await fetchResponse(createTransport({}, {}), request(url.href)).catch(e => e);
+
 		expect(e).toBeInstanceOf(StatusError);
 		expect(e.statusCode).toBe(400);
 		expect(hits).toBe(0);
@@ -442,6 +486,7 @@ describe('fetchResponse', () => {
 			res.write(partial, () => setTimeout(() => req.socket.destroy(), 10));
 		});
 		const e = await fetchResponse(localTransport(), request(server.url)).catch(e => e);
+
 		expect(e).toBeInstanceOf(Error);
 		expect(e.code === 'ECONNRESET' || e.code === 'ERR_STREAM_PREMATURE_CLOSE').toBe(true);
 	});
@@ -449,9 +494,12 @@ describe('fetchResponse', () => {
 	test('gzip の本文が壊れていたらエラーになり、展開器を破棄する', async () => {
 		const inner: zlib.Unzip[] = [];
 		const createUnzip = zlib.createUnzip;
+
 		vi.spyOn(zlib, 'createUnzip').mockImplementation(options => {
 			const stream = createUnzip(options);
+
 			inner.push(stream);
+
 			return stream;
 		});
 		const corrupt = Buffer.concat([gzipPage.subarray(0, 20), Buffer.alloc(200, 0xff)]);
@@ -461,6 +509,7 @@ describe('fetchResponse', () => {
 			res.write(corrupt);
 		});
 		const e = await fetchResponse(localTransport(), request(server.url)).catch(e => e);
+
 		expect(e).toBeInstanceOf(Error);
 		expect(e.code).toMatch(/^Z_/);
 		expect(inner).toHaveLength(1);
@@ -470,9 +519,12 @@ describe('fetchResponse', () => {
 	test('受信量の上限で打ち切ったら、展開器と応答を破棄する', async () => {
 		const inner: zlib.Unzip[] = [];
 		const createUnzip = zlib.createUnzip;
+
 		vi.spyOn(zlib, 'createUnzip').mockImplementation(options => {
 			const stream = createUnzip(options);
+
 			inner.push(stream);
+
 			return stream;
 		});
 		let serverSocket: net.Socket | undefined;
@@ -481,6 +533,7 @@ describe('fetchResponse', () => {
 			res.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' });
 			res.write(gzipPage);
 		});
+
 		await expect(fetchResponse(localTransport(), request(server.url, { contentLengthLimit: 100 })))
 			.rejects.toThrow(/^maxSize exceeded \(\d+ > 100\) on response$/);
 		expect(inner.every(stream => stream.destroyed)).toBe(true);
@@ -490,10 +543,14 @@ describe('fetchResponse', () => {
 	test('空の本文（content-length: 0、gzip でも）は空として返す', async () => {
 		const server = await serve((req, res) => {
 			const headers: http.OutgoingHttpHeaders = { 'content-type': 'text/html', 'content-length': '0' };
-			if (req.url === '/gz') headers['content-encoding'] = 'gzip';
+
+			if (req.url === '/gz') {
+				headers['content-encoding'] = 'gzip';
+			}
 			res.writeHead(200, headers);
 			res.end();
 		});
+
 		expect((await fetchResponse(localTransport(), request(server.url))).body.length).toBe(0);
 		expect((await fetchResponse(localTransport(), request(new URL('/gz', server.url).href))).body.length).toBe(0);
 	});
@@ -504,6 +561,7 @@ describe('fetchResponse', () => {
 			res.write('partial');
 			// stall
 		});
+
 		await expect(fetchResponse(localTransport(), request(server.url, { responseTimeout: 200 })))
 			.rejects.toThrow("Timeout awaiting 'socket' for 200ms");
 	});
@@ -512,6 +570,7 @@ describe('fetchResponse', () => {
 		const server = await serve((_req, res) => res.end('ok'));
 		const { agent, calls } = hookedAgent();
 		const result = await fetchResponse(createTransport({ agent: { http: agent } }, {}), request(server.url));
+
 		expect(result.body.toString()).toBe('ok');
 		expect(calls()).toBeGreaterThan(0);
 		agent.destroy();
@@ -525,6 +584,7 @@ async function countingServer(handler: http.RequestListener): Promise<{ server: 
 		sockets.add(req.socket);
 		handler(req, res);
 	});
+
 	return { server, connections: () => sockets.size, sockets };
 }
 
@@ -542,6 +602,7 @@ describe('transport 内の接続の再利用', () => {
 	test('同じ transport の続くリクエストは同じ接続を使う', async () => {
 		const { server, connections } = await countingServer(ok);
 		const transport = localTransport();
+
 		await fetchResponse(transport, request(server.url, { method: 'HEAD' }));
 		await fetchResponse(transport, request(server.url));
 		await fetchResponse(transport, request(new URL('/favicon.ico', server.url).href, { method: 'HEAD' }));
@@ -552,14 +613,17 @@ describe('transport 内の接続の再利用', () => {
 	test('https でも同じ transport の続くリクエストは同じ接続を使う', async () => {
 		let connections = 0;
 		const secure = https.createServer({ cert: LOOPBACK_CERT, key: LOOPBACK_KEY }, ok);
+
 		secure.on('connection', () => connections++);
 		await new Promise<void>(resolve => secure.listen(0, '127.0.0.1', resolve));
 		try {
 			const url = `https://127.0.0.1:${(secure.address() as net.AddressInfo).port}/`;
 			const transport = localTransport();
+
 			transport.guardedAgents!.https.options.ca = LOOPBACK_CERT;
 			await fetchResponse(transport, request(url, { method: 'HEAD' }));
 			const result = await fetchResponse(transport, request(url));
+
 			expect(result.body.toString()).toBe('ok');
 			expect(connections).toBe(1);
 			transport.close();
@@ -572,11 +636,14 @@ describe('transport 内の接続の再利用', () => {
 	test('close で transport の agent が持つソケットをすべて閉じる', async () => {
 		const { server, sockets } = await countingServer(ok);
 		const transport = localTransport();
+
 		await fetchResponse(transport, request(server.url));
 		const idle = Object.values(transport.guardedAgents?.http.freeSockets ?? {}).flat();
+
 		expect(idle).toHaveLength(1);
 		const [serverSide] = sockets;
 		const closed = new Promise(resolve => serverSide.once('close', resolve));
+
 		transport.close();
 		expect(idle.every(socket => socket?.destroyed)).toBe(true);
 		await closed;
@@ -585,6 +652,7 @@ describe('transport 内の接続の再利用', () => {
 	test('close は guard なしや agent を渡された transport でも呼べ、渡された agent には触れない', async () => {
 		const { agent } = hookedAgent();
 		const destroy = vi.spyOn(agent, 'destroy');
+
 		createTransport({}, { CHIRAMISS_ALLOW_PRIVATE_IP: 'true' }).close();
 		createTransport({ agent: { http: agent } }, {}).close();
 		createTransport({ proxy: { http: 'http://proxy.example:8080' } }, {}).close();
@@ -635,10 +703,12 @@ describe('transport 内の接続の再利用', () => {
 			}
 		});
 		const transport = localTransport();
+
 		await expect(fetchResponse(transport, request(server.url, overrides))).rejects.toThrow(error);
 		await new Promise(resolve => setImmediate(resolve));
 		expect(freeSocketCount(transport.guardedAgents?.http)).toBe(0);
 		const result = await fetchResponse(transport, request(server.url));
+
 		expect(result.body.toString()).toBe('ok');
 		expect(connections()).toBe(2);
 		transport.close();
@@ -649,6 +719,7 @@ describe('transport 内の接続の再利用', () => {
 			if (req.url === '/') {
 				res.writeHead(302, { location: '/next', 'content-type': 'text/html' });
 				res.write('moved');
+
 				// The body never ends: the socket cannot be reused after the client drops the response.
 				return;
 			}
@@ -656,6 +727,7 @@ describe('transport 内の接続の再利用', () => {
 		});
 		const transport = localTransport();
 		const result = await fetchResponse(transport, request(server.url));
+
 		expect(result.body.toString()).toBe('ok');
 		expect(connections()).toBe(2);
 		transport.close();
@@ -665,14 +737,20 @@ describe('transport 内の接続の再利用', () => {
 		const served = new Map<net.Socket, number>();
 		const { server, connections } = await countingServer((req, res) => {
 			const n = (served.get(req.socket) ?? 0) + 1;
+
 			served.set(req.socket, n);
 			// Like a server that drops idle keep-alive connections: the second request on a socket gets no answer.
-			if (n > 1) req.socket.destroy();
-			else ok(req, res);
+			if (n > 1) {
+				req.socket.destroy();
+			} else {
+				ok(req, res);
+			}
 		});
 		const transport = localTransport();
+
 		await fetchResponse(transport, request(server.url, { method: 'HEAD' }));
 		const result = await fetchResponse(transport, request(server.url));
+
 		expect(result.body.toString()).toBe('ok');
 		expect(connections()).toBe(2);
 		transport.close();
@@ -685,6 +763,7 @@ describe('transport 内の接続の再利用', () => {
 			req.socket.destroy();
 		});
 		const transport = localTransport();
+
 		await expect(fetchResponse(transport, request(server.url))).rejects.toThrow('socket hang up');
 		expect(requests).toBe(1);
 		transport.close();
@@ -693,13 +772,16 @@ describe('transport 内の接続の再利用', () => {
 	test('プールにソケットがあっても、ホップごとの事前確認は省かない', async () => {
 		const { server, connections } = await countingServer(ok);
 		const url = new URL(server.url);
+
 		url.hostname = 'localhost';
 		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8', '::1/128'] }, {});
+
 		await fetchResponse(transport, request(url.href));
 		expect(freeSocketCount(transport.guardedAgents?.http)).toBe(1);
 		// The name now resolves to a network that is not allowed: the pooled socket must not be used.
 		vi.spyOn(dns.promises, 'lookup').mockResolvedValue([{ address: '10.0.0.1', family: 4 }] as never);
 		const e = await fetchResponse(transport, request(url.href)).catch(e => e);
+
 		expect(e).toBeInstanceOf(StatusError);
 		expect(e.message).toBe('Private IP rejected 10.0.0.1');
 		expect(connections()).toBe(1);
@@ -709,9 +791,11 @@ describe('transport 内の接続の再利用', () => {
 	test('新しいソケットを開くたびに接続時の名前解決で確認し、再利用のときは開き直さない', async () => {
 		const { server, connections } = await countingServer((req, res) => setTimeout(() => ok(req, res), 20));
 		const url = new URL(server.url);
+
 		url.hostname = 'localhost';
 		const lookup = vi.spyOn(dns, 'lookup');
 		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8', '::1/128'] }, {});
+
 		// Two at once need two sockets, each checked when it connects.
 		await Promise.all([fetchResponse(transport, request(url.href)), fetchResponse(transport, request(url.href))]);
 		expect(connections()).toBe(2);
