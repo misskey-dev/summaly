@@ -10,20 +10,24 @@ export type HeadInfo = {
 	links: LinkTag[];
 };
 
-const CHUNK_SIZE = 16 * 1024;
-
 /**
  * `</head>` か `<body>` に達するまでだけ読む軽量パーサ。
- * `<title>` が head の外にしかない場合に備え、停止後も title だけは探す。
+ * `<title>` が head の外にしかない場合に備え、head の後も title が取れるまでは title だけを探す。
+ * head が終わり title も取れた時点でトークナイズを止め、残りの本文は読まない。
  */
 export function parseHead(html: string): HeadInfo {
 	const metas = new Map<string, string>();
 	const links: LinkTag[] = [];
 	// Kept in an object: the parser callbacks change these during parser.write(), which plain `let`
-	// narrowing would not see in the loop below.
+	// narrowing would not see after it.
 	const state: { title: string | null; headDone: boolean } = { title: null, headDone: false };
 	let inTitle = false;
 	let titleText = '';
+	// Nothing after this point can change the result. pause() stops the tokenizer right after the current
+	// tag, even in the middle of the string written, so the rest of the page is never tokenized.
+	const stopIfDone = () => {
+		if (state.headDone && state.title !== null) parser.pause();
+	};
 
 	const parser = new Parser({
 		// htmlparser2 types attribs as always present; an attribute that is not on the tag is undefined.
@@ -38,6 +42,7 @@ export function parseHead(html: string): HeadInfo {
 			if (state.headDone) return;
 			if (name === 'body') {
 				state.headDone = true;
+				stopIfDone();
 			} else if (name === 'meta') {
 				const content = attrs['content'];
 				if (content === undefined) return;
@@ -60,16 +65,16 @@ export function parseHead(html: string): HeadInfo {
 			if (name === 'title' && inTitle) {
 				inTitle = false;
 				state.title = titleText;
+				stopIfDone();
 			} else if (name === 'head') {
 				state.headDone = true;
+				stopIfDone();
 			}
 		},
 	}, { decodeEntities: false });
 
-	for (let i = 0; i < html.length; i += CHUNK_SIZE) {
-		parser.write(html.slice(i, i + CHUNK_SIZE));
-		if (state.headDone && state.title !== null) break;
-	}
+	// While paused, end() does not resume: the rest stays untokenized.
+	parser.write(html);
 	parser.end();
 
 	return {

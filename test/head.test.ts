@@ -1,6 +1,11 @@
-import { describe, expect, test } from 'vitest';
+import { Parser } from 'htmlparser2';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { parseHead } from '@/html/head.js';
 import { loadDom } from '@/html/dom.js';
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 describe('parseHead', () => {
 	test('og:title / name=description / link rel=icon を読む', () => {
@@ -69,6 +74,43 @@ describe('parseHead', () => {
 		const big = 'a'.repeat(1024 * 1024);
 		const h = parseHead(`<head><script>var x = "${big}";</script><meta property="og:title" content="after"></head>`);
 		expect(h.meta('property:og:title')).toBe('after');
+	});
+
+	test('head が終わり title も取れたら、同じチャンクの残り（body）はトークナイズしない', () => {
+		const opened = vi.spyOn(Parser.prototype, 'onopentagname');
+		// The whole page fits in the first chunk the parser is given.
+		const body = '<p>x</p>'.repeat(1000);
+		const h = parseHead(`<html><head><title>T</title><meta name="a" content="1"></head><body>${body}</body></html>`);
+		expect(h.title).toBe('T');
+		expect(h.meta('name:a')).toBe('1');
+		// html, head, title, meta, and body (where it stops); none of the <p> tags.
+		expect(opened.mock.calls.length).toBeLessThanOrEqual(5);
+	});
+
+	test('<body> の開始で止まるときも、その後ろはトークナイズしない', () => {
+		const opened = vi.spyOn(Parser.prototype, 'onopentagname');
+		const h = parseHead(`<title>T</title><body>${'<p>x</p>'.repeat(1000)}`);
+		expect(h.title).toBe('T');
+		expect(opened.mock.calls.length).toBeLessThanOrEqual(2);
+	});
+
+	test('title が body 側にしかなければ、title が閉じるまで読み、その後ろは読まない', () => {
+		const opened = vi.spyOn(Parser.prototype, 'onopentagname');
+		const h = parseHead(`<head><meta name="a" content="1"></head><body><p>x</p><title>Late</title>${'<p>y</p>'.repeat(1000)}</body>`);
+		expect(h.title).toBe('Late');
+		expect(h.meta('name:a')).toBe('1');
+		// head, meta, body, p, title
+		expect(opened.mock.calls.length).toBeLessThanOrEqual(5);
+	});
+
+	test('head の後ろが壊れた巨大なマークアップでも結果は変わらない', () => {
+		const head = '<head><title>T</title><meta property="og:title" content="OG"><link rel="icon" href="/i.png"></head>';
+		const broken = `<body>${'<div class="a" <p <<!-- <script>'.repeat(50000)}`;
+		const plain = parseHead(head);
+		const withBroken = parseHead(head + broken);
+		expect(withBroken.title).toBe(plain.title);
+		expect(withBroken.meta('property:og:title')).toBe('OG');
+		expect(withBroken.links).toEqual(plain.links);
 	});
 
 	test('エンティティはデコードしない', () => {
