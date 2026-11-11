@@ -297,6 +297,17 @@ describe('coalescing and caching', () => {
 		expect(await cache.get('d')).toEqual(entry('d'));
 	});
 
+	// A summary of a page usually stores two entries (the summary and its favicon check), so the default keeps
+	// as many summaries as the 1000 it kept before favicon checks were cached.
+	test('MemorySummaryCache は既定で 2000 件まで持つ', async () => {
+		const cache = new MemorySummaryCache();
+		for (let i = 0; i <= 2000; i++) await cache.set(`k${i}`, { kind: 'icon', href: null }, 60_000);
+
+		expect(cache.size).toBe(2000);
+		expect(await cache.get('k0')).toBeUndefined();
+		expect(await cache.get('k1')).toEqual({ kind: 'icon', href: null });
+	});
+
 	test('MemorySummaryCache は maxBytes を超えると古いものから捨てる', async () => {
 		const entry = (message: string): CacheEntry => ({ kind: 'error', error: { name: 'Error', message } });
 		const one = await sizeOf('a', entry('x'.repeat(100)));

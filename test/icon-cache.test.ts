@@ -6,6 +6,7 @@ import {
 	createSummarizer,
 	defaultSummarizeOptions,
 	type InflightCoordinator,
+	InProcessCoordinator,
 	MemorySummaryCache,
 	type SummaryCache,
 	type SummaryResult,
@@ -272,6 +273,31 @@ describe('favicon の確認結果のキャッシュ', () => {
 
 		expect(allowed.icon).toBe(icons.favicon);
 		expect(denied.icon).toBeNull();
+	});
+
+	// The documented contract of InflightCoordinator: run is called again, with another key, from inside a task.
+	test('coordinator.run は要約の task の中から icon のキーで呼ばれる（入れ子になる）', async () => {
+		const s = await site();
+		const inner = new InProcessCoordinator();
+		const running: string[] = [];
+		const nested: [string, string][] = [];
+		const coordinator: InflightCoordinator = {
+			run: async (key, task) => {
+				for (const outer of running) nested.push([outer, key]);
+				running.push(key);
+				try {
+					return await inner.run(key, task);
+				} finally {
+					running.splice(running.indexOf(key), 1);
+				}
+			},
+		};
+		const opts = { ...defaultSummarizeOptions, allowedPrivateNetworks };
+		const summarize = createSummarizer({ allowedPrivateNetworks, coordinator });
+
+		await summarize(`${s.url}a`);
+
+		expect(nested).toEqual([[buildRequestKey(`${s.url}a`, opts), buildIconKey(s.favicon, opts)]]);
 	});
 
 	test('要約のキーに icon のエントリ、icon のキーに要約のエントリがあっても、取り直して正しい結果を返す', async () => {

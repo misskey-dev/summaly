@@ -1,13 +1,17 @@
 import type { CacheEntry, SummaryCache } from '@/coalesce/types.js';
 
-const DEFAULT_MAX_ENTRIES = 1000;
+/**
+ * A summary of a page usually stores two entries (the summary and its favicon check), so this keeps as many
+ * summaries as the 1000 entries kept before favicon checks were cached. Memory stays bounded by DEFAULT_MAX_BYTES.
+ */
+const DEFAULT_MAX_ENTRIES = 2000;
 const DEFAULT_MAX_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAX_ENTRY_BYTES = 256 * 1024;
 
 type StoredEntry = { entry: CacheEntry; expiresAt: number; bytes: number };
 
 export type MemorySummaryCacheOptions = {
-	/** Most entries kept at once. Default 1000. */
+	/** Most entries kept at once, summaries and favicon checks together. Default 2000. */
 	maxEntries?: number;
 	/** Most estimated bytes kept at once, over all entries. Default 64 MiB. */
 	maxBytes?: number;

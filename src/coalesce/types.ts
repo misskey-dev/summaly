@@ -31,6 +31,11 @@ export interface SummaryCache {
 
 /**
  * 同じ key で実行中の処理があれば、新しく task を走らせずにその結果を共有する
+ *
+ * run は入れ子で呼ばれる。要約の task の中から、favicon の確認のために別の key で run が呼ばれ、
+ * 外側の task はその完了を待つ。そのため、key をまたいで待たせる実装（全体を1本ずつ直列にする、
+ * 同時実行数を N に絞るなど）は、外側の task が枠を持ったまま内側の run が枠を待って止まる。
+ * 待たせるのは同じ key どうしだけにすること。同時実行数を絞りたいときは、run の外（要約を呼ぶ側）で絞る
  */
 export interface InflightCoordinator {
 	run<T>(key: string, task: () => Promise<T>): Promise<T>;
