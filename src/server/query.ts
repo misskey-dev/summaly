@@ -42,7 +42,7 @@ function tighten(requested: number | undefined, ceiling: number): number {
 	return requested != null && requested > 0 && requested <= ceiling ? requested : ceiling;
 }
 
-/** Like tighten, but a ceiling of 0 means no timeout, which any positive timeout tightens (Ruling R38). */
+/** Like tighten, but a ceiling of 0 means no timeout, which any positive timeout tightens. */
 function tightenTimeout(requested: number | undefined, ceiling: number): number {
 	return ceiling === 0 && requested != null && requested > 0 ? requested : tighten(requested, ceiling);
 }

@@ -11,7 +11,7 @@ export type Provider = {
 
 /**
  * Wraps a caller-supplied `SummalyPlugin`. The plugin gets the same `GeneralScrapingOptions` upstream passes:
- * the caller's raw values, not the context's effective settings (Ruling R19).
+ * the caller's raw values, not the context's effective settings.
  */
 export function fromPlugin(plugin: SummalyPlugin): Provider {
 	return {

@@ -234,7 +234,7 @@ describe('fromPlugin', () => {
 		});
 	});
 
-	test('未指定の値は undefined のまま、lang は検証せずにそのまま渡す (Ruling R19)', async () => {
+	test('未指定の値は undefined のまま、lang は検証せずにそのまま渡す', async () => {
 		let received: GeneralScrapingOptions | undefined;
 		const provider = fromPlugin({
 			test: () => true,

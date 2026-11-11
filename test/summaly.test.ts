@@ -33,7 +33,7 @@ afterEach(async () => {
 	await Promise.all(servers.splice(0).map(s => s.close()));
 });
 
-/** Starts a test server on an ephemeral port (Ruling R5) and returns its origin such as `http://127.0.0.1:12345`. */
+/** Starts a test server on an ephemeral port and returns its origin such as `http://127.0.0.1:12345`. */
 async function serve(handler: Handler, host?: string): Promise<string> {
 	const server = await startTestServer(handler, host);
 	servers.push(server);
@@ -354,7 +354,7 @@ describe('chiramiss additions', () => {
 			},
 		};
 
-		// A URL no builtin matches goes to the plugin, with the GeneralScrapingOptions upstream builds (Ruling R19):
+		// A URL no builtin matches goes to the plugin, with the GeneralScrapingOptions upstream builds:
 		// the caller's raw values merged over summalyDefaultOptions, so unset keys stay undefined and lang is not validated.
 		const host = await serve(onlyRoot((_req, res) => sendWithLength(res, Buffer.from('<html></html>'))));
 		const custom = await summaly(host, { plugins: [plugin], lang: 'not a valid lang!', allowedPrivateNetworks });

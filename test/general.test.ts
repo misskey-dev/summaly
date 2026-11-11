@@ -10,7 +10,7 @@ import { parseHead } from '@/html/head.js';
 import type { Summary } from '@/types.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
-/** Upstream fixtures hard-code this origin; it is rewritten to the dynamic test server origin (Ruling R5). */
+/** Upstream fixtures hard-code this origin; it is rewritten to the dynamic test server origin. */
 const UPSTREAM_ORIGIN = 'http://localhost:3060';
 const LOCAL_NETWORKS = ['127.0.0.0/8', '::1/128'];
 
