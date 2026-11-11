@@ -2,7 +2,7 @@
 // and how its frontend imports the result type. Checked against built/index.d.ts by `pnpm typecheck:compat`.
 import * as http from 'node:http';
 import * as https from 'node:https';
-import { summaly, version } from '../../built/index.js';
+import { version } from '../../built/index.js';
 import type { SummalyResult } from '../../built/index.js';
 
 declare const meta: {
@@ -16,6 +16,7 @@ declare const httpRequestService: { httpAgent: http.Agent; httpsAgent: https.Age
 declare const summalyDefaultUserAgent: string;
 
 export async function fetchSummary(url: string, lang?: string): Promise<SummalyResult> {
+	const { summaly } = await import('../../built/index.js');
 	return summaly(url, {
 		followRedirects: meta.urlPreviewAllowRedirect,
 		lang: lang ?? 'ja-JP',
