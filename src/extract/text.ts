@@ -14,6 +14,16 @@ export function clip(s: string, max: number): string {
 	return trimmed.length > max ? trimmed.slice(0, max) + '...' : trimmed;
 }
 
+/** Escapes `s` for use as a literal inside a (non-unicode) RegExp. Uses RegExp.escape where it exists (Node 24+). */
+function escapeRegExp(s: string): string {
+	return typeof RegExp.escape === 'function' ? RegExp.escape(s) : escapeRegExpFallback(s);
+}
+
+/** For Node 22, which has no RegExp.escape. */
+function escapeRegExpFallback(s: string): string {
+	return s.replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
+}
+
 /** Removes a trailing site name such as `Title | Site` or `Title - Site` from the title. */
 export function cleanupTitle(title: string, siteName?: string | null): string {
 	const trimmed = title.trim();
@@ -21,6 +31,6 @@ export function cleanupTitle(title: string, siteName?: string | null): string {
 		return trimmed;
 	}
 
-	const pattern = new RegExp(`^(.+?)\\s?[\\-\\|:・]\\s?${RegExp.escape(siteName.trim())}$`);
+	const pattern = new RegExp(`^(.+?)\\s?[\\-\\|:・]\\s?${escapeRegExp(siteName.trim())}$`);
 	return pattern.exec(trimmed)?.[1] ?? trimmed;
 }
