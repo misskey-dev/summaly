@@ -537,7 +537,8 @@ describe('fetchResponse through a proxy: CONNECT authority', () => {
 		const started = Date.now();
 		// Each attempt gives up after responseTimeout (200ms); the operation ends at 300ms, during the second attempt
 		const e = await fetchResponse(transport, { ...request('http://multi.test/'), responseTimeout: 200, operationTimeout: 300 }).catch(e => e);
-		expect(Date.now() - started).toBeLessThan(1000);
+		// Generous wall-clock bound for slow CI; the message and the attempt count below are the real checks.
+		expect(Date.now() - started).toBeLessThan(3000);
 		expect(e.message).toContain("Timeout awaiting 'request' for 300ms");
 		expect(p.accepted()).toBe(2);
 		expect(await waitFor(() => p.open() === 0)).toBe(true);

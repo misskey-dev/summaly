@@ -24,6 +24,11 @@ async function main(): Promise<void> {
 	const fastify = buildApp(config, {}, { logger: true });
 
 	let closing = false;
+	// A response sent during shutdown closes its connection: otherwise a keep-alive client's socket, idle once the
+	// in-flight request is answered, would hold fastify.close() open until the keep-alive timeout.
+	fastify.addHook('onSend', async (_request, reply) => {
+		if (closing) reply.header('connection', 'close');
+	});
 	const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
 		if (closing) return;
 		closing = true;
