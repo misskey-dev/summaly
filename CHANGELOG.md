@@ -7,6 +7,8 @@
 * サーバーの起動に fastify-cli を使用しないように
 * Dockerfile を追加
   * `docker build` でスタンドアロンサーバーのイメージをビルドできます。起動方法は README.md を参照してください
+* リリースごとにコンテナイメージを `ghcr.io/misskey-dev/summaly` に公開するように
+  * `linux/amd64` と `linux/arm64` に対応しています
 
 5.5.2 / 2026/09/18
 ------------------

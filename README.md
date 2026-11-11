@@ -73,6 +73,20 @@ Invalid values (e.g. `SUMMALY_PORT=abc`) make the server exit with an error.
 
 Run the server with Docker:
 
+Container images for `linux/amd64` and `linux/arm64` are published to GitHub Container Registry for each release.
+
+```
+docker run --rm -p 127.0.0.1:3000:3000 -e SUMMALY_LANG=ja-JP ghcr.io/misskey-dev/summaly:latest
+```
+
+Each release is tagged with its version, e.g. `5.6.0`, `5.6` and `5` (pre-releases only with their full version), and the latest release is also tagged as `latest`.
+
+The environment variables above can be passed with `-e`.
+In the image, `SUMMALY_HOST` defaults to `0.0.0.0` so that the server is reachable through a published port, and the server runs as the non-root `node` user.
+Publish the port only where needed (e.g. `127.0.0.1:3000:3000` as above), or do not publish it and access the server from other containers on the same network.
+
+To build the image yourself:
+
 ```
 git clone https://github.com/misskey-dev/summaly.git
 cd summaly
@@ -80,17 +94,16 @@ docker build -t summaly .
 docker run --rm -p 127.0.0.1:3000:3000 -e SUMMALY_LANG=ja-JP summaly
 ```
 
-The environment variables above can be passed with `-e`.
-In the image, `SUMMALY_HOST` defaults to `0.0.0.0` so that the server is reachable through a published port, and the server runs as the non-root `node` user.
-Publish the port only where needed (e.g. `127.0.0.1:3000:3000` as above), or do not publish it and access the server from other containers on the same network.
-
-With Docker Compose, put the following in your own `compose.yaml`, e.g. next to the cloned `summaly` directory.
+With Docker Compose, put the following in your `compose.yaml`.
 Other services in the same Compose project can access the server at `http://summaly:3000/`.
 
 ```yaml
 services:
   summaly:
-    build: ./summaly # path to the cloned repository, relative to compose.yaml
+    image: ghcr.io/misskey-dev/summaly:latest
+    # To build the image yourself, replace "image" with "build" and the path to the cloned repository,
+    # relative to compose.yaml:
+    # build: ./summaly
     restart: unless-stopped
     environment:
       SUMMALY_LANG: ja-JP
