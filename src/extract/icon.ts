@@ -15,12 +15,15 @@ export async function resolveIcon(ctx: ScrapeContext, href: string, pageUrl: URL
 		return null;
 	}
 
+	// At most one HEAD per call: the fallback below reuses this call's check if it already ran.
+	let checked: Promise<string | null> | undefined;
+	const check = (): Promise<string | null> => (checked ??= checkIcon(ctx, target));
 	try {
-		return await runCoalescedIcon(ctx.coalesce, () => ctx.iconKey(target), () => checkIcon(ctx, target));
+		return await runCoalescedIcon(ctx.coalesce, () => ctx.iconKey(target), check);
 	} catch {
-		// Only a failing cache or coordinator gets here (checkIcon never throws). The icon must not depend on
-		// their health, so check without them.
-		return await checkIcon(ctx, target);
+		// Only a failing cache lookup or coordinator gets here (checkIcon never throws, and a failed store is
+		// ignored). The icon must not depend on their health, so check without them.
+		return await check();
 	}
 }
 

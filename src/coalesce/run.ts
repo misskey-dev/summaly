@@ -91,6 +91,7 @@ type Use<E extends CacheEntry, T> = {
  * Runs `use.run` at most once per key at a time and caches the entry it returns, failures included.
  * Order: cache lookup → `use.run` through the coordinator → the entry stored in the cache → a result settled for each caller.
  * Every caller, including the one whose call ran the work, gets its result settled from the same entry.
+ * A failing `cache.get` or coordinator rejects; a failing `cache.set` does not (the entry is just not stored).
  * `key` is called only when there is a cache or a coordinator to use it (building it hashes every option).
  */
 async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => string, use: Use<E, T>): Promise<T> {
@@ -116,7 +117,15 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 
 		const entry = await use.run();
 		const ttl = use.succeeded(entry) ? deps.cacheTtl : deps.errorCacheTtl;
-		if (cache !== null && ttl > 0) await cache.set(requestKey, entry, ttl);
+		if (cache !== null && ttl > 0) {
+			// Storing is best effort: a failed set must not throw away work already done, nor make the callers
+			// sharing it (or the favicon check's fallback) do it again.
+			try {
+				await cache.set(requestKey, entry, ttl);
+			} catch {
+				// Not stored; the callers still get the entry.
+			}
+		}
 		return entry;
 	};
 

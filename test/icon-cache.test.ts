@@ -5,6 +5,7 @@ import { buildIconKey, buildRequestKey } from '@/coalesce/key.js';
 import {
 	createSummarizer,
 	defaultSummarizeOptions,
+	type InflightCoordinator,
 	MemorySummaryCache,
 	type SummaryCache,
 	type SummaryResult,
@@ -46,7 +47,14 @@ type Site = {
  * Serves, at every path, a page whose `<link rel=icon>` points to `faviconHref` (default `/favicon.png`),
  * and answers `/favicon.png` with `faviconStatus` (default 200) after `faviconDelayMs`.
  */
-async function site(opts: { faviconStatus?: number; faviconDelayMs?: number; faviconHref?: string; host?: string } = {}): Promise<Site> {
+async function site(opts: {
+	faviconStatus?: number;
+	faviconDelayMs?: number;
+	faviconHref?: string;
+	host?: string;
+	/** Called when a page GET arrives, before it is answered. */
+	onPageGet?: () => void;
+} = {}): Promise<Site> {
 	let faviconHeads = 0;
 	const server = await startTestServer((req, res) => {
 		if (new URL(req.url ?? '/', 'http://localhost').pathname === '/favicon.png') {
@@ -54,6 +62,7 @@ async function site(opts: { faviconStatus?: number; faviconDelayMs?: number; fav
 			setTimeout(() => res.writeHead(opts.faviconStatus ?? 200, { 'content-type': 'image/png' }).end(), opts.faviconDelayMs ?? 0);
 			return;
 		}
+		if (req.method === 'GET') opts.onPageGet?.();
 		const page = Buffer.from(`<html><head><title>Page</title><link rel="icon" href="${opts.faviconHref ?? '/favicon.png'}"></head></html>`);
 		res.writeHead(200, { 'content-type': 'text/html', 'content-length': page.byteLength });
 		res.end(page);
@@ -272,4 +281,53 @@ describe('favicon の確認結果のキャッシュ', () => {
 		expect(summary.icon).toBe(s.favicon);
 		expect(s.faviconHeads()).toBe(1);
 	});
+
+	test('icon のエントリの保存に失敗しても、その favicon に HEAD を送り直さない', async () => {
+		const s = await site();
+		const summarize = createSummarizer({ allowedPrivateNetworks, cache: failingIconSet(new MemorySummaryCache()) });
+
+		const summary = await summarize(`${s.url}a`);
+
+		expect(summary.icon).toBe(s.favicon);
+		expect(s.faviconHeads()).toBe(1);
+	});
+
+	test('icon のエントリの保存に失敗しても、同時に待っていた要約は HEAD を送らずに結果を受け取る', async () => {
+		const s = await site({ faviconDelayMs: 200 });
+		const summarize = createSummarizer({ allowedPrivateNetworks, cache: failingIconSet(new MemorySummaryCache()) });
+
+		const results = await Promise.all([summarize(`${s.url}a`), summarize(`${s.url}b`), summarize(`${s.url}c`)]);
+
+		expect(results.map(r => r.icon)).toEqual([s.favicon, s.favicon, s.favicon]);
+		expect(s.faviconHeads()).toBe(1);
+	});
+
+	test('coordinator が確認を済ませた後で失敗しても、その favicon に HEAD を送り直さない', async () => {
+		const s = await site();
+		const coordinator: InflightCoordinator = {
+			// Runs every task, but fails to hand back the favicon check's outcome.
+			run: async (_key, task) => {
+				const value = await task();
+				if ((value as { kind?: unknown }).kind === 'icon') throw new Error('coordinator is down');
+				return value;
+			},
+		};
+		const summarize = createSummarizer({ allowedPrivateNetworks, coordinator });
+
+		const summary = await summarize(`${s.url}a`);
+
+		expect(summary.icon).toBe(s.favicon);
+		expect(s.faviconHeads()).toBe(1);
+	});
 });
+
+/** `inner`, except that storing an icon entry fails. */
+function failingIconSet(inner: SummaryCache): SummaryCache {
+	return {
+		get: key => inner.get(key),
+		set: async (key, entry, ttlMs) => {
+			if (entry.kind === 'icon') throw new Error('cache is down');
+			await inner.set(key, entry, ttlMs);
+		},
+	};
+}

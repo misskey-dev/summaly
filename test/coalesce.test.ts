@@ -529,6 +529,35 @@ describe('runCoalesced', () => {
 		expect(key).not.toHaveBeenCalled();
 	});
 
+	test('保存に失敗しても、得た結果を実行した呼び出しにも待っていた呼び出しにも返す', async () => {
+		const cache: SummaryCache = {
+			get: async () => undefined,
+			set: async () => {
+				throw new Error('cache is down');
+			},
+		};
+		const deps = { cache, coordinator: new InProcessCoordinator(), cacheTtl: 1000, errorCacheTtl: 1000 };
+		let calls = 0;
+		const task = async () => {
+			calls++;
+			await sleep(50);
+			return result;
+		};
+
+		const values = await Promise.all([runCoalesced(deps, () => 'k', task), runCoalesced(deps, () => 'k', task)]);
+		const icons = await Promise.all([
+			runCoalescedIcon(deps, () => 'i', async () => {
+				await sleep(50);
+				return 'https://example.com/favicon.ico';
+			}),
+			runCoalescedIcon(deps, () => 'i', async () => 'https://example.com/other.ico'),
+		]);
+
+		expect(values).toEqual([result, result]);
+		expect(calls).toBe(1);
+		expect(icons).toEqual(['https://example.com/favicon.ico', 'https://example.com/favicon.ico']);
+	});
+
 	test('TTL が 0 なら保存しない', async () => {
 		const cache = new JsonCache();
 		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, () => 'ok', async () => result);
