@@ -3,12 +3,15 @@ import { readFileSync } from 'node:fs';
 import http, { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { summaly, summalyDefaultOptions } from '@/index.js';
+import { createSummaly, summalyDefaultOptions } from '@/index.js';
 import { StatusError } from '@/http/status-error.js';
 import type { GeneralScrapingOptions, Summary, SummalyPlugin } from '@/types.js';
 import { DEFAULT_BOT_UA } from '@/version.js';
 import { loopbackAgents } from './helpers/loopback-agent.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
+
+/** These tests serve different content at the same URL, so results must not be cached across calls. */
+const summaly = createSummaly({ cache: false });
 
 /** Replaces upstream's SUMMALY_ALLOW_PRIVATE_IP=true for tests that do not exercise the env var itself. */
 const allowedPrivateNetworks = ['127.0.0.0/8', '::1/128'];
