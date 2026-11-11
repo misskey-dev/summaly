@@ -99,20 +99,45 @@ function parseNonNegativeInteger(name: string, value: string, max = Number.MAX_S
 
 /**
  * Parses a comma-separated CIDR list. Spaces around entries and empty entries are ignored,
- * but at least one CIDR is required.
+ * but at least one CIDR is required. Each CIDR must be canonical (see checkCidr).
  */
 function parseCidrList(name: string, value: string): string[] {
 	const cidrs = value.split(',').map(entry => entry.trim()).filter(entry => entry !== '');
 	const expected = 'a comma-separated list of CIDRs such as 10.0.0.0/8,fd00::/8';
 	if (cidrs.length === 0) throw invalidValue(name, value, expected);
 	for (const cidr of cidrs) {
-		try {
-			ipaddr.parseCIDR(cidr);
-		} catch {
-			throw invalidValue(name, value, expected);
+		const problem = checkCidr(cidr);
+		if (problem === 'invalid') throw invalidValue(name, value, expected);
+		if (problem != null) {
+			throw new ServerConfigError(`Invalid value for ${name}: ${JSON.stringify(value)} (${cidr} is an IPv4-mapped IPv6 CIDR, which never matches; write it in IPv4 form${problem.ipv4 != null ? ` (${problem.ipv4})` : ''})`);
 		}
 	}
 	return cidrs;
+}
+
+/**
+ * Same checks as the lib's parseAllowedNetwork (packages/chiramiss/src/http/address-guard.ts), repeated here
+ * so a bad value stops the server at startup instead of failing every request; change both together.
+ * - IPv4 must be four plain decimal parts without leading zeros: ipaddr.parseCIDR also reads octal, hex and
+ *   short forms ('192.168.010.0/24' is 192.168.8.0/24), which would allow a network other than the one meant.
+ * - IPv4-mapped IPv6 (::ffff:0:0/96) never matches, since addresses are checked in their IPv4 form.
+ *   The IPv4 form of the network is returned for the error message when the prefix is /96 or longer.
+ */
+function checkCidr(cidr: string): 'invalid' | { ipv4: string | undefined } | undefined {
+	let addr: ipaddr.IPv4 | ipaddr.IPv6;
+	let bits: number;
+	try {
+		[addr, bits] = ipaddr.parseCIDR(cidr);
+	} catch {
+		return 'invalid';
+	}
+	if (addr.kind() === 'ipv4') {
+		return ipaddr.IPv4.isValidCIDRFourPartDecimal(cidr) ? undefined : 'invalid';
+	}
+	if ((addr as ipaddr.IPv6).isIPv4MappedAddress()) {
+		return { ipv4: bits >= 96 ? `${(addr as ipaddr.IPv6).toIPv4Address().toString()}/${bits - 96}` : undefined };
+	}
+	return undefined;
 }
 
 /**
@@ -135,6 +160,9 @@ function parseProxyUrl(name: string, value: string): string {
 /**
  * Replaces everything between the scheme separator (`scheme://`, or the start when there is none) and the last `@`
  * with `***`. Works on the raw text, so it also covers values `new URL()` cannot parse.
+ *
+ * A copy of the lib's redactUserinfo in packages/chiramiss/src/http/proxy.ts (internal there, not exported).
+ * Both must change together, so that a proxy URL is redacted the same way at startup and at request time.
  */
 function redactUserinfo(value: string): string {
 	const at = value.lastIndexOf('@');

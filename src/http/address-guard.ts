@@ -8,16 +8,39 @@ type Network = [ipaddr.IPv4 | ipaddr.IPv6, number];
 
 export type AddressGuard = { allowedNetworks: Network[] };
 
+/**
+ * @throws {TypeError} if an entry is not a CIDR in canonical form (see parseAllowedNetwork)
+ */
 export function createAddressGuard(allowedNetworks: string[] = []): AddressGuard {
-	return {
-		allowedNetworks: allowedNetworks.map(cidr => {
-			try {
-				return ipaddr.parseCIDR(cidr);
-			} catch {
-				throw new TypeError(`Invalid CIDR: ${cidr}`);
-			}
-		}),
-	};
+	return { allowedNetworks: allowedNetworks.map(parseAllowedNetwork) };
+}
+
+/**
+ * Parses one allowed network. Only canonical CIDRs are accepted:
+ * - IPv4 must be four plain decimal parts without leading zeros. ipaddr.parseCIDR also reads octal, hex and
+ *   short forms ('192.168.010.0/24' is 192.168.8.0/24, '127.1/8' is 127.0.0.1/8), which would silently allow
+ *   a network other than the one the administrator meant.
+ * - IPv4-mapped IPv6 (::ffff:0:0/96) is refused: addresses are checked after ipaddr.process() turns mapped
+ *   addresses into IPv4, so such a network would never match anything.
+ *
+ * The standalone server repeats these checks at startup (packages/server/src/config.ts checkCidr);
+ * change both together.
+ */
+function parseAllowedNetwork(cidr: string): Network {
+	let network: Network;
+	try {
+		network = ipaddr.parseCIDR(cidr);
+	} catch {
+		throw new TypeError(`Invalid CIDR: ${cidr}`);
+	}
+	const [addr, bits] = network;
+	if (addr.kind() === 'ipv4') {
+		if (!ipaddr.IPv4.isValidCIDRFourPartDecimal(cidr)) throw new TypeError(`Invalid CIDR: ${cidr}`);
+	} else if ((addr as ipaddr.IPv6).isIPv4MappedAddress()) {
+		const ipv4 = bits >= 96 ? ` (${(addr as ipaddr.IPv6).toIPv4Address().toString()}/${bits - 96})` : '';
+		throw new TypeError(`IPv4-mapped IPv6 CIDRs never match, write it in IPv4 form${ipv4}: ${cidr}`);
+	}
+	return network;
 }
 
 export function isAddressAllowed(guard: AddressGuard, ip: string): boolean {

@@ -25,6 +25,33 @@ describe('AddressGuard', () => {
 
 	test('不正な CIDR は TypeError', () => expect(() => createAddressGuard(['nope'])).toThrow(TypeError));
 
+	// ipaddr.parseCIDR reads these as other networks (e.g. 192.168.010.0 → 192.168.8.0), so they are rejected.
+	test.each(['192.168.010.0/24', '010.0.0.0/8', '0x7f.1/32', '127.1/8', '0x7f000001/32', '2130706433/32'])
+		('正規の4つの10進数でない IPv4 CIDR %s は TypeError', cidr => {
+			expect(() => createAddressGuard([cidr])).toThrow(TypeError);
+			expect(() => createAddressGuard([cidr])).toThrow(`Invalid CIDR: ${cidr}`);
+		});
+
+	test.each([
+		['::ffff:192.168.0.0/112', '192.168.0.0/16'],
+		['::ffff:127.0.0.1/128', '127.0.0.1/32'],
+		['::ffff:0:0/96', '0.0.0.0/0'],
+	])('IPv4 射影 IPv6 の CIDR %s は IPv4 形式を促す TypeError', (cidr, ipv4) => {
+		expect(() => createAddressGuard([cidr])).toThrow(TypeError);
+		expect(() => createAddressGuard([cidr])).toThrow(`write it in IPv4 form (${ipv4})`);
+	});
+
+	test('IPv4 射影 IPv6 の範囲が /96 より広い CIDR も TypeError', () => {
+		expect(() => createAddressGuard(['::ffff:0:0/80'])).toThrow('write it in IPv4 form');
+	});
+
+	test('正規の IPv4 / IPv6 CIDR は受け付ける', () => {
+		const guard = createAddressGuard(['0.0.0.0/0', '10.0.0.0/8', '192.168.10.0/24', '::/0', '::1/128', 'fd00::/8', '2001:db8::/32']);
+		expect(guard.allowedNetworks).toHaveLength(7);
+		expect(isAddressAllowed(createAddressGuard(['192.168.10.0/24']), '192.168.10.5')).toBe(true);
+		expect(isAddressAllowed(createAddressGuard(['fd00::/8']), 'fd00::1')).toBe(true);
+	});
+
 	test('assertHostAllowed は localhost を StatusError(400) で拒否する', async () => {
 		const e = await assertHostAllowed(createAddressGuard(), 'localhost').catch(e => e);
 		expect(e).toBeInstanceOf(StatusError);

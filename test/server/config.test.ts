@@ -213,6 +213,32 @@ describe('loadServerConfig', () => {
 		}
 	});
 
+	test.each(['192.168.010.0/24', '010.0.0.0/8', '0x7f.1/32', '127.1/8', '0x7f000001/32', '2130706433/32', '10.0.0.0/8,192.168.010.0/24'])
+		('SUMMALY_ALLOWED_PRIVATE_NETWORKS の正規でない IPv4 CIDR %s はエラー', value => {
+			expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value })).toThrow(ServerConfigError);
+			expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value })).toThrow(`Invalid value for SUMMALY_ALLOWED_PRIVATE_NETWORKS: ${JSON.stringify(value)}`);
+		});
+
+	test.each([
+		['::ffff:192.168.0.0/112', '192.168.0.0/16'],
+		['::ffff:127.0.0.1/128', '127.0.0.1/32'],
+		['10.0.0.0/8,::ffff:0:0/96', '0.0.0.0/0'],
+	])('SUMMALY_ALLOWED_PRIVATE_NETWORKS の IPv4 射影 IPv6 CIDR %s は IPv4 形式を促すエラー', (value, ipv4) => {
+		expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value })).toThrow(ServerConfigError);
+		expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value })).toThrow(`write it in IPv4 form (${ipv4})`);
+	});
+
+	test('SUMMALY_ALLOWED_PRIVATE_NETWORKS の IPv4 射影 IPv6 の範囲が /96 より広い CIDR もエラー', () => {
+		expect(() => loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: '::ffff:0:0/80' })).toThrow('write it in IPv4 form');
+	});
+
+	test('SUMMALY_ALLOWED_PRIVATE_NETWORKS の正規の IPv4 / IPv6 CIDR は受け付ける', () => {
+		const value = '0.0.0.0/0,10.0.0.0/8,192.168.10.0/24,::/0,::1/128,fd00::/8,2001:db8::/32';
+		expect(loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value }).summalyOptions).toEqual({
+			allowedPrivateNetworks: value.split(','),
+		});
+	});
+
 	describe('プロキシ', () => {
 		test('HTTPS_PROXY / NO_PROXY を proxy に入れる、大文字が小文字より優先', () => {
 			expect(loadServerConfig({

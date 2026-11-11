@@ -6,7 +6,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { createSummaly, type InflightCoordinator, type SummaryCache } from '@tiramiss-community/chiramiss';
 import type { ServerConfig } from './config.js';
-import { parseQueryOptions } from './query.js';
+import { resolveRequestOptions } from './query.js';
 
 export type AppDeps = {
 	/**
@@ -47,13 +47,7 @@ export function buildApp(config: ServerConfig, deps: AppDeps = {}, options: AppO
 		}
 
 		try {
-			return await summarize(url, {
-				// Same default as upstream's fastify plugin
-				followRedirects: false,
-				...parseQueryOptions(query),
-				// Environment variables win, so that the administrator can pin limits.
-				...config.summalyOptions,
-			});
+			return await summarize(url, resolveRequestOptions(query, config.summalyOptions));
 		} catch (e) {
 			return reply.status(500).send({
 				error: e,
