@@ -31,7 +31,8 @@ export type Transport = {
 	/**
 	 * Proxy agents owned by this transport, one per scheme in `proxy`. They resolve only the proxy host,
 	 * so a proxied hop checks its target with `assertHostAllowed` before anything is sent to the proxy,
-	 * and tunnels to the address that check validated (see `TUNNEL_TARGET`).
+	 * and tunnels to an address that check validated (see `TUNNEL_TARGET`). While `guard` is set they refuse
+	 * a request without validated addresses.
 	 */
 	proxyAgents: { http?: http.Agent; https?: https.Agent };
 };
@@ -53,7 +54,8 @@ export function createTransport(
 		guard,
 		guardedAgents: guard ? createGuardedAgents(guard) : null,
 		proxy,
-		proxyAgents: proxy ? createProxyAgents(proxy) : {},
+		// A guarded transport never lets the proxy resolve a target name: its agents CONNECT only to validated addresses.
+		proxyAgents: proxy ? createProxyAgents(proxy, { requireAddress: guard != null }) : {},
 	};
 }
 

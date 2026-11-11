@@ -48,7 +48,7 @@ function parseEntry(entry: string): { host: string; port: string | null } {
 
 /**
  * Checks the proxy URLs of a public `ProxyOptions`: each non-empty URL must be `http:` or `https:` with a host name.
- * Throws a TypeError naming the bad value (with any password masked).
+ * Throws a TypeError naming the bad value, with any userinfo (user name and password) redacted.
  */
 export function assertProxyOptions(proxy: ProxyOptions): void {
 	for (const scheme of ['http', 'https'] as const) {
@@ -65,16 +65,22 @@ function parseProxyUrl(value: string, scheme: 'http' | 'https'): URL {
 		// Reported below
 	}
 	if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:') || url.hostname === '') {
-		throw new TypeError(`Invalid ${scheme} proxy URL (only http: and https: URLs with a host are supported): ${maskPassword(value, url)}`);
+		throw new TypeError(`Invalid ${scheme} proxy URL (only http: and https: URLs with a host are supported): ${redactUserinfo(value)}`);
 	}
 	return url;
 }
 
-function maskPassword(value: string, url: URL | undefined): string {
-	if (!url?.password) return value;
-	const masked = new URL(url.href);
-	masked.password = '***';
-	return masked.href;
+/**
+ * Replaces everything between the scheme separator (`scheme://`, or the start when there is none) and the last `@`
+ * with `***`. Works on the raw text, so it also covers values `new URL()` cannot parse (where the parsed
+ * user name and password are unavailable) and a user name used alone as a token.
+ */
+function redactUserinfo(value: string): string {
+	const at = value.lastIndexOf('@');
+	if (at === -1) return value;
+	const scheme = /^[a-z][a-z0-9+.-]*:\/\//i.exec(value);
+	const start = scheme && scheme[0].length <= at ? scheme[0].length : 0;
+	return `${value.slice(0, start)}***${value.slice(at)}`;
 }
 
 /**
@@ -82,10 +88,22 @@ function maskPassword(value: string, url: URL | undefined): string {
  * Node passes request options through to `Agent#createConnection`.
  */
 export type TunnelTarget = {
-	/** Address to CONNECT to: the address the guard validated. When absent, the target host name is sent and the proxy resolves it. */
-	address?: string;
-	/** Aborts a pending CONNECT (the request's own signal is not passed on to the agent) */
+	/**
+	 * Addresses to CONNECT to: the addresses the guard validated, tried in order until the proxy opens a tunnel.
+	 * Required by agents built with `requireAddress` (a guarded transport). Only an unguarded transport may leave
+	 * it out, in which case the target host name is sent and the proxy resolves it.
+	 */
+	addresses?: string[];
+	/** Aborts a pending CONNECT, including the remaining addresses (the request's own signal is not passed on to the agent) */
 	signal?: AbortSignal;
+};
+
+export type TunnelingAgentOptions = {
+	/**
+	 * Refuse to CONNECT unless the request carries validated addresses in `TUNNEL_TARGET` (default true).
+	 * Must be true whenever the transport is guarded: CONNECT by name would let the proxy resolve the target again.
+	 */
+	requireAddress?: boolean;
 };
 
 export const TUNNEL_TARGET = Symbol('chiramiss.tunnelTarget');
@@ -105,15 +123,17 @@ function callbackError(callback: ConnectionCallback | undefined, err: Error): vo
  */
 export class TunnelingHttpAgent extends http.Agent {
 	readonly proxy: URL;
+	readonly requireAddress: boolean;
 
-	constructor(proxy: URL) {
+	constructor(proxy: URL, { requireAddress = true }: TunnelingAgentOptions = {}) {
 		// keepAlive off: the transport has no close hook, so idle pooled sockets would outlive the call.
 		super({ keepAlive: false });
 		this.proxy = proxy;
+		this.requireAddress = requireAddress;
 	}
 
 	override createConnection(options: TunnelRequestOptions, callback?: ConnectionCallback): undefined {
-		openTunnel(this.proxy, options, (err, socket) => {
+		openTunnel(this, options, (err, socket) => {
 			if (err || !socket) callbackError(callback, err ?? new Error('Proxy tunnel failed'));
 			else callback?.(null, socket);
 		});
@@ -127,14 +147,16 @@ export class TunnelingHttpAgent extends http.Agent {
  */
 export class TunnelingHttpsAgent extends https.Agent {
 	readonly proxy: URL;
+	readonly requireAddress: boolean;
 
-	constructor(proxy: URL) {
+	constructor(proxy: URL, { requireAddress = true }: TunnelingAgentOptions = {}) {
 		super({ keepAlive: false });
 		this.proxy = proxy;
+		this.requireAddress = requireAddress;
 	}
 
 	override createConnection(options: TunnelRequestOptions, callback?: ConnectionCallback): undefined {
-		openTunnel(this.proxy, options, (err, socket) => {
+		openTunnel(this, options, (err, socket) => {
 			if (err || !socket) {
 				callbackError(callback, err ?? new Error('Proxy tunnel failed'));
 				return;
@@ -158,19 +180,53 @@ export class TunnelingHttpsAgent extends https.Agent {
 	}
 }
 
+type TunnelCallback = (err: Error | null, socket?: net.Socket) => void;
+
 /**
- * Opens a CONNECT tunnel through `proxy` to the request's target. The handshake (TCP connect to the proxy
- * and the CONNECT reply) is bounded by the request's `timeout` and aborted by the target's signal;
- * on failure the socket to the proxy is destroyed.
+ * Opens a CONNECT tunnel through the agent's proxy to the request's target, trying each validated address in
+ * order until the proxy accepts one (a non-2xx reply, an error or the per-attempt timeout moves on to the next).
+ * The target's signal (the operation timeout) aborts the whole sequence.
+ * A guarded agent (`requireAddress`) fails without contacting the proxy when no validated address is attached.
  */
-function openTunnel(proxy: URL, options: TunnelRequestOptions, callback: (err: Error | null, socket?: net.Socket) => void): void {
+function openTunnel(
+	agent: { proxy: URL; requireAddress: boolean },
+	options: TunnelRequestOptions,
+	callback: TunnelCallback,
+): void {
 	const target = options[TUNNEL_TARGET];
 	const signal = target?.signal;
+	const addresses = target?.addresses ?? [];
+	if (addresses.length === 0 && agent.requireAddress) {
+		callback(new Error('Proxy tunnel refused: no validated address for the target (guarded transport)'));
+		return;
+	}
+	// Only an unguarded transport gets here without addresses: the proxy resolves the name.
+	const hosts = addresses.length > 0 ? addresses : [options.host ?? ''];
+	let index = 0;
+	const attempt = () => {
+		connectOnce(agent.proxy, hosts[index], options, signal, (err, socket) => {
+			if (!err) {
+				callback(null, socket);
+				return;
+			}
+			index++;
+			if (signal?.aborted || index >= hosts.length) callback(err);
+			else attempt();
+		});
+	};
+	attempt();
+}
+
+/**
+ * Sends one CONNECT for `host` (an address, or the target name when unguarded). The handshake (TCP connect to
+ * the proxy and the CONNECT reply) is bounded by the request's `timeout` and aborted by `signal`;
+ * on failure the socket to the proxy is destroyed.
+ */
+function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, signal: AbortSignal | undefined, callback: TunnelCallback): void {
 	if (signal?.aborted) {
 		callback(abortReason(signal));
 		return;
 	}
-	const host = target?.address ?? options.host ?? '';
 	const authority = `${host.includes(':') ? `[${host}]` : host}:${options.port}`;
 	const headers: http.OutgoingHttpHeaders = { host: authority, connection: 'close' };
 	if (proxy.username || proxy.password) {
@@ -246,11 +302,12 @@ function abortReason(signal: AbortSignal | undefined): Error {
 /**
  * Builds the tunneling agents for the schemes that have a proxy URL.
  * The proxy host is trusted configuration and is resolved without the private IP guard;
- * callers must check each target with `assertHostAllowed` and pass the validated address in `TUNNEL_TARGET`.
+ * callers must check each target with `assertHostAllowed` and pass the validated addresses in `TUNNEL_TARGET`.
+ * `requireAddress` (default true) makes the agents refuse a request without them; pass false only when unguarded.
  */
-export function createProxyAgents(proxy: ProxyOptions): { http?: http.Agent; https?: https.Agent } {
+export function createProxyAgents(proxy: ProxyOptions, options: TunnelingAgentOptions = {}): { http?: http.Agent; https?: https.Agent } {
 	const agents: { http?: http.Agent; https?: https.Agent } = {};
-	if (proxy.http) agents.http = new TunnelingHttpAgent(parseProxyUrl(proxy.http, 'http'));
-	if (proxy.https) agents.https = new TunnelingHttpsAgent(parseProxyUrl(proxy.https, 'https'));
+	if (proxy.http) agents.http = new TunnelingHttpAgent(parseProxyUrl(proxy.http, 'http'), options);
+	if (proxy.https) agents.https = new TunnelingHttpsAgent(parseProxyUrl(proxy.https, 'https'), options);
 	return agents;
 }

@@ -1,6 +1,7 @@
 // Derived from misskey-dev/summaly (MIT)
 import http from 'node:http';
 import https from 'node:https';
+import net from 'node:net';
 import { Transform, type TransformCallback, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import zlib from 'node:zlib';
@@ -106,10 +107,11 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		// Direct hops use the transport-owned guarded agents, whose lookup re-checks at connect time
 		// (DNS rebinding defense). They never hold sockets opened under another policy, so that check
 		// is never skipped by socket reuse.
-		// Proxied hops tunnel to the address validated above, so the proxy never resolves the name again
-		// (DNS rebinding / split-horizon DNS). The proxy agents read it from the request options.
+		// Proxied hops tunnel to an address validated above, so the proxy never resolves the name again
+		// (DNS rebinding / split-horizon DNS). The proxy agents read them from the request options and
+		// try them in order (IPv4 first) until a tunnel opens, all under the operation's signal.
 		agent = selectOwnedAgent(transport, url);
-		tunnelTarget = { address: validated?.[0], signal };
+		tunnelTarget = { addresses: validated && ipv4First(validated), signal };
 	}
 
 	const options: https.RequestOptions & { [TUNNEL_TARGET]?: TunnelTarget } = {
@@ -303,6 +305,11 @@ class Decompressor extends Transform {
 		this.#inner?.destroy();
 		callback(err);
 	}
+}
+
+/** Stable reorder putting IPv4 addresses before IPv6 ones. */
+function ipv4First(addresses: string[]): string[] {
+	return [...addresses.filter(a => net.isIPv4(a)), ...addresses.filter(a => !net.isIPv4(a))];
 }
 
 function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
