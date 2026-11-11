@@ -10,6 +10,7 @@ import { createTransport } from '@/http/transport.js';
 import { fetchResponse, type FetchRequest } from '@/http/request.js';
 import { decodeHtml } from '@/http/decode.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
+import { LOOPBACK_CERT, LOOPBACK_KEY } from './helpers/tls-cert.js';
 
 const SJIS_HTML = readFileSync(new URL('./fixtures/sjis.html', import.meta.url));
 const SJIS_TITLE = 'シフトJISで書かれた日本語のページ';
@@ -445,6 +446,182 @@ describe('fetchResponse', () => {
 		expect(result.body.toString()).toBe('ok');
 		expect(calls()).toBeGreaterThan(0);
 		agent.destroy();
+	});
+});
+
+/** A server that counts the TCP connections it accepts. */
+async function countingServer(handler: http.RequestListener): Promise<{ server: TestServer; connections: () => number; sockets: Set<net.Socket> }> {
+	const sockets = new Set<net.Socket>();
+	const server = await serve((req, res) => {
+		sockets.add(req.socket);
+		handler(req, res);
+	});
+	return { server, connections: () => sockets.size, sockets };
+}
+
+/** Answers `ok` with a content-length, also to HEAD (Node does not keep a HEAD response without one alive). */
+const ok: http.RequestListener = (_req, res) => {
+	res.writeHead(200, { 'content-type': 'text/html', 'content-length': '2' });
+	res.end('ok');
+};
+
+function freeSocketCount(agent: http.Agent | undefined): number {
+	return Object.values(agent?.freeSockets ?? {}).reduce((n, list) => n + (list?.length ?? 0), 0);
+}
+
+describe('transport 内の接続の再利用', () => {
+	test('同じ transport の続くリクエストは同じ接続を使う', async () => {
+		const { server, connections } = await countingServer(ok);
+		const transport = localTransport();
+		await fetchResponse(transport, request(server.url, { method: 'HEAD' }));
+		await fetchResponse(transport, request(server.url));
+		await fetchResponse(transport, request(new URL('/favicon.ico', server.url).href, { method: 'HEAD' }));
+		expect(connections()).toBe(1);
+		transport.close();
+	});
+
+	test('https でも同じ transport の続くリクエストは同じ接続を使う', async () => {
+		let connections = 0;
+		const secure = https.createServer({ cert: LOOPBACK_CERT, key: LOOPBACK_KEY }, ok);
+		secure.on('connection', () => connections++);
+		await new Promise<void>(resolve => secure.listen(0, '127.0.0.1', resolve));
+		try {
+			const url = `https://127.0.0.1:${(secure.address() as net.AddressInfo).port}/`;
+			const transport = localTransport();
+			transport.guardedAgents!.https.options.ca = LOOPBACK_CERT;
+			await fetchResponse(transport, request(url, { method: 'HEAD' }));
+			const result = await fetchResponse(transport, request(url));
+			expect(result.body.toString()).toBe('ok');
+			expect(connections).toBe(1);
+			transport.close();
+		} finally {
+			secure.closeAllConnections();
+			await new Promise(resolve => secure.close(resolve));
+		}
+	});
+
+	test('close で transport の agent が持つソケットをすべて閉じる', async () => {
+		const { server, sockets } = await countingServer(ok);
+		const transport = localTransport();
+		await fetchResponse(transport, request(server.url));
+		const idle = Object.values(transport.guardedAgents?.http.freeSockets ?? {}).flat();
+		expect(idle).toHaveLength(1);
+		const [serverSide] = sockets;
+		const closed = new Promise(resolve => serverSide.once('close', resolve));
+		transport.close();
+		expect(idle.every(socket => socket?.destroyed)).toBe(true);
+		await closed;
+	});
+
+	test('close は guard なしや agent を渡された transport でも呼べ、渡された agent には触れない', async () => {
+		const { agent } = hookedAgent();
+		const destroy = vi.spyOn(agent, 'destroy');
+		createTransport({}, { CHIRAMISS_ALLOW_PRIVATE_IP: 'true' }).close();
+		createTransport({ agent: { http: agent } }, {}).close();
+		createTransport({ proxy: { http: 'http://proxy.example:8080' } }, {}).close();
+		expect(destroy).not.toHaveBeenCalled();
+		agent.destroy();
+	});
+
+	const brokenResponses: [string, http.RequestListener, Partial<FetchRequest>, RegExp | string][] = [
+		['ステータスエラー', (_req, res) => {
+			res.writeHead(404, { 'content-type': 'text/html' });
+			res.end('not found');
+		}, {}, '404 Not Found'],
+		['typeFilter 不一致', (_req, res) => {
+			res.writeHead(200, { 'content-type': 'application/json' });
+			res.end('{}');
+		}, { typeFilter: /^text\/html/ }, 'Rejected by type filter application/json'],
+		['受信中のサイズ超過', (_req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html' });
+			res.write('a'.repeat(200));
+		}, { contentLengthLimit: 100 }, /^maxSize exceeded/],
+		['展開後のサイズ超過', (_req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' });
+			// Not ended: the response is still incomplete when the limit trips.
+			res.write(zlib.gzipSync(Buffer.alloc(64 * 1024)));
+		}, { contentLengthLimit: 1024 }, /^maxSize exceeded/],
+		['responseTimeout', (_req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html' });
+			res.write('partial');
+		}, { responseTimeout: 100 }, "Timeout awaiting 'socket' for 100ms"],
+		['operationTimeout', (_req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html' });
+			res.write('partial');
+		}, { operationTimeout: 100 }, "Timeout awaiting 'request' for 100ms"],
+		['途中で切断', (req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html', 'content-length': '100' });
+			res.write('partial', () => req.socket.destroy());
+		}, {}, /aborted|ECONNRESET|Premature close/],
+	];
+
+	test.each(brokenResponses)('%s で失敗した接続はプールに戻さず、次は新しい接続を使う', async (_name, broken, overrides, error) => {
+		let first = true;
+		const { server, connections } = await countingServer((req, res) => {
+			if (first) {
+				first = false;
+				broken(req, res);
+			} else {
+				ok(req, res);
+			}
+		});
+		const transport = localTransport();
+		await expect(fetchResponse(transport, request(server.url, overrides))).rejects.toThrow(error);
+		await new Promise(resolve => setImmediate(resolve));
+		expect(freeSocketCount(transport.guardedAgents?.http)).toBe(0);
+		const result = await fetchResponse(transport, request(server.url));
+		expect(result.body.toString()).toBe('ok');
+		expect(connections()).toBe(2);
+		transport.close();
+	});
+
+	test('リダイレクトの応答で破棄した接続はプールに戻さない', async () => {
+		const { server, connections } = await countingServer((req, res) => {
+			if (req.url === '/') {
+				res.writeHead(302, { location: '/next', 'content-type': 'text/html' });
+				res.write('moved');
+				// The body never ends: the socket cannot be reused after the client drops the response.
+				return;
+			}
+			ok(req, res);
+		});
+		const transport = localTransport();
+		const result = await fetchResponse(transport, request(server.url));
+		expect(result.body.toString()).toBe('ok');
+		expect(connections()).toBe(2);
+		transport.close();
+	});
+
+	test('プールにソケットがあっても、ホップごとの事前確認は省かない', async () => {
+		const { server, connections } = await countingServer(ok);
+		const url = new URL(server.url);
+		url.hostname = 'localhost';
+		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8', '::1/128'] }, {});
+		await fetchResponse(transport, request(url.href));
+		expect(freeSocketCount(transport.guardedAgents?.http)).toBe(1);
+		// The name now resolves to a network that is not allowed: the pooled socket must not be used.
+		vi.spyOn(dns.promises, 'lookup').mockResolvedValue([{ address: '10.0.0.1', family: 4 }] as never);
+		const e = await fetchResponse(transport, request(url.href)).catch(e => e);
+		expect(e).toBeInstanceOf(StatusError);
+		expect(e.message).toBe('Private IP rejected 10.0.0.1');
+		expect(connections()).toBe(1);
+		transport.close();
+	});
+
+	test('新しいソケットを開くたびに接続時の名前解決で確認し、再利用のときは開き直さない', async () => {
+		const { server, connections } = await countingServer((req, res) => setTimeout(() => ok(req, res), 20));
+		const url = new URL(server.url);
+		url.hostname = 'localhost';
+		const lookup = vi.spyOn(dns, 'lookup');
+		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8', '::1/128'] }, {});
+		// Two at once need two sockets, each checked when it connects.
+		await Promise.all([fetchResponse(transport, request(url.href)), fetchResponse(transport, request(url.href))]);
+		expect(connections()).toBe(2);
+		expect(lookup).toHaveBeenCalledTimes(2);
+		await fetchResponse(transport, request(url.href));
+		expect(connections()).toBe(2);
+		expect(lookup).toHaveBeenCalledTimes(2);
+		transport.close();
 	});
 });
 

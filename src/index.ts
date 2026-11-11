@@ -101,21 +101,25 @@ export const summaly: (url: string, options?: SummarizeOptions) => Promise<Summa
  */
 async function summarizeUncached(url: string, opts: SummarizeOptions): Promise<SummaryResult> {
 	const ctx = createScrapeContext(opts);
+	// The requests of this call share the transport's connections; none of them outlive the call.
+	try {
+		const actualUrl = opts.followRedirects ? await resolveFinalUrl(ctx, url) : url;
+		const target = new URL(actualUrl);
 
-	const actualUrl = opts.followRedirects ? await resolveFinalUrl(ctx, url) : url;
-	const target = new URL(actualUrl);
+		const providers = [...builtinProviders, ...(opts.plugins ?? []).map(fromPlugin)];
+		const match = providers.find(provider => provider.test(target));
 
-	const providers = [...builtinProviders, ...(opts.plugins ?? []).map(fromPlugin)];
-	const match = providers.find(provider => provider.test(target));
+		const summary = match ? await match.summarize(ctx, target) : await scrapeGeneral(ctx, target);
+		if (summary == null) {
+			throw new Error('failed summarize');
+		}
 
-	const summary = match ? await match.summarize(ctx, target) : await scrapeGeneral(ctx, target);
-	if (summary == null) {
-		throw new Error('failed summarize');
+		return Object.assign(summary, {
+			url: actualUrl,
+		});
+	} finally {
+		ctx.transport.close();
 	}
-
-	return Object.assign(summary, {
-		url: actualUrl,
-	});
 }
 
 /**

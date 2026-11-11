@@ -48,7 +48,8 @@ export class TunnelingHttpAgent extends http.Agent {
 	readonly requireAddress: boolean;
 
 	constructor(proxy: URL, { requireAddress = true }: TunnelingAgentOptions = {}) {
-		// keepAlive off: the transport has no close hook, so idle pooled sockets would outlive the call.
+		// keepAlive off: each socket is a tunnel to the address its own hop validated. The pool key (host and port)
+		// does not carry that address, so reuse could send a request through a tunnel its hop never checked.
 		super({ keepAlive: false });
 		this.proxy = proxy;
 		this.requireAddress = requireAddress;

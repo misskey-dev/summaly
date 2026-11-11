@@ -4,7 +4,10 @@ import type { ProxyOptions, SummarizeOptions } from '@/types.js';
 import { type AddressGuard, createAddressGuard, createGuardedLookup, privateIpAllowedByEnv } from './address-guard.js';
 import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy/index.js';
 
-/** Per-call connection settings. Holds no global state. */
+/**
+ * Per-call connection settings. Holds no global state: one transport serves one summary call
+ * (its requests may share connections) and is closed when that call ends.
+ */
 export type Transport = {
 	/**
 	 * Caller-supplied agents. A hop whose scheme has one uses it and leaves private IP blocking to it.
@@ -18,8 +21,10 @@ export type Transport = {
 	 */
 	guard: AddressGuard | null;
 	/**
-	 * Agents owned by this transport, built with the guarded lookup. Never shared with other pools,
+	 * Agents owned by this transport, built with the guarded lookup. Never shared with other pools or other calls,
 	 * so every guarded connection runs the connect-time check (no reuse of unguarded sockets).
+	 * They keep connections alive so the requests of one call (HEAD for the final URL, the page, favicon, oEmbed)
+	 * can reuse a socket this transport opened and checked; `close` destroys them.
 	 * null when `guard` is null.
 	 */
 	guardedAgents: { http: http.Agent; https: https.Agent } | null;
@@ -35,6 +40,11 @@ export type Transport = {
 	 * a request without validated addresses.
 	 */
 	proxyAgents: { http?: http.Agent; https?: https.Agent };
+	/**
+	 * Destroys every agent this transport owns (guarded and proxy agents) with their sockets, idle or not.
+	 * Caller-supplied agents are left alone. Call it once the summary call is done, whatever its outcome.
+	 */
+	close(): void;
 };
 
 export function createTransport(
@@ -49,13 +59,21 @@ export function createTransport(
 	const guardOff = privateIpAllowedByEnv(env) || (agents.http != null && agents.https != null);
 	const guard = guardOff ? null : createAddressGuard(opts.allowedPrivateNetworks);
 	const proxy = proxyWithoutCallerSchemes(opts.proxy, agents);
+	const guardedAgents = guard ? createGuardedAgents(guard) : null;
+	// A guarded transport never lets the proxy resolve a target name: its agents CONNECT only to validated addresses.
+	const proxyAgents = proxy ? createProxyAgents(proxy, { requireAddress: guard != null }) : {};
 	return {
 		agents: hasAgent ? agents : {},
 		guard,
-		guardedAgents: guard ? createGuardedAgents(guard) : null,
+		guardedAgents,
 		proxy,
-		// A guarded transport never lets the proxy resolve a target name: its agents CONNECT only to validated addresses.
-		proxyAgents: proxy ? createProxyAgents(proxy, { requireAddress: guard != null }) : {},
+		proxyAgents,
+		close() {
+			guardedAgents?.http.destroy();
+			guardedAgents?.https.destroy();
+			proxyAgents.http?.destroy();
+			proxyAgents.https?.destroy();
+		},
 	};
 }
 
@@ -93,9 +111,11 @@ export function selectOwnedAgent(transport: Transport, url: URL): http.Agent | u
 
 function createGuardedAgents(guard: AddressGuard): { http: http.Agent; https: https.Agent } {
 	const lookup = createGuardedLookup(guard);
-	// keepAlive off: the transport has no close hook, so idle pooled sockets would outlive the call.
+	// keepAlive: a socket goes back to the pool only after a complete response, and the pool lives as long as the
+	// transport (one call); Transport#close destroys it. A response dropped early (error, size limit, timeout)
+	// destroys its socket, so it never returns to the pool.
 	return {
-		http: new http.Agent({ keepAlive: false, lookup }),
-		https: new https.Agent({ keepAlive: false, lookup }),
+		http: new http.Agent({ keepAlive: true, lookup }),
+		https: new https.Agent({ keepAlive: true, lookup }),
 	};
 }
