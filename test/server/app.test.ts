@@ -353,9 +353,10 @@ describe('環境変数で設定したサーバーの動作', () => {
 		const res = await app.inject({ method: 'GET', url: '/', query: { url: targetUrl } });
 
 		expect(res.statusCode).toBe(200);
-		expect(runs).toBe(1);
-		expect(sets).toHaveLength(1);
-		expect(sets[0]).toMatchObject({ kind: 'ok', value: { title: 'KISS principle' } });
+		// One for the summary and one for its favicon check, which goes through the same cache and coordinator.
+		expect(runs).toBe(2);
+		expect(sets.map(entry => entry.kind).sort()).toEqual(['icon', 'ok']);
+		expect(sets.find(entry => entry.kind === 'ok')).toMatchObject({ kind: 'ok', value: { title: 'KISS principle' } });
 	});
 });
 

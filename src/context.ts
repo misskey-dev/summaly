@@ -1,3 +1,5 @@
+import { buildIconKey } from '@/coalesce/key.js';
+import type { CoalesceDeps } from '@/coalesce/run.js';
 import { type FetchRequest, type FetchResult, fetchResponse } from '@/http/request.js';
 import { type Transport, createTransport } from '@/http/transport.js';
 import { type ResolvedOptions, resolveOptions } from '@/options.js';
@@ -10,9 +12,18 @@ export type ScrapeContext = {
 	/** The caller's raw values (no defaults filled in, lang not validated), as upstream hands them to plugins. */
 	scrapingOptions: GeneralScrapingOptions;
 	transport: Transport;
+	/**
+	 * The summarizer's cache and in-flight sharing, for results shared between summaries (favicon checks).
+	 * Both are off in a context built without them.
+	 */
+	coalesce: CoalesceDeps;
+	/** Key of a favicon check of `url` (absolute) under this call's options. */
+	iconKey: (url: string) => string;
 };
 
-export function createScrapeContext(opts: SummarizeOptions): ScrapeContext {
+const NO_COALESCE: CoalesceDeps = Object.freeze({ cache: null, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 });
+
+export function createScrapeContext(opts: SummarizeOptions, coalesce: CoalesceDeps = NO_COALESCE): ScrapeContext {
 	return {
 		options: resolveOptions(opts),
 		scrapingOptions: toScrapingOptions(opts),
@@ -21,6 +32,8 @@ export function createScrapeContext(opts: SummarizeOptions): ScrapeContext {
 			allowedPrivateNetworks: opts.allowedPrivateNetworks,
 			proxy: opts.proxy,
 		}),
+		coalesce,
+		iconKey: url => buildIconKey(url, opts),
 	};
 }
 

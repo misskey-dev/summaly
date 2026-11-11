@@ -362,7 +362,8 @@ describe('coalescing and caching', () => {
 			await summarize(`${server.url}page/${i}`).catch(() => {});
 			expect(cache.estimatedBytes).toBeLessThanOrEqual(maxBytes);
 		}
-		expect(cache.size).toBe(50);
+		// 50 summaries, plus the one favicon check (/favicon.ico) every page shares.
+		expect(cache.size).toBe(51);
 		expect(cache.estimatedBytes).toBeLessThanOrEqual(50 * 4 * 1024);
 	}, 60_000);
 
@@ -430,7 +431,8 @@ describe('coalescing and caching', () => {
 			isPermanentError: freshError.isPermanentError,
 		});
 
-		expect(cache.stored.size).toBe(2);
+		// The two summaries, plus the favicon check (/favicon.ico) of the page that was fetched.
+		expect(cache.stored.size).toBe(3);
 	});
 
 	test('複製できない結果は ok として保存せず、エラーとしてキャッシュする', async () => {

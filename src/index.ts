@@ -2,7 +2,7 @@
 import { InProcessCoordinator } from '@/coalesce/in-process-coordinator.js';
 import { buildRequestKey } from '@/coalesce/key.js';
 import { MemorySummaryCache } from '@/coalesce/memory-cache.js';
-import { runCoalesced } from '@/coalesce/run.js';
+import { type CoalesceDeps, runCoalesced } from '@/coalesce/run.js';
 import { type ScrapeContext, createScrapeContext, fetchWithContext } from '@/context.js';
 import { scrapeGeneral } from '@/extract/general.js';
 import { builtinProviders } from '@/providers/index.js';
@@ -71,13 +71,13 @@ export function createSummarizer(base: SummarizeOptions = {}): (url: string, opt
 		};
 		const cache = options.cache ?? base.cache ?? memoryCache;
 		const coordinator = options.coordinator ?? base.coordinator ?? inProcessCoordinator;
-		const deps = {
+		const deps: CoalesceDeps = {
 			cache: cache === false ? null : cache,
 			coordinator: coordinator === false ? null : coordinator,
 			cacheTtl: options.cacheTtl ?? base.cacheTtl ?? DEFAULT_CACHE_TTL,
 			errorCacheTtl: options.errorCacheTtl ?? base.errorCacheTtl ?? DEFAULT_ERROR_CACHE_TTL,
 		};
-		return runCoalesced(deps, () => buildRequestKey(url, opts), () => summarizeUncached(url, opts));
+		return runCoalesced(deps, () => buildRequestKey(url, opts), () => summarizeUncached(url, opts, deps));
 	};
 }
 
@@ -97,10 +97,11 @@ export const summarize: (url: string, options?: SummarizeOptions) => Promise<Sum
 export const summaly: (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = summarize;
 
 /**
- * The whole summary without caching or sharing: final URL, provider match, scraping.
+ * The whole summary without caching or sharing it: final URL, provider match, scraping.
+ * `deps` is handed on for the favicon checks, whose results are cached and shared across summaries.
  */
-async function summarizeUncached(url: string, opts: SummarizeOptions): Promise<SummaryResult> {
-	const ctx = createScrapeContext(opts);
+async function summarizeUncached(url: string, opts: SummarizeOptions, deps: CoalesceDeps): Promise<SummaryResult> {
+	const ctx = createScrapeContext(opts, deps);
 	// The requests of this call share the transport's connections; none of them outlive the call.
 	try {
 		const actualUrl = opts.followRedirects ? await resolveFinalUrl(ctx, url) : url;
