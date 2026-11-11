@@ -30,7 +30,9 @@ export const amazon: Provider = {
 	test: url => HOSTNAMES.has(url.hostname),
 
 	async summarize(ctx, url) {
-		const page = await fetchPage(ctx, url);
+		// Upstream fetched with scpaping()'s defaults, so redirects are always followed and content-length is never required (Ruling R20).
+		// The rest of the context (transport, User-Agent, lang, timeouts, size limit) still applies.
+		const page = await fetchPage({ ...ctx, options: { ...ctx.options, followRedirects: true, contentLengthRequired: false } }, url);
 		const $ = loadDom(page.html);
 
 		const title = $('#title').text();

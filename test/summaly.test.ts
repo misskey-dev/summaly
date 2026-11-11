@@ -216,6 +216,48 @@ describe('local tests', () => {
 });
 
 describe('chiramiss additions', () => {
+	test('SUMMALY_ALLOW_PRIVATE_IP=true なら allowedPrivateNetworks や agent なしでもローカルサーバーを要約できる (本家互換)', async () => {
+		// The top-level afterEach restores the original value.
+		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
+		const content = fixture('htmls/og-title.html');
+		const host = await serve((_req, res) => sendWithLength(res, content));
+
+		const summary = await summaly(host);
+
+		expect(summary.title).toBe('Strawberry Pasta');
+	});
+
+	test('Amazon のページ取得は followRedirects: false / contentLengthRequired: true を指定しても本家と同じくリダイレクトに従い content-length を要求しない', async () => {
+		const page = fixture('amazon.html');
+		const requests: string[] = [];
+		const server = await serve((req, res) => {
+			requests.push(`${req.method} ${req.headers.host}${req.url}`);
+			if (req.url === '/dp/OLD') {
+				res.writeHead(301, { location: '/dp/B000000000' });
+				res.end();
+			} else if (req.url === '/dp/B000000000') {
+				sendStream(res, [page]);
+			} else {
+				res.writeHead(404).end();
+			}
+		});
+		const agents = loopbackAgents(Number(new URL(server).port));
+		cleanups.push(() => agents.destroy());
+
+		const summary = await summaly('https://www.amazon.co.jp/dp/OLD', {
+			followRedirects: false,
+			contentLengthRequired: true,
+			agent: { http: agents.http, https: agents.https },
+		});
+
+		expect(summary).toMatchObject({
+			title: 'KISS 原則の本',
+			sitename: 'Amazon',
+			url: 'https://www.amazon.co.jp/dp/OLD',
+		});
+		expect(requests).toEqual(['GET www.amazon.co.jp/dp/OLD', 'GET www.amazon.co.jp/dp/B000000000']);
+	});
+
 	test('設定の違う agent を並行に渡しても互いに干渉しない', async () => {
 		const pageA = Buffer.from('<html><head><title>A</title></head></html>');
 		const pageB = Buffer.from('<html><head><title>B</title></head></html>');
@@ -309,22 +351,46 @@ describe('chiramiss additions', () => {
 			},
 		};
 
-		// A URL no builtin matches goes to the plugin, with the GeneralScrapingOptions upstream builds.
+		// A URL no builtin matches goes to the plugin, with the GeneralScrapingOptions upstream builds (Ruling R19):
+		// the caller's raw values merged over summalyDefaultOptions, so unset keys stay undefined and lang is not validated.
 		const host = await serve(onlyRoot((_req, res) => sendWithLength(res, Buffer.from('<html></html>'))));
-		const custom = await summaly(host, { plugins: [plugin], lang: 'ja', userAgent: 'test-ua', allowedPrivateNetworks });
+		const custom = await summaly(host, { plugins: [plugin], lang: 'not a valid lang!', allowedPrivateNetworks });
 		expect(custom).toEqual({ ...pluginSummary, url: `${host}/` });
-		expect(calls).toEqual([{
-			url: `${host}/`,
-			opts: {
-				lang: 'ja',
-				userAgent: 'test-ua',
-				followRedirects: true,
-				responseTimeout: 20000,
-				operationTimeout: 60000,
-				contentLengthLimit: 10485760,
-				contentLengthRequired: false,
-			},
-		}]);
+		expect(calls).toHaveLength(1);
+		expect(calls[0].url).toBe(`${host}/`);
+		expect(calls[0].opts).toStrictEqual({
+			lang: 'not a valid lang!',
+			userAgent: undefined,
+			followRedirects: true,
+			responseTimeout: undefined,
+			operationTimeout: undefined,
+			contentLengthLimit: undefined,
+			contentLengthRequired: undefined,
+		});
+
+		// Values the caller does give are passed through as given.
+		const given = await summaly(host, {
+			plugins: [plugin],
+			lang: 'ja',
+			userAgent: 'test-ua',
+			followRedirects: false,
+			responseTimeout: 1000,
+			operationTimeout: 2000,
+			contentLengthLimit: 3000,
+			contentLengthRequired: true,
+			allowedPrivateNetworks,
+		});
+		expect(given).toEqual({ ...pluginSummary, url: host });
+		expect(calls).toHaveLength(2);
+		expect(calls[1].opts).toStrictEqual({
+			lang: 'ja',
+			userAgent: 'test-ua',
+			followRedirects: false,
+			responseTimeout: 1000,
+			operationTimeout: 2000,
+			contentLengthLimit: 3000,
+			contentLengthRequired: true,
+		});
 
 		// A URL a builtin matches goes to the builtin even though the plugin matches too.
 		const wikiBody = Buffer.from(JSON.stringify({ query: { pages: { 1: { title: 'Wiki', extract: 'text' } } } }));
@@ -336,6 +402,6 @@ describe('chiramiss additions', () => {
 		cleanups.push(() => agents.destroy());
 		const builtin = await summaly('https://ja.wikipedia.org/wiki/Wiki', { plugins: [plugin], agent: { http: agents.http, https: agents.https } });
 		expect(builtin).toMatchObject({ title: 'Wiki', description: 'text', sitename: 'Wikipedia', url: 'https://ja.wikipedia.org/wiki/Wiki' });
-		expect(calls).toHaveLength(1);
+		expect(calls).toHaveLength(2);
 	});
 });

@@ -1,17 +1,21 @@
 import { type FetchRequest, type FetchResult, fetchResponse } from '@/http/request.js';
 import { type Transport, createTransport } from '@/http/transport.js';
 import { type ResolvedOptions, resolveOptions } from '@/options.js';
-import type { SummalyOptions } from '@/types.js';
+import { toScrapingOptions } from '@/providers/provider.js';
+import type { GeneralScrapingOptions, SummalyOptions } from '@/types.js';
 
 /** Everything one summary needs to make requests. Built per call; holds no global state. */
 export type ScrapeContext = {
 	options: ResolvedOptions;
+	/** The caller's raw values (no defaults filled in, lang not validated), as upstream hands them to plugins. */
+	scrapingOptions: GeneralScrapingOptions;
 	transport: Transport;
 };
 
 export function createScrapeContext(opts: SummalyOptions): ScrapeContext {
 	return {
 		options: resolveOptions(opts),
+		scrapingOptions: toScrapingOptions(opts),
 		transport: createTransport({
 			agent: opts.agent,
 			allowedPrivateNetworks: opts.allowedPrivateNetworks,

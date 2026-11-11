@@ -233,4 +233,27 @@ describe('fromPlugin', () => {
 			contentLengthRequired: true,
 		});
 	});
+
+	test('未指定の値は undefined のまま、lang は検証せずにそのまま渡す (Ruling R19)', async () => {
+		let received: GeneralScrapingOptions | undefined;
+		const provider = fromPlugin({
+			test: () => true,
+			summarize: async (_url, opts) => {
+				received = opts;
+				return null;
+			},
+		});
+
+		await provider.summarize(createScrapeContext({ lang: 'not a valid lang!' }), new URL('https://custom.example/'));
+
+		expect(received).toStrictEqual({
+			lang: 'not a valid lang!',
+			userAgent: undefined,
+			followRedirects: undefined,
+			responseTimeout: undefined,
+			operationTimeout: undefined,
+			contentLengthLimit: undefined,
+			contentLengthRequired: undefined,
+		});
+	});
 });
