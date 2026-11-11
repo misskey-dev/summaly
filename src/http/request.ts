@@ -120,13 +120,10 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		signal,
 	};
 	if (tunnelTarget) options[TUNNEL_TARGET] = tunnelTarget;
-	if (req.responseTimeout > 0) {
-		options.timeout = req.responseTimeout;
-	} else if (agent !== undefined && (agent === transport.guardedAgents?.http || agent === transport.guardedAgents?.https)) {
-		// The guarded agents set a timeout on their sockets for idle ones (see createGuardedAgents); without a value
-		// of its own, a request would keep it and be cut while waiting for the server. 0 turns it off for this request.
-		options.timeout = 0;
-	}
+	// The guarded agents set a timeout on their sockets for idle ones (see createGuardedAgents); a request on them must
+	// replace it with its own (0 turns it off), or it would be cut while waiting for the server.
+	const guardedHop = agent !== undefined && (agent === transport.guardedAgents?.http || agent === transport.guardedAgents?.https);
+	if (req.responseTimeout > 0 || guardedHop) options.timeout = req.responseTimeout;
 
 	let timeoutError: Error | undefined;
 	const send = () => new Promise<http.IncomingMessage>((resolve, reject) => {
@@ -137,6 +134,12 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 			signal.removeEventListener('abort', onAbort);
 			resolve(r);
 		});
+		if (guardedHop) {
+			// Node sets the request's timeout on a reused socket only when it differs from the agent's timeout, but
+			// the idle socket may hold a shorter one: Node cuts it to the server's `Keep-Alive: timeout` hint. Set it
+			// on every socket, so a request whose timeout equals the agent's is not cut early.
+			request.setTimeout(req.responseTimeout);
+		}
 		// Reject on abort right away: until the agent hands over a socket (e.g. while a proxy CONNECT is pending),
 		// destroying the request only records the error.
 		const onAbort = () => {

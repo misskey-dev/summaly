@@ -43,8 +43,9 @@ export type GuardedAgentPoolOptions = GuardedAgentOptions & {
  * (error, size limit, timeout) destroys its socket, so it never returns to the pool.
  *
  * `timeout` applies to idle sockets (the agent destroys a pooled socket when it fires) and is unref'd with them, so
- * idle sockets never keep the process alive. An active request sets its own socket timeout (sendRequest passes
- * `responseTimeout`, 0 included), so the idle timeout never cuts a request.
+ * idle sockets never keep the process alive. An active request sets its own socket timeout (sendRequest sets
+ * `responseTimeout`, 0 included, on every socket it gets, even when it equals the agent's), so neither the idle
+ * timeout nor one shortened by the server's `Keep-Alive: timeout` hint cuts a request.
  *
  * Accepted risk, shared by every keep-alive client: a non-compliant server that sends a body after a HEAD response
  * (or past Content-Length) in a later segment can have those bytes read as the next response on the reused socket,

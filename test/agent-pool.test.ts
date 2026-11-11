@@ -271,4 +271,35 @@ describe('pool を使う transport', () => {
 			.rejects.toThrow("Timeout awaiting 'socket' for 100ms");
 		expect(freeSockets(transport.guardedAgents!.http)).toHaveLength(0);
 	});
+
+	test('responseTimeout が待機中の timeout と同じ値でも、再利用した接続ではサーバの Keep-Alive のヒントで縮んだ timeout で切らない', async () => {
+		// Node keeps an idle socket for min(agent timeout, hint - 1 s): `Keep-Alive: timeout=2` leaves it 1000ms,
+		// and does not set the socket timeout again for a request whose timeout equals the agent's.
+		const server = http.createServer((req, res) => {
+			setTimeout(() => {
+				res.writeHead(200, { 'content-type': 'text/html', 'content-length': '2' });
+				res.end(req.method === 'HEAD' ? undefined : 'ok');
+			}, req.method === 'HEAD' ? 0 : 1300);
+		});
+		server.keepAliveTimeout = 2000;
+		const sockets = new Set<net.Socket>();
+		server.on('connection', socket => sockets.add(socket));
+		await new Promise<void>(resolve => server.listen(0, '127.0.0.1', () => resolve()));
+		servers.push({
+			url: '',
+			close: () => new Promise<void>(resolve => {
+				server.close(() => resolve());
+				server.closeAllConnections();
+			}),
+		});
+		const url = `http://127.0.0.1:${(server.address() as net.AddressInfo).port}/`;
+		const pool = new GuardedAgentPool({ idleTimeout: 1500 });
+		const transport = createTransport({ allowedPrivateNetworks: LOCAL, agentPool: pool }, {});
+		const head = await fetchResponse(transport, request(url, { method: 'HEAD' }));
+		expect(head.headers['keep-alive']).toBe('timeout=2');
+		const result = await fetchResponse(transport, request(url, { responseTimeout: 1500 }));
+		expect(result.body.toString()).toBe('ok');
+		expect(sockets.size).toBe(1);
+		transport.guardedAgents!.http.destroy();
+	}, 10_000);
 });
