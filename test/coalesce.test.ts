@@ -10,6 +10,7 @@ import {
 	InProcessCoordinator,
 	MemorySummaryCache,
 	StatusError,
+	summalyDefaultOptions,
 	type SummalyPlugin,
 	type SummalyOptions,
 	type SummalyResult,
@@ -119,6 +120,13 @@ class JsonCache implements SummaryCache {
 	async set(key: string, entry: CacheEntry, _ttlMs: number): Promise<void> {
 		this.stored.set(key, JSON.stringify(entry));
 	}
+}
+
+/** Estimated bytes of one entry, as MemorySummaryCache accounts it. */
+async function sizeOf(key: string, entry: CacheEntry): Promise<number> {
+	const cache = new MemorySummaryCache();
+	await cache.set(key, entry, 60_000);
+	return cache.estimatedBytes;
 }
 
 describe('coalescing and caching', () => {
@@ -285,6 +293,106 @@ describe('coalescing and caching', () => {
 		expect(await cache.get('d')).toEqual(entry('d'));
 	});
 
+	test('MemorySummaryCache は maxBytes を超えると古いものから捨てる', async () => {
+		const entry = (message: string): CacheEntry => ({ kind: 'error', error: { name: 'Error', message } });
+		const one = await sizeOf('a', entry('x'.repeat(100)));
+		const cache = new MemorySummaryCache({ maxBytes: one * 2 });
+
+		await cache.set('a', entry('x'.repeat(100)), 60_000);
+		await cache.set('b', entry('y'.repeat(100)), 60_000);
+		expect(cache.estimatedBytes).toBe(one * 2);
+		await cache.set('c', entry('z'.repeat(100)), 60_000);
+
+		expect(cache.estimatedBytes).toBe(one * 2);
+		expect(await cache.get('a')).toBeUndefined();
+		expect(await cache.get('b')).toEqual(entry('y'.repeat(100)));
+		expect(await cache.get('c')).toEqual(entry('z'.repeat(100)));
+	});
+
+	test('MemorySummaryCache は maxEntryBytes を超えるものを保存しない', async () => {
+		const small: CacheEntry = { kind: 'error', error: { name: 'Error', message: 'small' } };
+		const large: CacheEntry = { kind: 'error', error: { name: 'Error', message: 'x'.repeat(1000) } };
+		const cache = new MemorySummaryCache({ maxEntryBytes: 1000 });
+
+		await cache.set('k', small, 60_000);
+		// Re-setting the key with an entry too large to store also drops the old one.
+		await cache.set('k', large, 60_000);
+
+		expect(await cache.get('k')).toBeUndefined();
+		expect(cache.size).toBe(0);
+		expect(cache.estimatedBytes).toBe(0);
+	});
+
+	test('maxEntryBytes を超える結果は保存されず、次の呼び出しで取り直す', async () => {
+		const plugin = fixedPlugin('large.example', { sitename: 'x'.repeat(10_000) });
+		const cache = new MemorySummaryCache({ maxEntryBytes: 10_000 });
+		const summaly = createSummaly({ plugins: [plugin], followRedirects: false, cache });
+
+		const first = await summaly('https://large.example/');
+		const second = await summaly('https://large.example/');
+
+		expect(second).toEqual(first);
+		expect(plugin.calls()).toBe(2);
+		expect(cache.size).toBe(0);
+	});
+
+	/** Serves `page` as text/html at every path. */
+	async function pageServer(page: Buffer): Promise<TestServer> {
+		const server = await startTestServer((_req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html', 'content-length': page.byteLength });
+			res.end(page);
+		});
+		servers.push(server);
+		return server;
+	}
+
+	test('og:site_name が約 1 MB のページを 50 件取っても maxBytes を超えない', async () => {
+		// A site name this long makes the title cleanup fail (as upstream does) with an error whose message
+		// quotes the whole site name; the stored copy of that message is clipped.
+		const server = await pageServer(Buffer.from(`<html><head><title>t</title><meta property="og:site_name" content="${'s'.repeat(1024 * 1024)}"></head></html>`));
+		const maxBytes = 64 * 1024 * 1024;
+		const cache = new MemorySummaryCache({ maxBytes });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache });
+
+		for (let i = 0; i < 50; i++) {
+			await summaly(`${server.url}page/${i}`).catch(() => {});
+			expect(cache.estimatedBytes).toBeLessThanOrEqual(maxBytes);
+		}
+		expect(cache.size).toBe(50);
+		expect(cache.estimatedBytes).toBeLessThanOrEqual(50 * 4 * 1024);
+	}, 60_000);
+
+	test('大きな結果を保存し続けても maxBytes を超えず、古いものから捨てる', async () => {
+		const server = await pageServer(Buffer.from(`<html><head><title>t</title><meta property="og:image" content="/${'i'.repeat(256 * 1024)}"></head></html>`));
+		const maxBytes = 2 * 1024 * 1024;
+		// maxEntryBytes is raised so these entries (about 512 KiB each) are stored and the byte budget is what limits them.
+		const cache = new MemorySummaryCache({ maxBytes, maxEntryBytes: 1024 * 1024 });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache });
+
+		for (let i = 0; i < 20; i++) {
+			const result = await summaly(`${server.url}page/${i}`);
+			expect(result.thumbnail?.length).toBeGreaterThan(256 * 1024);
+			expect(cache.estimatedBytes).toBeLessThanOrEqual(maxBytes);
+		}
+		expect(cache.size).toBeGreaterThan(0);
+		expect(cache.size).toBeLessThan(20);
+		// The newest stays; the oldest went first.
+		const keyOf = (i: number) => buildRequestKey(`${server.url}page/${i}`, { ...summalyDefaultOptions, allowedPrivateNetworks });
+		expect(await cache.get(keyOf(19))).toBeDefined();
+		expect(await cache.get(keyOf(0))).toBeUndefined();
+	});
+
+	test('既定の MemorySummaryCache は約 1 MB の結果を保存しない', async () => {
+		const plugin = fixedPlugin('huge.example', { sitename: 's'.repeat(1024 * 1024) });
+		const cache = new MemorySummaryCache();
+		const summaly = createSummaly({ plugins: [plugin], followRedirects: false, cache });
+
+		await summaly('https://huge.example/');
+
+		expect(cache.size).toBe(0);
+		expect(cache.estimatedBytes).toBe(0);
+	});
+
 	test('MemorySummaryCache は期限切れのものを返さない', async () => {
 		const cache = new MemorySummaryCache();
 		const entry: CacheEntry = { kind: 'error', error: { name: 'Error', message: 'x' } };
@@ -382,6 +490,22 @@ describe('runCoalesced', () => {
 			expect(error).not.toBeInstanceOf(StatusError);
 			expect(error).toMatchObject({ name: 'TypeError', message: 'boom' });
 		}
+	});
+
+	test('保存するエラーのメッセージは 1024 文字に切り詰める', async () => {
+		const cache = new JsonCache();
+		const deps = { cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
+
+		const thrown = await runCoalesced(deps, 'k', async () => {
+			throw new StatusError('x'.repeat(5000), 500, 'Internal Server Error');
+		}).catch((e: unknown) => e) as StatusError;
+
+		const stored = await cache.get('k');
+		expect(stored).toMatchObject({ kind: 'error', error: { statusCode: 500, statusMessage: 'Internal Server Error' } });
+		expect(stored?.kind === 'error' && stored.error.message).toBe('x'.repeat(1024));
+		// The caller whose call ran the task gets the same clipped error as later callers.
+		expect(thrown.message).toBe('x'.repeat(1024));
+		expect(thrown.statusCode).toBe(500);
 	});
 
 	test('TTL が 0 なら保存しない', async () => {

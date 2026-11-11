@@ -11,11 +11,19 @@ export type CoalesceDeps = {
 	errorCacheTtl: number;
 };
 
+/** Longest error message kept (characters). A message can quote remote content, and every cached entry stays in memory. */
+const MAX_ERROR_MESSAGE_LENGTH = 1024;
+
+function clip(message: string): string {
+	return message.length > MAX_ERROR_MESSAGE_LENGTH ? message.slice(0, MAX_ERROR_MESSAGE_LENGTH) : message;
+}
+
+/** The message is clipped to MAX_ERROR_MESSAGE_LENGTH; every caller gets the error rebuilt from this form. */
 function serializeError(error: unknown): SerializedError {
 	if (!(error instanceof Error)) {
-		return { name: 'Error', message: String(error) };
+		return { name: 'Error', message: clip(String(error)) };
 	}
-	const serialized: SerializedError = { name: error.name, message: error.message };
+	const serialized: SerializedError = { name: error.name, message: clip(error.message) };
 	const { statusCode, statusMessage } = error as Partial<StatusError>;
 	if (typeof statusCode === 'number') serialized.statusCode = statusCode;
 	if (typeof statusMessage === 'string') serialized.statusMessage = statusMessage;
