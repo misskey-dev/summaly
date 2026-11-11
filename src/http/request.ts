@@ -6,7 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import zlib from 'node:zlib';
 import { assertHostAllowed } from './address-guard.js';
 import { StatusError } from './status-error.js';
-import type { Transport } from './transport.js';
+import { type Transport, selectOwnedAgent } from './transport.js';
 
 export type FetchRequest = {
 	url: string;
@@ -94,13 +94,17 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 	// A caller-supplied agent for this scheme takes over private IP blocking; otherwise the hop stays guarded.
 	const callerAgent = isHttps ? transport.agents.https : transport.agents.http;
 	let agent: http.Agent | undefined = callerAgent;
-	if (!callerAgent && transport.guard) {
-		// Gate every hop before connecting. net.connect skips `lookup` for IP literals, so this is the only check for them.
-		await abortable(assertHostAllowed(transport.guard, url.hostname), signal);
-		// The transport-owned agents carry the guarded lookup, which re-checks at connect time (DNS rebinding defense).
-		// They never hold sockets opened under another policy, so that check is never skipped by socket reuse.
-		agent = isHttps ? transport.guardedAgents?.https : transport.guardedAgents?.http;
-		if (!agent) throw new Error('Guarded transport has no guarded agent');
+	if (!callerAgent) {
+		if (transport.guard) {
+			// Gate every hop before connecting or asking the proxy. This is the only check of the target when
+			// it is an IP literal (net.connect skips `lookup`) or when the hop goes through the proxy
+			// (the proxy agent resolves only the proxy host; the proxy itself is trusted configuration).
+			await abortable(assertHostAllowed(transport.guard, url.hostname), signal);
+		}
+		// Direct hops use the transport-owned guarded agents, whose lookup re-checks at connect time
+		// (DNS rebinding defense). They never hold sockets opened under another policy, so that check
+		// is never skipped by socket reuse.
+		agent = selectOwnedAgent(transport, url);
 	}
 
 	const options: https.RequestOptions = {
