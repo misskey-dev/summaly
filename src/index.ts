@@ -6,6 +6,7 @@ import { type CoalesceDeps, runCoalesced } from '@/coalesce/run.js';
 import { type ScrapeContext, createScrapeContext, fetchWithContext, fixOptions } from '@/context.js';
 import { scrapeGeneral } from '@/extract/general.js';
 import { privateIpAllowedByEnv } from '@/http/address-guard.js';
+import { GuardedAgentPool } from '@/http/agent-pool.js';
 import { builtinProviders } from '@/providers/index.js';
 import { fromPlugin } from '@/providers/provider.js';
 import type { SummarizeOptions, SummaryResult } from '@/types.js';
@@ -57,12 +58,15 @@ const DEFAULT_CACHE_TTL = 5 * 60 * 1000;
 const DEFAULT_ERROR_CACHE_TTL = 30 * 1000;
 
 /**
- * Creates a summarize function with its own result cache and in-flight sharing.
+ * Creates a summarize function with its own result cache, in-flight sharing and connection pool.
  * Options given per call are merged over `base`. `cache: false` / `coordinator: false` (in either) turns that part off.
+ * Its calls with the same `allowedPrivateNetworks` reuse each other's idle connections for a short time
+ * (see GuardedAgentPool); separate summarizers never share connections.
  */
 export function createSummarizer(base: SummarizeOptions = {}): (url: string, options?: SummarizeOptions) => Promise<SummaryResult> {
 	const memoryCache = new MemorySummaryCache();
 	const inProcessCoordinator = new InProcessCoordinator();
+	const agentPool = new GuardedAgentPool();
 
 	return (url, options = {}) => {
 		// Fixed when the call starts: the summary key, the transport and the favicon check keys are all built from
@@ -84,7 +88,7 @@ export function createSummarizer(base: SummarizeOptions = {}): (url: string, opt
 		return runCoalesced(
 			deps,
 			() => buildRequestKey(url, opts, allowPrivateIp),
-			() => summarizeUncached(url, opts, deps, allowPrivateIp),
+			() => summarizeUncached(url, opts, deps, allowPrivateIp, agentPool),
 		);
 	};
 }
@@ -108,15 +112,18 @@ export const summaly: (url: string, options?: SummarizeOptions) => Promise<Summa
  * The whole summary without caching or sharing it: final URL, provider match, scraping.
  * `deps` is handed on for the favicon checks, whose results are cached and shared across summaries.
  * `allowPrivateIp` is the value the summary key was built with, so the transport uses it too.
+ * `agentPool` is the summarizer's connection pool.
  */
 async function summarizeUncached(
 	url: string,
 	opts: SummarizeOptions,
 	deps: CoalesceDeps,
 	allowPrivateIp: boolean,
+	agentPool: GuardedAgentPool,
 ): Promise<SummaryResult> {
-	const ctx = createScrapeContext(opts, deps, allowPrivateIp);
-	// The requests of this call share the transport's connections; none of them outlive the call.
+	const ctx = createScrapeContext(opts, deps, allowPrivateIp, agentPool);
+	// The requests of this call share the transport's connections. Guarded connections that completed their responses
+	// stay idle in the summarizer's pool for later calls; proxy connections end with the call (see Transport#close).
 	try {
 		const actualUrl = opts.followRedirects ? await resolveFinalUrl(ctx, url) : url;
 		const target = new URL(actualUrl);

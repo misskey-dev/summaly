@@ -1,6 +1,7 @@
 import { buildIconKey } from '@/coalesce/key.js';
 import type { CoalesceDeps } from '@/coalesce/run.js';
 import { privateIpAllowedByEnv } from '@/http/address-guard.js';
+import type { GuardedAgentPool } from '@/http/agent-pool.js';
 import { type FetchRequest, type FetchResult, fetchResponse } from '@/http/request.js';
 import { type Transport, createTransport } from '@/http/transport.js';
 import { type ResolvedOptions, resolveOptions } from '@/options.js';
@@ -44,11 +45,14 @@ export function fixOptions(opts: SummarizeOptions): SummarizeOptions {
  * `allowPrivateIp` is whether the environment allows private IPs (see privateIpAllowedByEnv); a summarizer passes
  * the value its summary key was built with. The transport and the favicon check keys use the same value and the same
  * copy of `opts` (see fixOptions).
+ * `agentPool` is the summarizer's pool of guarded agents, keyed by that copy's `allowedPrivateNetworks`; without it,
+ * the transport builds its own agents and its close destroys them.
  */
 export function createScrapeContext(
 	opts: SummarizeOptions,
 	coalesce: CoalesceDeps = NO_COALESCE,
 	allowPrivateIp: boolean = privateIpAllowedByEnv(),
+	agentPool?: GuardedAgentPool,
 ): ScrapeContext {
 	const fixed = fixOptions(opts);
 	return {
@@ -59,6 +63,7 @@ export function createScrapeContext(
 			allowedPrivateNetworks: fixed.allowedPrivateNetworks,
 			proxy: fixed.proxy,
 			allowPrivateIp,
+			agentPool,
 		}),
 		coalesce,
 		iconKey: url => buildIconKey(url, fixed, allowPrivateIp),
