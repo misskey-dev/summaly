@@ -2,7 +2,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { buildRequestKey, objectId } from '@/coalesce/key.js';
+import { buildIconKey, buildRequestKey, objectId } from '@/coalesce/key.js';
 import { runCoalesced } from '@/coalesce/run.js';
 import {
 	type CacheEntry,
@@ -16,6 +16,7 @@ import {
 	type SummaryResult,
 	type SummaryCache,
 } from '@/index.js';
+import { JsonCache } from './helpers/json-cache.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
 const allowedPrivateNetworks = ['127.0.0.0/8', '::1/128'];
@@ -111,18 +112,6 @@ function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): Sum
 		},
 		calls: () => calls,
 	};
-}
-
-/** A SummaryCache that keeps only JSON strings, like a Redis-backed implementation would. */
-class JsonCache implements SummaryCache {
-	readonly stored = new Map<string, string>();
-	async get(key: string): Promise<CacheEntry | undefined> {
-		const raw = this.stored.get(key);
-		return raw === undefined ? undefined : JSON.parse(raw) as CacheEntry;
-	}
-	async set(key: string, entry: CacheEntry, _ttlMs: number): Promise<void> {
-		this.stored.set(key, JSON.stringify(entry));
-	}
 }
 
 /** Estimated bytes of one entry, as MemorySummaryCache accounts it. */
@@ -654,5 +643,69 @@ describe('buildRequestKey', () => {
 
 		expect(objectId(a)).toBe(objectId(a));
 		expect(objectId(a)).not.toBe(objectId(b));
+	});
+});
+
+describe('buildIconKey', () => {
+	const url = 'https://example.com/favicon.ico';
+
+	test('SHA-256 の16進表記で、プロキシの認証情報をそのまま含まない', () => {
+		const key = buildIconKey(url, { proxy: { https: 'http://user:secret@proxy.example:8080' } });
+
+		expect(key).toMatch(/^[0-9a-f]{64}$/);
+		expect(key).not.toContain('secret');
+	});
+
+	test('同じ URL と設定でも、要約のキーとは重ならない', () => {
+		const variants: SummarizeOptions[] = [{}, { ...defaultSummarizeOptions }, { allowedPrivateNetworks }, { userAgent: 'ua' }];
+		for (const opts of variants) {
+			expect(buildIconKey(url, opts)).not.toBe(buildRequestKey(url, opts));
+		}
+	});
+
+	test('HEAD の結果を変えうる設定が違えば key も違う', () => {
+		const agent = new http.Agent();
+		cleanups.push(() => agent.destroy());
+		const variants: SummarizeOptions[] = [
+			{},
+			{ userAgent: 'ua' },
+			{ responseTimeout: 1 },
+			{ operationTimeout: 1 },
+			{ contentLengthLimit: 1 },
+			{ allowedPrivateNetworks: ['10.0.0.0/8'] },
+			{ proxy: { https: 'http://proxy.example:8080' } },
+			{ proxy: { https: 'http://proxy.example:8080', noProxy: 'example.com' } },
+			{ agent: { http: agent } },
+			{ agent: { http: new http.Agent() } },
+		];
+		const keys = variants.map(opts => buildIconKey(url, opts));
+
+		expect(new Set(keys).size).toBe(variants.length);
+		expect(buildIconKey('https://example.com/other.ico', {})).not.toBe(keys[0]);
+		expect(buildIconKey(url, { agent: { http: agent } })).toBe(keys[8]);
+	});
+
+	test('プライベート IP 許可の環境変数が違えば key も違う', () => {
+		for (const name of ALLOW_PRIVATE_IP_VARS) delete process.env[name];
+		const unset = buildIconKey(url, {});
+		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
+
+		expect(buildIconKey(url, {})).not.toBe(unset);
+	});
+
+	test('HEAD に使わない設定（lang、plugins、followRedirects、contentLengthRequired）と cache / coordinator / TTL は含めない', () => {
+		const plugin: SummaryPlugin = { test: () => false, summarize: async () => null };
+		const base = buildIconKey(url, {});
+
+		expect(buildIconKey(url, {
+			lang: 'ja-JP',
+			plugins: [plugin],
+			followRedirects: false,
+			contentLengthRequired: true,
+			cache: false,
+			coordinator: false,
+			cacheTtl: 1,
+			errorCacheTtl: 2,
+		})).toBe(base);
 	});
 });

@@ -53,21 +53,15 @@ function canonical(value: unknown): string {
 }
 
 /**
- * Key for the cache and in-flight sharing: the URL plus every option that can change the result.
- * `cache`, `coordinator`, `cacheTtl` and `errorCacheTtl` do not change the result and are left out.
- * Returned as a SHA-256 hex digest, because the parts include proxy URLs that may carry credentials
- * and the key may be stored outside the process (e.g. Redis).
+ * Options that change how any request of a summary is sent or what it may reach, so they change every result
+ * built from requests (the summary and each favicon check). Both keys take them from here, so they are listed once.
  */
-export function buildRequestKey(url: string, opts: SummarizeOptions): string {
-	const parts = {
-		url,
-		lang: opts.lang,
+function requestParts(opts: SummarizeOptions): Record<string, unknown> {
+	return {
 		userAgent: opts.userAgent,
-		followRedirects: opts.followRedirects,
 		responseTimeout: opts.responseTimeout,
 		operationTimeout: opts.operationTimeout,
 		contentLengthLimit: opts.contentLengthLimit,
-		contentLengthRequired: opts.contentLengthRequired,
 		allowedPrivateNetworks: opts.allowedPrivateNetworks,
 		proxy: opts.proxy === undefined ? undefined : {
 			http: opts.proxy.http,
@@ -78,9 +72,43 @@ export function buildRequestKey(url: string, opts: SummarizeOptions): string {
 			http: identity(opts.agent?.http),
 			https: identity(opts.agent?.https),
 		},
-		plugins: opts.plugins?.map(identity),
 		// The resolved value, so that allowing private IPs by either variable name gives the same key.
 		allowPrivateIp: privateIpAllowedByEnv(),
 	};
+}
+
+/**
+ * Returned as a SHA-256 hex digest, because the parts include proxy URLs that may carry credentials
+ * and the key may be stored outside the process (e.g. Redis).
+ */
+function digest(parts: Record<string, unknown>): string {
 	return createHash('sha256').update(canonical(parts)).digest('hex');
+}
+
+/**
+ * Key for the cache and in-flight sharing of a summary: the URL plus every option that can change the result.
+ * `cache`, `coordinator`, `cacheTtl` and `errorCacheTtl` do not change the result and are left out.
+ * `purpose` keeps it apart from every favicon check key.
+ */
+export function buildRequestKey(url: string, opts: SummarizeOptions): string {
+	return digest({
+		...requestParts(opts),
+		purpose: 'summary',
+		url,
+		lang: opts.lang,
+		followRedirects: opts.followRedirects,
+		contentLengthRequired: opts.contentLengthRequired,
+		plugins: opts.plugins?.map(identity),
+	});
+}
+
+/**
+ * Key for the cache and in-flight sharing of a favicon check: the icon's absolute URL plus the options that can
+ * change a HEAD for it. The HEAD sends no Accept-Language, always follows redirects and never requires
+ * content-length, so `lang`, `followRedirects` and `contentLengthRequired` are left out. So are `plugins`: a plugin
+ * never checks a favicon, and which provider summarizes the page does not change a check's result.
+ * `purpose` keeps it apart from every summary key.
+ */
+export function buildIconKey(url: string, opts: SummarizeOptions): string {
+	return digest({ ...requestParts(opts), purpose: 'icon', url });
 }
