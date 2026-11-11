@@ -1,4 +1,5 @@
 import http from 'node:http';
+import https from 'node:https';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { buildIconKey, buildRequestKey } from '@/coalesce/key.js';
@@ -270,6 +271,24 @@ describe('favicon の確認結果のキャッシュ', () => {
 
 		const allowed = await summarize(`${pages.url}a`);
 		const denied = await summarize(`${pages.url}b`);
+
+		expect(allowed.icon).toBe(icons.favicon);
+		expect(denied.icon).toBeNull();
+	});
+
+	test('要約の途中で agent のオブジェクトが書き換えられても、guard なしで得た icon を guard ありの呼び出しに返さない', async () => {
+		const icons = await site({ host: '127.0.0.2' });
+		const httpAgent = new http.Agent();
+		const httpsAgent = new https.Agent();
+		cleanups.push(() => httpAgent.destroy(), () => httpsAgent.destroy());
+		// Both agents supplied: the caller takes over private IP blocking, so the first call reaches 127.0.0.2.
+		const agent: { http?: http.Agent; https?: https.Agent } = { http: httpAgent, https: httpsAgent };
+		// The caller drops its http agent while the first call is fetching its page, after its transport was built.
+		const pages = await site({ faviconHref: icons.favicon, onPageGet: () => delete agent.http });
+		const summarize = createSummarizer({ allowedPrivateNetworks: ['127.0.0.1/32'] });
+
+		const allowed = await summarize(`${pages.url}a`, { agent });
+		const denied = await summarize(`${pages.url}b`, { agent: { https: httpsAgent } });
 
 		expect(allowed.icon).toBe(icons.favicon);
 		expect(denied.icon).toBeNull();

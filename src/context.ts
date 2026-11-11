@@ -25,7 +25,7 @@ export type ScrapeContext = {
 const NO_COALESCE: CoalesceDeps = Object.freeze({ cache: null, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 });
 
 /**
- * `opts` with its arrays and objects copied (`allowedPrivateNetworks`, `proxy`, `plugins`), so a caller changing
+ * `opts` with its arrays and objects copied (`allowedPrivateNetworks`, `proxy`, `agent`, `plugins`), so a caller changing
  * them while a call runs does not reach the call. A call builds its transport and every key from one such copy
  * and one reading of the private IP environment variables, so the transport that sends a request and the key its
  * result is stored under always agree on what may be reached.
@@ -35,6 +35,7 @@ export function fixOptions(opts: SummarizeOptions): SummarizeOptions {
 		...opts,
 		allowedPrivateNetworks: opts.allowedPrivateNetworks?.slice(),
 		proxy: opts.proxy && { ...opts.proxy },
+		agent: opts.agent && { ...opts.agent },
 		plugins: opts.plugins?.slice(),
 	};
 }
