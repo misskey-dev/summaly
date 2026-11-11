@@ -4,7 +4,7 @@ import https from 'node:https';
 import type { AddressInfo } from 'node:net';
 import net from 'node:net';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { createProxyAgents, selectProxyUrl, TUNNEL_TARGET, TunnelingHttpAgent, TunnelingHttpsAgent } from '@/http/proxy.js';
+import { createProxyAgents, selectProxyUrl, TUNNEL_TARGET, TunnelingHttpAgent, TunnelingHttpsAgent } from '@/http/proxy/index.js';
 import { fetchResponse, type FetchRequest } from '@/http/request.js';
 import { StatusError } from '@/http/status-error.js';
 import { createTransport } from '@/http/transport.js';

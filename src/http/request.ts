@@ -7,7 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import zlib from 'node:zlib';
 import { assertHostAllowed } from './address-guard.js';
 import { StatusError } from './status-error.js';
-import { TUNNEL_TARGET, type TunnelTarget } from './proxy.js';
+import { TUNNEL_TARGET, type TunnelTarget } from './proxy/index.js';
 import { type Transport, selectOwnedAgent } from './transport.js';
 
 export type FetchRequest = {

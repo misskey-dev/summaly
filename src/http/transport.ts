@@ -2,7 +2,7 @@ import http from 'node:http';
 import https from 'node:https';
 import type { ProxyOptions, SummalyOptions } from '@/types.js';
 import { type AddressGuard, createAddressGuard, createGuardedLookup, privateIpAllowedByEnv } from './address-guard.js';
-import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy.js';
+import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy/index.js';
 
 /** Per-call connection settings. Holds no global state. */
 export type Transport = {

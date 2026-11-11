@@ -161,7 +161,7 @@ function parseProxyUrl(name: string, value: string): string {
  * Replaces everything between the scheme separator (`scheme://`, or the start when there is none) and the last `@`
  * with `***`. Works on the raw text, so it also covers values `new URL()` cannot parse.
  *
- * A copy of the lib's redactUserinfo in packages/chiramiss/src/http/proxy.ts (internal there, not exported).
+ * A copy of the lib's redactUserinfo in packages/chiramiss/src/http/proxy/proxy-url.ts (internal there, not exported).
  * Both must change together, so that a proxy URL is redacted the same way at startup and at request time.
  */
 function redactUserinfo(value: string): string {
