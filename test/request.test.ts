@@ -592,6 +592,35 @@ describe('transport 内の接続の再利用', () => {
 		transport.close();
 	});
 
+	test('再利用したソケットが応答前に切られたら、新しい接続で送り直す', async () => {
+		const served = new Map<net.Socket, number>();
+		const { server, connections } = await countingServer((req, res) => {
+			const n = (served.get(req.socket) ?? 0) + 1;
+			served.set(req.socket, n);
+			// Like a server that drops idle keep-alive connections: the second request on a socket gets no answer.
+			if (n > 1) req.socket.destroy();
+			else ok(req, res);
+		});
+		const transport = localTransport();
+		await fetchResponse(transport, request(server.url, { method: 'HEAD' }));
+		const result = await fetchResponse(transport, request(server.url));
+		expect(result.body.toString()).toBe('ok');
+		expect(connections()).toBe(2);
+		transport.close();
+	});
+
+	test('新しい接続が応答前に切られたときは送り直さない', async () => {
+		let requests = 0;
+		const { server } = await countingServer(req => {
+			requests++;
+			req.socket.destroy();
+		});
+		const transport = localTransport();
+		await expect(fetchResponse(transport, request(server.url))).rejects.toThrow('socket hang up');
+		expect(requests).toBe(1);
+		transport.close();
+	});
+
 	test('プールにソケットがあっても、ホップごとの事前確認は省かない', async () => {
 		const { server, connections } = await countingServer(ok);
 		const url = new URL(server.url);

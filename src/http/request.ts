@@ -124,8 +124,9 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 	if (req.responseTimeout > 0) options.timeout = req.responseTimeout;
 
 	let timeoutError: Error | undefined;
-	const res = await new Promise<http.IncomingMessage>((resolve, reject) => {
+	const send = () => new Promise<http.IncomingMessage>((resolve, reject) => {
 		let response: http.IncomingMessage | undefined;
+		let failed = false;
 		const request = (isHttps ? https : http).request(url, options, r => {
 			response = r;
 			signal.removeEventListener('abort', onAbort);
@@ -146,10 +147,21 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		// Stays attached after the response so late socket errors never go unhandled.
 		request.on('error', err => {
 			signal.removeEventListener('abort', onAbort);
+			const first = !failed;
+			failed = true;
+			// A pooled keep-alive socket that the server closed while it sat idle fails before any response.
+			// GET and HEAD are idempotent, so send again: the retry takes another pooled socket or opens a new one,
+			// which goes through the same agent and checks. A request on a new socket is never retried.
+			if (first && response === undefined && request.reusedSocket && (err as NodeJS.ErrnoException).code === 'ECONNRESET'
+				&& !signal.aborted && timeoutError === undefined) {
+				send().then(resolve, reject);
+				return;
+			}
 			reject(err);
 		});
 		request.end();
 	});
+	const res = await send();
 	return { res, timeoutError: () => timeoutError };
 }
 
