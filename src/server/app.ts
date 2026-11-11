@@ -1,10 +1,10 @@
 // Derived from misskey-dev/summaly (MIT)
 /**
- * HTTP endpoints of the standalone summaly server
+ * HTTP endpoints of the standalone chiramiss server
  */
 
 import Fastify, { type FastifyInstance } from 'fastify';
-import { createSummaly, type InflightCoordinator, type SummaryCache } from '@tiramiss-community/chiramiss';
+import { createSummarizer, type InflightCoordinator, type SummaryCache } from '@tiramiss-community/chiramiss';
 import type { ServerConfig } from './config.js';
 import { resolveRequestOptions } from './query.js';
 
@@ -35,7 +35,7 @@ export function buildApp(config: ServerConfig, deps: AppDeps = {}, options: AppO
 	const app = Fastify({ logger: options.logger ?? false });
 
 	// One instance per app, so concurrent and repeated requests share its in-flight runs and cache.
-	const summarize = createSummaly({ ...config.summalyOptions, ...deps });
+	const summarize = createSummarizer({ ...config.summarizeOptions, ...deps });
 
 	app.get('/', async (req, reply) => {
 		const query = req.query as Record<string, unknown>;
@@ -47,7 +47,7 @@ export function buildApp(config: ServerConfig, deps: AppDeps = {}, options: AppO
 		}
 
 		try {
-			return await summarize(url, resolveRequestOptions(query, config.summalyOptions));
+			return await summarize(url, resolveRequestOptions(query, config.summarizeOptions));
 		} catch (e) {
 			return reply.status(500).send({
 				error: e,

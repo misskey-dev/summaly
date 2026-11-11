@@ -1,10 +1,10 @@
 // Derived from misskey-dev/summaly (MIT)
 /**
- * Configuration loader for the standalone summaly server
+ * Configuration loader for the standalone chiramiss server
  */
 
 import ipaddr from 'ipaddr.js';
-import type { ProxyOptions, SummalyOptions } from '@tiramiss-community/chiramiss';
+import type { ProxyOptions, SummarizeOptions } from '@tiramiss-community/chiramiss';
 
 export type ServerConfig = {
 	/**
@@ -18,9 +18,9 @@ export type ServerConfig = {
 	port: number;
 
 	/**
-	 * Options passed to summaly
+	 * Options passed to summarize
 	 */
-	summalyOptions: SummalyOptions;
+	summarizeOptions: SummarizeOptions;
 };
 
 export const DEFAULT_SERVER_HOST = 'localhost';
@@ -192,53 +192,62 @@ function loadProxyOptions(env: NodeJS.ProcessEnv): ProxyOptions | undefined {
 }
 
 /**
+ * Reads a server setting: `CHIRAMISS_<suffix>`, or `SUMMALY_<suffix>` (kept for summaly compatibility) when that is
+ * unset or empty. Returns the value together with the name it came from, so error messages show the variable read.
+ */
+function readSetting(env: NodeJS.ProcessEnv, suffix: string): { name: string; value: string } | undefined {
+	return readFirstEnv(env, [`CHIRAMISS_${suffix}`, `SUMMALY_${suffix}`]);
+}
+
+/**
  * Builds the standalone server configuration from environment variables.
  *
- * Unset or empty variables are omitted from `summalyOptions` entirely, so that they do not
+ * Each setting is read from `CHIRAMISS_<NAME>`, falling back to `SUMMALY_<NAME>` when that is unset or empty.
+ * Unset or empty variables are omitted from `summarizeOptions` entirely, so that they do not
  * override values taken from the request (e.g. the `lang` query parameter).
  *
  * @throws {ServerConfigError} if a variable has an invalid value
  */
 export function loadServerConfig(env: NodeJS.ProcessEnv): ServerConfig {
-	const host = readEnv(env, 'SUMMALY_HOST') ?? DEFAULT_SERVER_HOST;
+	const host = readSetting(env, 'HOST')?.value ?? DEFAULT_SERVER_HOST;
 
-	const rawPort = readEnv(env, 'SUMMALY_PORT');
-	const port = rawPort != null ? parseNonNegativeInteger('SUMMALY_PORT', rawPort, MAX_PORT) : DEFAULT_SERVER_PORT;
+	const rawPort = readSetting(env, 'PORT');
+	const port = rawPort != null ? parseNonNegativeInteger(rawPort.name, rawPort.value, MAX_PORT) : DEFAULT_SERVER_PORT;
 
-	const summalyOptions: SummalyOptions = {};
+	const summarizeOptions: SummarizeOptions = {};
 
-	const lang = readEnv(env, 'SUMMALY_LANG');
-	if (lang != null) summalyOptions.lang = lang;
+	const lang = readSetting(env, 'LANG');
+	if (lang != null) summarizeOptions.lang = lang.value;
 
-	const userAgent = readEnv(env, 'SUMMALY_USER_AGENT');
-	if (userAgent != null) summalyOptions.userAgent = userAgent;
+	const userAgent = readSetting(env, 'USER_AGENT');
+	if (userAgent != null) summarizeOptions.userAgent = userAgent.value;
 
-	const followRedirects = readEnv(env, 'SUMMALY_FOLLOW_REDIRECTS');
-	if (followRedirects != null) summalyOptions.followRedirects = parseBoolean('SUMMALY_FOLLOW_REDIRECTS', followRedirects);
+	const followRedirects = readSetting(env, 'FOLLOW_REDIRECTS');
+	if (followRedirects != null) summarizeOptions.followRedirects = parseBoolean(followRedirects.name, followRedirects.value);
 
-	const responseTimeout = readEnv(env, 'SUMMALY_RESPONSE_TIMEOUT');
-	if (responseTimeout != null) summalyOptions.responseTimeout = parseNonNegativeInteger('SUMMALY_RESPONSE_TIMEOUT', responseTimeout, MAX_TIMEOUT);
+	const responseTimeout = readSetting(env, 'RESPONSE_TIMEOUT');
+	if (responseTimeout != null) summarizeOptions.responseTimeout = parseNonNegativeInteger(responseTimeout.name, responseTimeout.value, MAX_TIMEOUT);
 
-	const operationTimeout = readEnv(env, 'SUMMALY_OPERATION_TIMEOUT');
-	if (operationTimeout != null) summalyOptions.operationTimeout = parseNonNegativeInteger('SUMMALY_OPERATION_TIMEOUT', operationTimeout, MAX_TIMEOUT);
+	const operationTimeout = readSetting(env, 'OPERATION_TIMEOUT');
+	if (operationTimeout != null) summarizeOptions.operationTimeout = parseNonNegativeInteger(operationTimeout.name, operationTimeout.value, MAX_TIMEOUT);
 
-	const contentLengthLimit = readEnv(env, 'SUMMALY_CONTENT_LENGTH_LIMIT');
-	if (contentLengthLimit != null) summalyOptions.contentLengthLimit = parseNonNegativeInteger('SUMMALY_CONTENT_LENGTH_LIMIT', contentLengthLimit);
+	const contentLengthLimit = readSetting(env, 'CONTENT_LENGTH_LIMIT');
+	if (contentLengthLimit != null) summarizeOptions.contentLengthLimit = parseNonNegativeInteger(contentLengthLimit.name, contentLengthLimit.value);
 
-	const contentLengthRequired = readEnv(env, 'SUMMALY_CONTENT_LENGTH_REQUIRED');
-	if (contentLengthRequired != null) summalyOptions.contentLengthRequired = parseBoolean('SUMMALY_CONTENT_LENGTH_REQUIRED', contentLengthRequired);
+	const contentLengthRequired = readSetting(env, 'CONTENT_LENGTH_REQUIRED');
+	if (contentLengthRequired != null) summarizeOptions.contentLengthRequired = parseBoolean(contentLengthRequired.name, contentLengthRequired.value);
 
-	const allowedPrivateNetworks = readEnv(env, 'SUMMALY_ALLOWED_PRIVATE_NETWORKS');
-	if (allowedPrivateNetworks != null) summalyOptions.allowedPrivateNetworks = parseCidrList('SUMMALY_ALLOWED_PRIVATE_NETWORKS', allowedPrivateNetworks);
+	const allowedPrivateNetworks = readSetting(env, 'ALLOWED_PRIVATE_NETWORKS');
+	if (allowedPrivateNetworks != null) summarizeOptions.allowedPrivateNetworks = parseCidrList(allowedPrivateNetworks.name, allowedPrivateNetworks.value);
 
 	const proxy = loadProxyOptions(env);
-	if (proxy != null) summalyOptions.proxy = proxy;
+	if (proxy != null) summarizeOptions.proxy = proxy;
 
-	const cacheTtl = readEnv(env, 'SUMMALY_CACHE_TTL');
-	if (cacheTtl != null) summalyOptions.cacheTtl = parseNonNegativeInteger('SUMMALY_CACHE_TTL', cacheTtl);
+	const cacheTtl = readSetting(env, 'CACHE_TTL');
+	if (cacheTtl != null) summarizeOptions.cacheTtl = parseNonNegativeInteger(cacheTtl.name, cacheTtl.value);
 
-	const errorCacheTtl = readEnv(env, 'SUMMALY_ERROR_CACHE_TTL');
-	if (errorCacheTtl != null) summalyOptions.errorCacheTtl = parseNonNegativeInteger('SUMMALY_ERROR_CACHE_TTL', errorCacheTtl);
+	const errorCacheTtl = readSetting(env, 'ERROR_CACHE_TTL');
+	if (errorCacheTtl != null) summarizeOptions.errorCacheTtl = parseNonNegativeInteger(errorCacheTtl.name, errorCacheTtl.value);
 
-	return { host, port, summalyOptions };
+	return { host, port, summarizeOptions };
 }

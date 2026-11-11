@@ -4,28 +4,28 @@
  */
 
 import { expect, test, describe } from 'vitest';
-import { DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, ServerConfigError, loadServerConfig } from '../src/config.js';
+import { DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, ServerConfigError, loadServerConfig, type ServerConfig } from '../src/config.js';
 
 describe('loadServerConfig', () => {
 	test('何も指定しない場合はデフォルト値になる', () => {
 		expect(loadServerConfig({})).toEqual({
 			host: 'localhost',
 			port: 3000,
-			summalyOptions: {},
+			summarizeOptions: {},
 		});
 		expect(DEFAULT_SERVER_HOST).toBe('localhost');
 		expect(DEFAULT_SERVER_PORT).toBe(3000);
 	});
 
-	test('何も指定しない場合、summalyOptions にキーが含まれない', () => {
-		expect(Object.keys(loadServerConfig({}).summalyOptions)).toEqual([]);
+	test('何も指定しない場合、summarizeOptions にキーが含まれない', () => {
+		expect(Object.keys(loadServerConfig({}).summarizeOptions)).toEqual([]);
 	});
 
 	test('関係のない環境変数は無視される', () => {
 		expect(loadServerConfig({ PATH: '/usr/bin', LANG: 'ja_JP.UTF-8', PORT: '8080', HOST: '0.0.0.0' })).toEqual({
 			host: 'localhost',
 			port: 3000,
-			summalyOptions: {},
+			summarizeOptions: {},
 		});
 	});
 
@@ -43,7 +43,7 @@ describe('loadServerConfig', () => {
 		})).toEqual({
 			host: '0.0.0.0',
 			port: 8080,
-			summalyOptions: {
+			summarizeOptions: {
 				lang: 'ja-JP',
 				userAgent: 'MyBot/1.0',
 				followRedirects: false,
@@ -69,34 +69,34 @@ describe('loadServerConfig', () => {
 		});
 
 		test('SUMMALY_LANG', () => {
-			expect(loadServerConfig({ SUMMALY_LANG: 'en-US' }).summalyOptions).toEqual({ lang: 'en-US' });
+			expect(loadServerConfig({ SUMMALY_LANG: 'en-US' }).summarizeOptions).toEqual({ lang: 'en-US' });
 		});
 
 		test('SUMMALY_USER_AGENT', () => {
-			expect(loadServerConfig({ SUMMALY_USER_AGENT: 'Mozilla/5.0 (compatible; Test)' }).summalyOptions).toEqual({ userAgent: 'Mozilla/5.0 (compatible; Test)' });
+			expect(loadServerConfig({ SUMMALY_USER_AGENT: 'Mozilla/5.0 (compatible; Test)' }).summarizeOptions).toEqual({ userAgent: 'Mozilla/5.0 (compatible; Test)' });
 		});
 
 		test('SUMMALY_FOLLOW_REDIRECTS', () => {
-			expect(loadServerConfig({ SUMMALY_FOLLOW_REDIRECTS: 'true' }).summalyOptions).toEqual({ followRedirects: true });
-			expect(loadServerConfig({ SUMMALY_FOLLOW_REDIRECTS: 'false' }).summalyOptions).toEqual({ followRedirects: false });
+			expect(loadServerConfig({ SUMMALY_FOLLOW_REDIRECTS: 'true' }).summarizeOptions).toEqual({ followRedirects: true });
+			expect(loadServerConfig({ SUMMALY_FOLLOW_REDIRECTS: 'false' }).summarizeOptions).toEqual({ followRedirects: false });
 		});
 
 		test('SUMMALY_RESPONSE_TIMEOUT', () => {
-			expect(loadServerConfig({ SUMMALY_RESPONSE_TIMEOUT: '0' }).summalyOptions).toEqual({ responseTimeout: 0 });
-			expect(loadServerConfig({ SUMMALY_RESPONSE_TIMEOUT: '20000' }).summalyOptions).toEqual({ responseTimeout: 20000 });
+			expect(loadServerConfig({ SUMMALY_RESPONSE_TIMEOUT: '0' }).summarizeOptions).toEqual({ responseTimeout: 0 });
+			expect(loadServerConfig({ SUMMALY_RESPONSE_TIMEOUT: '20000' }).summarizeOptions).toEqual({ responseTimeout: 20000 });
 		});
 
 		test('SUMMALY_OPERATION_TIMEOUT', () => {
-			expect(loadServerConfig({ SUMMALY_OPERATION_TIMEOUT: '60000' }).summalyOptions).toEqual({ operationTimeout: 60000 });
+			expect(loadServerConfig({ SUMMALY_OPERATION_TIMEOUT: '60000' }).summarizeOptions).toEqual({ operationTimeout: 60000 });
 		});
 
 		test('SUMMALY_CONTENT_LENGTH_LIMIT', () => {
-			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_LIMIT: '10485760' }).summalyOptions).toEqual({ contentLengthLimit: 10485760 });
+			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_LIMIT: '10485760' }).summarizeOptions).toEqual({ contentLengthLimit: 10485760 });
 		});
 
 		test('SUMMALY_CONTENT_LENGTH_REQUIRED', () => {
-			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_REQUIRED: 'true' }).summalyOptions).toEqual({ contentLengthRequired: true });
-			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_REQUIRED: 'false' }).summalyOptions).toEqual({ contentLengthRequired: false });
+			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_REQUIRED: 'true' }).summarizeOptions).toEqual({ contentLengthRequired: true });
+			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_REQUIRED: 'false' }).summarizeOptions).toEqual({ contentLengthRequired: false });
 		});
 	});
 
@@ -111,8 +111,8 @@ describe('loadServerConfig', () => {
 			['False', false],
 			['0', false],
 		])('%j は %j として扱われる', (value, expected) => {
-			expect(loadServerConfig({ SUMMALY_FOLLOW_REDIRECTS: value }).summalyOptions.followRedirects).toBe(expected);
-			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_REQUIRED: value }).summalyOptions.contentLengthRequired).toBe(expected);
+			expect(loadServerConfig({ SUMMALY_FOLLOW_REDIRECTS: value }).summarizeOptions.followRedirects).toBe(expected);
+			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_REQUIRED: value }).summarizeOptions.contentLengthRequired).toBe(expected);
 		});
 
 		test.each(['yes', 'no', 'on', 'off', '2', '-1', ' true', 'true ', 't', ' '])('%j はエラーになる', (value) => {
@@ -146,7 +146,7 @@ describe('loadServerConfig', () => {
 		});
 
 		test.each(['SUMMALY_RESPONSE_TIMEOUT', 'SUMMALY_OPERATION_TIMEOUT'])('%s は setTimeout の最大値までに制限される', (name) => {
-			expect(loadServerConfig({ [name]: '2147483647' }).summalyOptions).toEqual({
+			expect(loadServerConfig({ [name]: '2147483647' }).summarizeOptions).toEqual({
 				[name === 'SUMMALY_RESPONSE_TIMEOUT' ? 'responseTimeout' : 'operationTimeout']: 2147483647,
 			});
 			expect(() => loadServerConfig({ [name]: '2147483648' })).toThrow(ServerConfigError);
@@ -156,7 +156,7 @@ describe('loadServerConfig', () => {
 
 		test('安全な整数の範囲を超える値はエラーになる', () => {
 			expect(() => loadServerConfig({ SUMMALY_CONTENT_LENGTH_LIMIT: '9007199254740992' })).toThrow('Invalid value for SUMMALY_CONTENT_LENGTH_LIMIT');
-			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_LIMIT: '9007199254740991' }).summalyOptions.contentLengthLimit).toBe(Number.MAX_SAFE_INTEGER);
+			expect(loadServerConfig({ SUMMALY_CONTENT_LENGTH_LIMIT: '9007199254740991' }).summarizeOptions.contentLengthLimit).toBe(Number.MAX_SAFE_INTEGER);
 		});
 	});
 
@@ -181,14 +181,14 @@ describe('loadServerConfig', () => {
 			NO_PROXY: '',
 			no_proxy: '',
 		});
-		expect(config).toEqual({ host: 'localhost', port: 3000, summalyOptions: {} });
-		expect(Object.keys(config.summalyOptions)).toEqual([]);
+		expect(config).toEqual({ host: 'localhost', port: 3000, summarizeOptions: {} });
+		expect(Object.keys(config.summarizeOptions)).toEqual([]);
 	});
 
 	test('undefined は未設定として扱われる', () => {
 		const config = loadServerConfig({ SUMMALY_LANG: undefined, SUMMALY_PORT: undefined, HTTPS_PROXY: undefined });
-		expect(config).toEqual({ host: 'localhost', port: 3000, summalyOptions: {} });
-		expect(Object.keys(config.summalyOptions)).toEqual([]);
+		expect(config).toEqual({ host: 'localhost', port: 3000, summarizeOptions: {} });
+		expect(Object.keys(config.summarizeOptions)).toEqual([]);
 	});
 
 	test('渡された env を変更しない', () => {
@@ -200,10 +200,10 @@ describe('loadServerConfig', () => {
 	// chiramiss additions below
 
 	test('SUMMALY_ALLOWED_PRIVATE_NETWORKS をカンマ区切りで読む、不正な CIDR はエラー', () => {
-		expect(loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: '127.0.0.0/8' }).summalyOptions).toEqual({
+		expect(loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: '127.0.0.0/8' }).summarizeOptions).toEqual({
 			allowedPrivateNetworks: ['127.0.0.0/8'],
 		});
-		expect(loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: '10.0.0.0/8,fd00::/8, 192.168.0.0/16 ,' }).summalyOptions).toEqual({
+		expect(loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: '10.0.0.0/8,fd00::/8, 192.168.0.0/16 ,' }).summarizeOptions).toEqual({
 			allowedPrivateNetworks: ['10.0.0.0/8', 'fd00::/8', '192.168.0.0/16'],
 		});
 
@@ -234,7 +234,7 @@ describe('loadServerConfig', () => {
 
 	test('SUMMALY_ALLOWED_PRIVATE_NETWORKS の正規の IPv4 / IPv6 CIDR は受け付ける', () => {
 		const value = '0.0.0.0/0,10.0.0.0/8,192.168.10.0/24,::/0,::1/128,fd00::/8,2001:db8::/32';
-		expect(loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value }).summalyOptions).toEqual({
+		expect(loadServerConfig({ SUMMALY_ALLOWED_PRIVATE_NETWORKS: value }).summarizeOptions).toEqual({
 			allowedPrivateNetworks: value.split(','),
 		});
 	});
@@ -244,7 +244,7 @@ describe('loadServerConfig', () => {
 			expect(loadServerConfig({
 				HTTPS_PROXY: 'http://proxy.example:3128',
 				NO_PROXY: 'localhost,.internal',
-			}).summalyOptions).toEqual({
+			}).summarizeOptions).toEqual({
 				proxy: { https: 'http://proxy.example:3128', noProxy: 'localhost,.internal' },
 			});
 
@@ -255,7 +255,7 @@ describe('loadServerConfig', () => {
 				https_proxy: 'https://lower.example:3129',
 				NO_PROXY: 'upper.example',
 				no_proxy: 'lower.example',
-			}).summalyOptions).toEqual({
+			}).summarizeOptions).toEqual({
 				proxy: {
 					http: 'http://upper.example:3128',
 					https: 'https://upper.example:3129',
@@ -269,7 +269,7 @@ describe('loadServerConfig', () => {
 				http_proxy: 'http://lower.example:3128',
 				https_proxy: 'http://lower.example:3129',
 				no_proxy: '*',
-			}).summalyOptions).toEqual({
+			}).summarizeOptions).toEqual({
 				proxy: {
 					http: 'http://lower.example:3128',
 					https: 'http://lower.example:3129',
@@ -279,7 +279,7 @@ describe('loadServerConfig', () => {
 		});
 
 		test('大文字が空文字なら小文字を使う', () => {
-			expect(loadServerConfig({ HTTP_PROXY: '', http_proxy: 'http://lower.example:3128' }).summalyOptions).toEqual({
+			expect(loadServerConfig({ HTTP_PROXY: '', http_proxy: 'http://lower.example:3128' }).summarizeOptions).toEqual({
 				proxy: { http: 'http://lower.example:3128' },
 			});
 		});
@@ -318,13 +318,79 @@ describe('loadServerConfig', () => {
 	});
 
 	test('SUMMALY_CACHE_TTL / SUMMALY_ERROR_CACHE_TTL を読む', () => {
-		expect(loadServerConfig({ SUMMALY_CACHE_TTL: '60000', SUMMALY_ERROR_CACHE_TTL: '5000' }).summalyOptions).toEqual({
+		expect(loadServerConfig({ SUMMALY_CACHE_TTL: '60000', SUMMALY_ERROR_CACHE_TTL: '5000' }).summarizeOptions).toEqual({
 			cacheTtl: 60000,
 			errorCacheTtl: 5000,
 		});
-		expect(loadServerConfig({ SUMMALY_CACHE_TTL: '0', SUMMALY_ERROR_CACHE_TTL: '0' }).summalyOptions).toEqual({
+		expect(loadServerConfig({ SUMMALY_CACHE_TTL: '0', SUMMALY_ERROR_CACHE_TTL: '0' }).summarizeOptions).toEqual({
 			cacheTtl: 0,
 			errorCacheTtl: 0,
 		});
+	});
+});
+
+describe('CHIRAMISS_* と SUMMALY_*', () => {
+	type Case = {
+		/** Name without the CHIRAMISS_ / SUMMALY_ prefix */
+		suffix: string;
+		/** A valid value, the config it gives, another valid value and the config that one gives */
+		value: string;
+		expected: Partial<ServerConfig>;
+		other: string;
+		otherExpected: Partial<ServerConfig>;
+		/** A value that is rejected */
+		invalid: string;
+	};
+
+	const cases: Case[] = [
+		{ suffix: 'HOST', value: '0.0.0.0', expected: { host: '0.0.0.0' }, other: '::', otherExpected: { host: '::' }, invalid: '' },
+		{ suffix: 'PORT', value: '8080', expected: { port: 8080 }, other: '9090', otherExpected: { port: 9090 }, invalid: 'abc' },
+		{ suffix: 'LANG', value: 'ja-JP', expected: { summarizeOptions: { lang: 'ja-JP' } }, other: 'en-US', otherExpected: { summarizeOptions: { lang: 'en-US' } }, invalid: '' },
+		{ suffix: 'USER_AGENT', value: 'ChiramissUA/1.0', expected: { summarizeOptions: { userAgent: 'ChiramissUA/1.0' } }, other: 'SummalyUA/1.0', otherExpected: { summarizeOptions: { userAgent: 'SummalyUA/1.0' } }, invalid: '' },
+		{ suffix: 'FOLLOW_REDIRECTS', value: 'false', expected: { summarizeOptions: { followRedirects: false } }, other: 'true', otherExpected: { summarizeOptions: { followRedirects: true } }, invalid: 'yes' },
+		{ suffix: 'RESPONSE_TIMEOUT', value: '1000', expected: { summarizeOptions: { responseTimeout: 1000 } }, other: '2000', otherExpected: { summarizeOptions: { responseTimeout: 2000 } }, invalid: '-1' },
+		{ suffix: 'OPERATION_TIMEOUT', value: '5000', expected: { summarizeOptions: { operationTimeout: 5000 } }, other: '6000', otherExpected: { summarizeOptions: { operationTimeout: 6000 } }, invalid: '1.5' },
+		{ suffix: 'CONTENT_LENGTH_LIMIT', value: '1048576', expected: { summarizeOptions: { contentLengthLimit: 1048576 } }, other: '2048', otherExpected: { summarizeOptions: { contentLengthLimit: 2048 } }, invalid: '1e3' },
+		{ suffix: 'CONTENT_LENGTH_REQUIRED', value: 'true', expected: { summarizeOptions: { contentLengthRequired: true } }, other: 'false', otherExpected: { summarizeOptions: { contentLengthRequired: false } }, invalid: 'on' },
+		{ suffix: 'ALLOWED_PRIVATE_NETWORKS', value: '10.0.0.0/8', expected: { summarizeOptions: { allowedPrivateNetworks: ['10.0.0.0/8'] } }, other: '192.168.0.0/16', otherExpected: { summarizeOptions: { allowedPrivateNetworks: ['192.168.0.0/16'] } }, invalid: 'nope' },
+		{ suffix: 'CACHE_TTL', value: '60000', expected: { summarizeOptions: { cacheTtl: 60000 } }, other: '1000', otherExpected: { summarizeOptions: { cacheTtl: 1000 } }, invalid: 'NaN' },
+		{ suffix: 'ERROR_CACHE_TTL', value: '5000', expected: { summarizeOptions: { errorCacheTtl: 5000 } }, other: '100', otherExpected: { summarizeOptions: { errorCacheTtl: 100 } }, invalid: '+1' },
+	];
+
+	const defaults: ServerConfig = { host: 'localhost', port: 3000, summarizeOptions: {} };
+
+	test.each(cases)('CHIRAMISS_$suffix が読まれる', ({ suffix, value, expected }) => {
+		expect(loadServerConfig({ [`CHIRAMISS_${suffix}`]: value })).toEqual({ ...defaults, ...expected });
+	});
+
+	test.each(cases)('CHIRAMISS_$suffix と SUMMALY_$suffix が両方あれば CHIRAMISS_$suffix が優先される', ({ suffix, value, expected, other }) => {
+		expect(loadServerConfig({ [`CHIRAMISS_${suffix}`]: value, [`SUMMALY_${suffix}`]: other })).toEqual({ ...defaults, ...expected });
+	});
+
+	test.each(cases)('CHIRAMISS_$suffix が空文字なら SUMMALY_$suffix にフォールバックする', ({ suffix, other, otherExpected }) => {
+		expect(loadServerConfig({ [`CHIRAMISS_${suffix}`]: '', [`SUMMALY_${suffix}`]: other })).toEqual({ ...defaults, ...otherExpected });
+	});
+
+	test.each(cases.filter(c => c.invalid !== ''))('$suffix の不正値のエラーメッセージは読んだ変数名を含む', ({ suffix, value, invalid }) => {
+		expect(() => loadServerConfig({ [`CHIRAMISS_${suffix}`]: invalid })).toThrow(ServerConfigError);
+		expect(() => loadServerConfig({ [`CHIRAMISS_${suffix}`]: invalid })).toThrow(`Invalid value for CHIRAMISS_${suffix}: ${JSON.stringify(invalid)}`);
+		expect(() => loadServerConfig({ [`CHIRAMISS_${suffix}`]: invalid, [`SUMMALY_${suffix}`]: value })).toThrow(`Invalid value for CHIRAMISS_${suffix}: `);
+
+		expect(() => loadServerConfig({ [`CHIRAMISS_${suffix}`]: '', [`SUMMALY_${suffix}`]: invalid })).toThrow(`Invalid value for SUMMALY_${suffix}: ${JSON.stringify(invalid)}`);
+		expect(() => loadServerConfig({ [`SUMMALY_${suffix}`]: invalid })).toThrow(`Invalid value for SUMMALY_${suffix}: ${JSON.stringify(invalid)}`);
+	});
+
+	test.each(cases.filter(c => c.invalid !== ''))('CHIRAMISS_$suffix があれば SUMMALY_$suffix は読まれない (不正値でもエラーにならない)', ({ suffix, value, expected, invalid }) => {
+		expect(loadServerConfig({ [`CHIRAMISS_${suffix}`]: value, [`SUMMALY_${suffix}`]: invalid })).toEqual({ ...defaults, ...expected });
+	});
+
+	test('すべての CHIRAMISS_* が反映される', () => {
+		const env = Object.fromEntries(cases.map(c => [`CHIRAMISS_${c.suffix}`, c.value]));
+		const expected = cases.reduce<ServerConfig>((config, c) => ({
+			...config,
+			...c.expected,
+			summarizeOptions: { ...config.summarizeOptions, ...c.expected.summarizeOptions },
+		}), defaults);
+		expect(loadServerConfig(env)).toEqual(expected);
 	});
 });

@@ -1,6 +1,6 @@
 // Derived from misskey-dev/summaly (MIT)
 /**
- * Standalone summaly server
+ * Standalone chiramiss server (summaly-compatible)
  * Configured via environment variables (see README.md)
  */
 

@@ -1,8 +1,8 @@
 /**
- * Reads summaly options from the query string of `GET /`
+ * Reads summarize options from the query string of `GET /`
  */
 
-import type { SummalyOptions } from '@tiramiss-community/chiramiss';
+import type { SummarizeOptions } from '@tiramiss-community/chiramiss';
 import { MAX_TIMEOUT, toNonNegativeInteger } from './config.js';
 
 // Mirrors DEFAULT_RESPONSE_TIMEOUT / DEFAULT_OPERATION_TIMEOUT / DEFAULT_MAX_RESPONSE_SIZE in
@@ -22,10 +22,10 @@ export const LIB_DEFAULT_CONTENT_LENGTH_LIMIT = 10 * 1024 * 1024;
  *   upper bound, so any timeout above 0 from the query tightens it and is used.
  * - contentLengthRequired: the query may only turn the check on.
  */
-export function resolveRequestOptions(query: Record<string, unknown>, envOptions: SummalyOptions): SummalyOptions {
+export function resolveRequestOptions(query: Record<string, unknown>, envOptions: SummarizeOptions): SummarizeOptions {
 	const { responseTimeout, operationTimeout, contentLengthLimit, contentLengthRequired, ...fromQuery } = parseQueryOptions(query);
 
-	const options: SummalyOptions = {
+	const options: SummarizeOptions = {
 		followRedirects: false,
 		...fromQuery,
 		...envOptions,
@@ -53,8 +53,8 @@ function tightenTimeout(requested: number | undefined, ceiling: number): number 
  * A missing, malformed or repeated (array) value is left out, as if it had not been given:
  * upstream's server ignored all of these but `lang`, so dropping a value keeps its behavior.
  */
-export function parseQueryOptions(query: Record<string, unknown>): Partial<SummalyOptions> {
-	const options: Partial<SummalyOptions> = {};
+export function parseQueryOptions(query: Record<string, unknown>): Partial<SummarizeOptions> {
+	const options: Partial<SummarizeOptions> = {};
 
 	const lang = readString(query, 'lang');
 	if (lang != null) options.lang = lang;
