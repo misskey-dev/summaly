@@ -1,12 +1,14 @@
 import http from 'node:http';
 import https from 'node:https';
 import type { ProxyOptions, SummarizeOptions } from '@/types.js';
-import { type AddressGuard, createAddressGuard, createGuardedLookup, privateIpAllowedByEnv } from './address-guard.js';
+import { type AddressGuard, createAddressGuard, privateIpAllowedByEnv } from './address-guard.js';
+import { type GuardedAgentPool, type GuardedAgentSet, createGuardedAgents } from './agent-pool.js';
 import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy/index.js';
 
 /**
- * Per-call connection settings. Holds no global state: one transport serves one summary call
- * (its requests may share connections) and is closed when that call ends.
+ * Per-call connection settings. Holds no global state: one transport serves one summary call and is closed when that
+ * call ends. Its requests share connections; with an agent pool (owned by the summarizer), so do the calls that use
+ * the same pool and the same guard setting.
  */
 export type Transport = {
 	/**
@@ -21,10 +23,13 @@ export type Transport = {
 	 */
 	guard: AddressGuard | null;
 	/**
-	 * Agents owned by this transport, built with the guarded lookup. Never shared with other pools or other calls,
-	 * so every guarded connection runs the connect-time check (no reuse of unguarded sockets).
-	 * They keep connections alive so the requests of one call (HEAD for the final URL, the page, favicon, oEmbed)
-	 * can reuse a socket this transport opened and checked; `close` destroys them.
+	 * Keep-alive agents built with the guarded lookup of `guard` (see createGuardedAgents), so every guarded connection
+	 * runs the connect-time check and none is shared with agents of another guard setting (no reuse of sockets
+	 * checked under another policy). The requests of one call (HEAD for the final URL, the page, favicon, oEmbed)
+	 * reuse their sockets.
+	 * - With an agent pool, they come from the pool and are shared with the other calls of the pool's summarizer that
+	 *   have the same guard setting; `close` leaves them (and their idle sockets, closed on their idle timeout) alone.
+	 * - Without one, this transport builds its own and `close` destroys them.
 	 * null when `guard` is null.
 	 */
 	guardedAgents: { http: http.Agent; https: https.Agent } | null;
@@ -41,8 +46,9 @@ export type Transport = {
 	 */
 	proxyAgents: { http?: http.Agent; https?: https.Agent };
 	/**
-	 * Destroys every agent this transport owns (guarded and proxy agents) with their sockets, idle or not.
-	 * Caller-supplied agents are left alone. Call it once the summary call is done, whatever its outcome.
+	 * Destroys every agent this transport owns with their sockets, idle or not: the proxy agents, and the guarded agents
+	 * unless they come from an agent pool. Caller-supplied agents are left alone.
+	 * Call it once the summary call is done, whatever its outcome.
 	 */
 	close(): void;
 };
@@ -50,9 +56,17 @@ export type Transport = {
 /**
  * `opts.allowPrivateIp` is whether the environment allows private IPs, as the caller already read it
  * (so that its keys and this transport use the same value); when omitted, it is read from `env`.
+ * `opts.agentPool` supplies the guarded agents (and the guard) for `opts.allowedPrivateNetworks`; without it, this
+ * transport builds its own. Unused when the guard is off.
  */
 export function createTransport(
-	opts: { agent?: SummarizeOptions['agent']; allowedPrivateNetworks?: string[]; proxy?: ProxyOptions; allowPrivateIp?: boolean },
+	opts: {
+		agent?: SummarizeOptions['agent'];
+		allowedPrivateNetworks?: string[];
+		proxy?: ProxyOptions;
+		allowPrivateIp?: boolean;
+		agentPool?: GuardedAgentPool;
+	},
 	env: NodeJS.ProcessEnv = process.env,
 ): Transport {
 	// Public input: reject unusable proxy URLs (any scheme, even one a caller agent replaces) up front.
@@ -61,9 +75,11 @@ export function createTransport(
 	const hasAgent = agents.http != null || agents.https != null;
 	// The guard is handed off per scheme: only a scheme whose agent the caller supplied leaves blocking to the caller.
 	const guardOff = (opts.allowPrivateIp ?? privateIpAllowedByEnv(env)) || (agents.http != null && agents.https != null);
-	const guard = guardOff ? null : createAddressGuard(opts.allowedPrivateNetworks);
+	const guarded = guardOff ? null : (opts.agentPool?.acquire(opts.allowedPrivateNetworks) ?? ownGuardedAgents(opts.allowedPrivateNetworks));
+	const ownsGuardedAgents = opts.agentPool == null;
+	const guard = guarded?.guard ?? null;
+	const guardedAgents = guarded?.agents ?? null;
 	const proxy = proxyWithoutCallerSchemes(opts.proxy, agents);
-	const guardedAgents = guard ? createGuardedAgents(guard) : null;
 	// A guarded transport never lets the proxy resolve a target name: its agents CONNECT only to validated addresses.
 	const proxyAgents = proxy ? createProxyAgents(proxy, { requireAddress: guard != null }) : {};
 	return {
@@ -73,8 +89,10 @@ export function createTransport(
 		proxy,
 		proxyAgents,
 		close() {
-			guardedAgents?.http.destroy();
-			guardedAgents?.https.destroy();
+			if (ownsGuardedAgents) {
+				guardedAgents?.http.destroy();
+				guardedAgents?.https.destroy();
+			}
 			proxyAgents.http?.destroy();
 			proxyAgents.https?.destroy();
 		},
@@ -113,18 +131,8 @@ export function selectOwnedAgent(transport: Transport, url: URL): http.Agent | u
 	return agent;
 }
 
-function createGuardedAgents(guard: AddressGuard): { http: http.Agent; https: https.Agent } {
-	const lookup = createGuardedLookup(guard);
-	// keepAlive: a socket goes back to the pool only after a complete response, and the pool lives as long as the
-	// transport (one call); Transport#close destroys it. A response dropped early (error, size limit, timeout)
-	// destroys its socket, so it never returns to the pool.
-	// Accepted risk, shared by every keep-alive client: a non-compliant server that sends a body after a HEAD response
-	// (or past Content-Length) in a later segment can have those bytes read as the next response on the reused socket.
-	// Node destroys an idle pooled socket that receives data, and sendRequest sends again when the bytes break the
-	// response (HPE_*), but bytes that happen to parse as a body go unnoticed. Not reusing after a HEAD would give up
-	// most of the gain (HEAD for the final URL, then the page).
-	return {
-		http: new http.Agent({ keepAlive: true, lookup }),
-		https: new https.Agent({ keepAlive: true, lookup }),
-	};
+/** A guard and agents built for one transport, destroyed by its close. */
+function ownGuardedAgents(allowedNetworks: string[] | undefined): GuardedAgentSet {
+	const guard = createAddressGuard(allowedNetworks);
+	return { guard, agents: createGuardedAgents(guard) };
 }

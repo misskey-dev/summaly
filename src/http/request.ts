@@ -120,7 +120,13 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		signal,
 	};
 	if (tunnelTarget) options[TUNNEL_TARGET] = tunnelTarget;
-	if (req.responseTimeout > 0) options.timeout = req.responseTimeout;
+	if (req.responseTimeout > 0) {
+		options.timeout = req.responseTimeout;
+	} else if (agent !== undefined && (agent === transport.guardedAgents?.http || agent === transport.guardedAgents?.https)) {
+		// The guarded agents set a timeout on their sockets for idle ones (see createGuardedAgents); without a value
+		// of its own, a request would keep it and be cut while waiting for the server. 0 turns it off for this request.
+		options.timeout = 0;
+	}
 
 	let timeoutError: Error | undefined;
 	const send = () => new Promise<http.IncomingMessage>((resolve, reject) => {

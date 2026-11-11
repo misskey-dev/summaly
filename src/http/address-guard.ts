@@ -15,6 +15,18 @@ export function createAddressGuard(allowedNetworks: string[] = []): AddressGuard
 }
 
 /**
+ * A string that two guards share exactly when they allow the same networks as written: each network in canonical form
+ * (`ipaddr` toString, so `0:0:0:0:0:0:0:1/128` and `::1/128` agree), duplicates dropped, sorted.
+ * isAddressAllowed only asks whether some network matches, so order and duplicates never change what a guard allows.
+ * Networks that differ only in host bits (`127.0.0.1/8` and `127.0.0.0/8`) get different keys: such guards simply
+ * do not share, which is never unsafe.
+ */
+export function guardKey(guard: AddressGuard): string {
+	const networks = new Set(guard.allowedNetworks.map(([addr, bits]) => `${addr.toString()}/${bits}`));
+	return [...networks].sort().join(',');
+}
+
+/**
  * Parses one allowed network. Only canonical CIDRs are accepted:
  * - IPv4 must be four plain decimal parts without leading zeros. ipaddr.parseCIDR also reads octal, hex and
  *   short forms ('192.168.010.0/24' is 192.168.8.0/24, '127.1/8' is 127.0.0.1/8), which would silently allow
