@@ -12,7 +12,7 @@
   "main": "./built/index.js",
   "type": "module",
   "types": "./built/index.d.ts",
-  "packageManager": "pnpm@12.6.0",
+  "packageManager": "pnpm@12.17.0",
   "files": [
     "built",
     "LICENSE"
@@ -29,23 +29,23 @@
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/debug": "4.1.13",
     "@types/escape-regexp": "0.0.3",
-    "@types/node": "26.6.2",
-    "fastify": "5.12.6",
-    "oxlint": "1.85.0",
-    "oxlint-tsgolint": "7.0.2002",
-    "tsdown": "0.23.0",
+    "@types/node": "26.6.6",
+    "fastify": "5.12.8",
+    "oxlint": "1.91.0",
+    "oxlint-tsgolint": "7.0.2005",
+    "tsdown": "0.23.5",
     "typescript": "7.0.2",
-    "vitest": "5.0.1"
+    "vitest": "5.1.0"
   },
   "dependencies": {
     "chardet": "2.2.0",
     "cheerio": "1.2.0",
     "escape-regexp": "0.0.1",
-    "got": "16.0.0",
+    "got": "16.2.0",
     "html-entities": "2.6.0",
     "ipaddr.js": "2.5.0"
   },
   "optionalDependencies": {
-    "fastify": "5.12.6"
+    "fastify": "5.12.8"
   }
 }
