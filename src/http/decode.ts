@@ -75,6 +75,11 @@ function fromMeta(body: Buffer): string | null {
 
 	for (const [tag] of head.matchAll(metaTag)) {
 		const label = metaTagCharset(tag);
+
+		// Checked on the label itself: TextDecoder on Node 22 does not know x-user-defined, so canonicalEncoding() would drop it.
+		if (label?.trim().toLowerCase() === 'x-user-defined') {
+			return 'windows-1252';
+		}
 		const encoding = label ? canonicalEncoding(label) : null;
 
 		if (!encoding) {
@@ -83,9 +88,6 @@ function fromMeta(body: Buffer): string | null {
 		// A document that could be read as ASCII to find its meta cannot really be UTF-16 (HTML spec).
 		if (encoding === 'utf-16le' || encoding === 'utf-16be') {
 			return 'utf-8';
-		}
-		if (encoding === 'x-user-defined') {
-			return 'windows-1252';
 		}
 
 		return encoding;
