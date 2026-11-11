@@ -444,7 +444,7 @@ describe('fetchResponse', () => {
 });
 
 describe('decodeHtml', () => {
-	test('chardet で Shift_JIS を判定する', () => {
+	test('meta charset で Shift_JIS を判定する', () => {
 		expect(decodeHtml(SJIS_HTML)).toContain(SJIS_TITLE);
 	});
 
