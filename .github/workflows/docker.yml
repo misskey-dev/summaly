@@ -1,0 +1,141 @@
+name: Docker
+
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.23.2]
+        arch: [amd64, arm64]
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          run_install: false
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - name: Install
+        run: |
+          pnpm i --frozen-lockfile
+      # Needed only for running the arm64 containers in the test (building the image needs no emulation)
+      - name: Set up QEMU
+        if: matrix.arch != 'amd64'
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the Docker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: summaly:test
+      - name: Test the Docker image
+        run: |
+          pnpm exec vitest run ./test/docker.test.ts
+        env:
+          SUMMALY_TEST_IMAGE: summaly:test
+
+  publish:
+    # Publish only the releases that passed the test above
+    needs: test
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        node-version: [22.23.2]
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          run_install: false
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - name: Install
+        run: |
+          pnpm i --frozen-lockfile
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set the image name
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      # e.g. the release 5.6.0 is tagged as 5.6.0, 5.6, 5 and latest
+      # (pre-releases are tagged only with the full version)
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+      # Push the image by digest without tags, so that the tested image itself is published below
+      - name: Build and push the Docker image by digest
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - name: Test the pushed Docker image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          manifest=$(docker buildx imagetools inspect "$IMAGE@$DIGEST" --format '{{json .Manifest}}')
+          for platform in linux/amd64 linux/arm64; do
+            echo "::group::Test $platform"
+            # Pull the platform-specific manifest in the pushed image index
+            # (pulling the index digest again for another platform fails with "cannot overwrite digest")
+            platform_digest=$(jq -er --arg os "${platform%/*}" --arg arch "${platform#*/}" \
+              '.manifests[] | select(.platform.os == $os and .platform.architecture == $arch) | .digest' <<< "$manifest")
+            docker pull "$IMAGE@$platform_digest"
+            docker tag "$IMAGE@$platform_digest" summaly:test
+            SUMMALY_TEST_IMAGE=summaly:test pnpm exec vitest run ./test/docker.test.ts
+            echo "::endgroup::"
+          done
+      # Tag the tested image index as is (the digest does not change)
+      - name: Tag the Docker image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mapfile -t tags < <(jq -r '.tags[] | "--tag=" + .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          docker buildx imagetools create "${tags[@]}" "$IMAGE@$DIGEST"

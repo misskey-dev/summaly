@@ -43,7 +43,7 @@ async function getOEmbedPlayer($: cheerio.CheerioAPI, pageUrl: string): Promise<
 		return null;
 	}
 
-	if (!body.html.startsWith('<iframe ') || !body.html.endsWith('</iframe>')) {
+	if (typeof body.html !== 'string' || !body.html.startsWith('<iframe ') || !body.html.endsWith('</iframe>')) {
 		// It includes something else than an iframe
 		return null;
 	}

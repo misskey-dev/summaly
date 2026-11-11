@@ -1,0 +1,41 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": [
+		"config:recommended",
+		"schedule:weekly",
+		":maintainLockFilesMonthly",
+		"helpers:pinGitHubActionDigestsToSemver"
+	],
+	"timezone": "Asia/Tokyo",
+	"minimumReleaseAge": "7 days",
+	"osvVulnerabilityAlerts": true,
+	"configMigration": true,
+	"packageRules": [
+		{
+			"description": "パッチアップデートはまとめて1つのPRにする（0.x を含む）",
+			"matchUpdateTypes": ["patch"],
+			"groupName": "non-major dependencies"
+		},
+		{
+			"description": "マイナーアップデートはまとめて1つのPRにする（0.x は破壊的変更がありうるので個別PRにする）",
+			"matchUpdateTypes": ["minor"],
+			"matchCurrentVersion": "!/^v?0\\./",
+			"groupName": "non-major dependencies"
+		},
+		{
+			"description": "メジャーアップデートはグループ化せず、ダッシュボードで承認したときだけPRを作る",
+			"matchUpdateTypes": ["major"],
+			"dependencyDashboardApproval": true
+		},
+		{
+			"description": "@misskey-dev/oxlint-fmt-config の peerDependencies で完全固定されているため、fmt-config の更新に合わせて手動で上げる",
+			"matchPackageNames": ["@stylistic/eslint-plugin"],
+			"enabled": false
+		},
+		{
+			"description": "lockfile maintenance と digest 固定にはリリース日時がないので minimumReleaseAge を外す（間接依存の待機は pnpm-workspace.yaml の minimumReleaseAge で担保）",
+			"matchUpdateTypes": ["lockFileMaintenance", "pin", "pinDigest"],
+			"minimumReleaseAge": null
+		}
+	]
+}
