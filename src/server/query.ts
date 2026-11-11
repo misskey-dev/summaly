@@ -18,7 +18,8 @@ export const LIB_DEFAULT_CONTENT_LENGTH_LIMIT = 10 * 1024 * 1024;
  *   like upstream's server.
  * - responseTimeout, operationTimeout, contentLengthLimit: the query may only tighten. The ceiling is the environment
  *   variable when set, otherwise the lib default; a query value is used only when it is above 0 and not above the
- *   ceiling (0 would mean no timeout). Otherwise the ceiling applies.
+ *   ceiling (0 would mean no timeout). Otherwise the ceiling applies. A timeout ceiling of 0 (no timeout) has no
+ *   upper bound, so any timeout above 0 from the query tightens it and is used.
  * - contentLengthRequired: the query may only turn the check on.
  */
 export function resolveRequestOptions(query: Record<string, unknown>, envOptions: SummalyOptions): SummalyOptions {
@@ -28,8 +29,8 @@ export function resolveRequestOptions(query: Record<string, unknown>, envOptions
 		followRedirects: false,
 		...fromQuery,
 		...envOptions,
-		responseTimeout: tighten(responseTimeout, envOptions.responseTimeout ?? LIB_DEFAULT_RESPONSE_TIMEOUT),
-		operationTimeout: tighten(operationTimeout, envOptions.operationTimeout ?? LIB_DEFAULT_OPERATION_TIMEOUT),
+		responseTimeout: tightenTimeout(responseTimeout, envOptions.responseTimeout ?? LIB_DEFAULT_RESPONSE_TIMEOUT),
+		operationTimeout: tightenTimeout(operationTimeout, envOptions.operationTimeout ?? LIB_DEFAULT_OPERATION_TIMEOUT),
 		contentLengthLimit: tighten(contentLengthLimit, envOptions.contentLengthLimit ?? LIB_DEFAULT_CONTENT_LENGTH_LIMIT),
 	};
 	if (contentLengthRequired === true) options.contentLengthRequired = true;
@@ -39,6 +40,11 @@ export function resolveRequestOptions(query: Record<string, unknown>, envOptions
 
 function tighten(requested: number | undefined, ceiling: number): number {
 	return requested != null && requested > 0 && requested <= ceiling ? requested : ceiling;
+}
+
+/** Like tighten, but a ceiling of 0 means no timeout, which any positive timeout tightens (Ruling R38). */
+function tightenTimeout(requested: number | undefined, ceiling: number): number {
+	return ceiling === 0 && requested != null && requested > 0 ? requested : tighten(requested, ceiling);
 }
 
 /**

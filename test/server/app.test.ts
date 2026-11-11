@@ -443,9 +443,22 @@ describe('resolveRequestOptions', () => {
 			.toEqual({ followRedirects: false, responseTimeout: 499, operationTimeout: 1, contentLengthLimit: 100 });
 	});
 
-	test('環境変数の上限を 0 (無制限) にした場合はクエリでも変わらない', () => {
-		expect(resolveRequestOptions({ responseTimeout: '1000', operationTimeout: '1000' }, { responseTimeout: 0, operationTimeout: 0 }))
-			.toMatchObject({ responseTimeout: 0, operationTimeout: 0 });
+	test('環境変数のタイムアウトが 0 (無制限) なら、クエリの正の値はどれも適用される', () => {
+		const env = { responseTimeout: 0, operationTimeout: 0 };
+		expect(resolveRequestOptions({ responseTimeout: '1000', operationTimeout: '2000' }, env))
+			.toMatchObject({ responseTimeout: 1000, operationTimeout: 2000 });
+		expect(resolveRequestOptions({ responseTimeout: '2147483647', operationTimeout: '2147483647' }, env))
+			.toMatchObject({ responseTimeout: 2147483647, operationTimeout: 2147483647 });
+		// Each timeout is resolved on its own.
+		expect(resolveRequestOptions({ responseTimeout: '1000' }, env)).toMatchObject({ responseTimeout: 1000, operationTimeout: 0 });
+		expect(resolveRequestOptions({ operationTimeout: '1000' }, env)).toMatchObject({ responseTimeout: 0, operationTimeout: 1000 });
+	});
+
+	test('環境変数のタイムアウトが 0 (無制限) のとき、クエリの 0 や不正な値では無制限のまま', () => {
+		const env = { responseTimeout: 0, operationTimeout: 0 };
+		expect(resolveRequestOptions({}, env)).toMatchObject(env);
+		expect(resolveRequestOptions({ responseTimeout: '0', operationTimeout: '0' }, env)).toMatchObject(env);
+		expect(resolveRequestOptions({ responseTimeout: '-1', operationTimeout: '2147483648' }, env)).toMatchObject(env);
 	});
 
 	test('contentLengthRequired はクエリで有効にできるだけ', () => {
