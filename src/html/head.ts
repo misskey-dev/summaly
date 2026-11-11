@@ -19,23 +19,25 @@ const CHUNK_SIZE = 16 * 1024;
 export function parseHead(html: string): HeadInfo {
 	const metas = new Map<string, string>();
 	const links: LinkTag[] = [];
-	let title: string | null = null;
+	// Kept in an object: the parser callbacks change these during parser.write(), which plain `let`
+	// narrowing would not see in the loop below.
+	const state: { title: string | null; headDone: boolean } = { title: null, headDone: false };
 	let inTitle = false;
 	let titleText = '';
-	let headDone = false;
 
 	const parser = new Parser({
-		onopentag(name, attrs) {
+		// htmlparser2 types attribs as always present; an attribute that is not on the tag is undefined.
+		onopentag(name, attrs: Record<string, string | undefined>) {
 			if (name === 'title') {
-				if (title === null) {
+				if (state.title === null) {
 					inTitle = true;
 					titleText = '';
 				}
 				return;
 			}
-			if (headDone) return;
+			if (state.headDone) return;
 			if (name === 'body') {
-				headDone = true;
+				state.headDone = true;
 			} else if (name === 'meta') {
 				const content = attrs['content'];
 				if (content === undefined) return;
@@ -57,21 +59,21 @@ export function parseHead(html: string): HeadInfo {
 		onclosetag(name) {
 			if (name === 'title' && inTitle) {
 				inTitle = false;
-				title = titleText;
+				state.title = titleText;
 			} else if (name === 'head') {
-				headDone = true;
+				state.headDone = true;
 			}
 		},
 	}, { decodeEntities: false });
 
 	for (let i = 0; i < html.length; i += CHUNK_SIZE) {
 		parser.write(html.slice(i, i + CHUNK_SIZE));
-		if (headDone && title !== null) break;
+		if (state.headDone && state.title !== null) break;
 	}
 	parser.end();
 
 	return {
-		title,
+		title: state.title,
 		meta: key => metas.get(key),
 		links,
 	};
