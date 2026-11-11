@@ -137,7 +137,7 @@ export async function getResponse(args: GotOptions) {
 	const res = await receiveResponse({ req, opts: args, abort });
 
 	// 念のため最終応答に対しても同じチェックを行う（通常はreceiveResponse内で弾かれている）
-	if (!isPrivateIpAllowed() && res.ip != null) {
+	if (!isPrivateIpAllowed(new URL(res.url).protocol) && res.ip != null) {
 		assertPublicIp(res.ip);
 	}
 
@@ -164,11 +164,20 @@ export async function getResponse(args: GotOptions) {
 	return res;
 }
 
-function isPrivateIpAllowed() {
+/**
+ * @param protocol 実際にリクエストを送るURLのプロトコル（'http:' / 'https:'）。リダイレクト時はリダイレクト先のもの
+ */
+function isPrivateIpAllowed(protocol: string) {
 	// SUMMALY_ALLOW_PRIVATE_IPはテスト用
-	// agentが指定されている場合、接続先はagent(プロキシ等)になり実際の宛先IPを検査できないため、
+	if (process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true') return true;
+
+	// そのプロトコル用のagentが指定されている場合、接続先はagent(プロキシ等)になり実際の宛先IPを検査できないため、
 	// 宛先の制限はagent側に任せる
-	return process.env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.keys(agent).length > 0;
+	switch (protocol) {
+		case 'http:': return agent.http != null;
+		case 'https:': return agent.https != null;
+		default: return false;
+	}
 }
 
 function assertPublicIp(rawIp: string) {
@@ -194,9 +203,9 @@ async function receiveResponse<T>(args: {
 	const req = args.req;
 	const maxSize = args.opts.contentLengthLimit ?? DEFAULT_MAX_RESPONSE_SIZE;
 
-	const allowPrivateIp = isPrivateIpAllowed();
-
 	req.on('request', (clientRequest: ClientRequest) => {
+		const allowPrivateIp = isPrivateIpAllowed(clientRequest.protocol);
+
 		clientRequest.prependOnceListener('response', (res: IncomingMessage) => {
 			try {
 				const ip = res.socket.remoteAddress;

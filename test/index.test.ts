@@ -224,6 +224,24 @@ describe('local tests', () => {
 			expect(summary.title).toBe('Strawberry Pasta');
 		});
 
+		test('httpsのagentのみ指定されている場合、httpの接続先のprivate ipは許可しない', async () => {
+			const summary = await summaly(host, {
+				agent: {
+					https: new httpsAgent({ keepAlive: true }),
+				},
+			}).catch((e: StatusError) => e);
+			expect(summary).toBeInstanceOf(StatusError);
+		});
+
+		test('httpのagentのみ指定されている場合、httpの接続先のprivate ipを許可', async () => {
+			const summary = await summaly(host, {
+				agent: {
+					http: new httpAgent({ keepAlive: true }),
+				},
+			});
+			expect(summary.title).toBe('Strawberry Pasta');
+		});
+
 		test('agentが空のオブジェクトの場合はprivate ipを許可しない', async () => {
 			const summary = await summaly(host, { agent: {} }).catch((e: StatusError) => e);
 			if (summary instanceof StatusError) {
