@@ -15,21 +15,28 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [22.23.2]
         arch: [amd64, arm64]
 
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Check the Node.js version in the Dockerfile
+        run: |
+          expected=$(tr -d '[:space:]' < .node-version)
+          actual=$(sed -n 's/^ARG NODE_VERSION=//p' Dockerfile | tr -d '[:space:]')
+          if [ "$actual" != "$expected" ]; then
+            echo "::error file=Dockerfile::ARG NODE_VERSION ($actual) must match .node-version ($expected)"
+            exit 1
+          fi
       - name: Install pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           run_install: false
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Use Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version-file: .node-version
           cache: 'pnpm'
       - name: Install
         run: |
@@ -63,10 +70,6 @@ jobs:
       contents: read
       packages: write
 
-    strategy:
-      matrix:
-        node-version: [22.23.2]
-
     steps:
       - uses: actions/checkout@v7
         with:
@@ -75,10 +78,10 @@ jobs:
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           run_install: false
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Use Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version-file: .node-version
           cache: 'pnpm'
       - name: Install
         run: |
