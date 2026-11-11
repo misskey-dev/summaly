@@ -4,7 +4,7 @@ import https from 'node:https';
 import { Transform, type TransformCallback, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import zlib from 'node:zlib';
-import { assertHostAllowed, createGuardedLookup } from './address-guard.js';
+import { assertHostAllowed } from './address-guard.js';
 import { StatusError } from './status-error.js';
 import type { Transport } from './transport.js';
 
@@ -90,21 +90,26 @@ function buildHeaders(headers: FetchRequest['headers']): http.OutgoingHttpHeader
 
 /** Sends one hop and resolves once the response headers arrive. */
 async function sendRequest(transport: Transport, req: FetchRequest, url: URL, signal: AbortSignal) {
-	// Gate every hop before connecting. net.connect skips `lookup` for IP literals, so this is the only check for them.
-	if (transport.guard) {
+	const isHttps = url.protocol === 'https:';
+	// A caller-supplied agent for this scheme takes over private IP blocking; otherwise the hop stays guarded.
+	const callerAgent = isHttps ? transport.agents.https : transport.agents.http;
+	let agent: http.Agent | undefined = callerAgent;
+	if (!callerAgent && transport.guard) {
+		// Gate every hop before connecting. net.connect skips `lookup` for IP literals, so this is the only check for them.
 		await abortable(assertHostAllowed(transport.guard, url.hostname), signal);
+		// The transport-owned agents carry the guarded lookup, which re-checks at connect time (DNS rebinding defense).
+		// They never hold sockets opened under another policy, so that check is never skipped by socket reuse.
+		agent = isHttps ? transport.guardedAgents?.https : transport.guardedAgents?.http;
+		if (!agent) throw new Error('Guarded transport has no guarded agent');
 	}
 
-	const isHttps = url.protocol === 'https:';
 	const options: https.RequestOptions = {
 		method: req.method,
 		headers: buildHeaders(req.headers),
-		agent: isHttps ? transport.agents.https : transport.agents.http,
+		agent,
 		signal,
 	};
 	if (req.responseTimeout > 0) options.timeout = req.responseTimeout;
-	// Re-check at socket connect time (DNS rebinding defense).
-	if (transport.guard) options.lookup = createGuardedLookup(transport.guard);
 
 	let timeoutError: Error | undefined;
 	const res = await new Promise<http.IncomingMessage>((resolve, reject) => {
@@ -181,7 +186,14 @@ async function receiveResponse(req: FetchRequest, url: URL, res: http.IncomingMe
 	return { url: finalUrl.href, statusCode, headers, body };
 }
 
-/** Size check while receiving (counts decompressed bytes) */
+function maxSizeExceeded(size: number, maxSize: number): Error {
+	return new Error(`maxSize exceeded (${size} > ${maxSize}) on response`);
+}
+
+/**
+ * Size check while receiving. Counts decompressed bytes, and also the compressed bytes on the wire,
+ * so input that decompresses to little (e.g. endless empty gzip members) cannot stream unbounded.
+ */
 async function readBody(res: http.IncomingMessage, decompressor: Transform | null, maxSize: number): Promise<Buffer> {
 	const chunks: Buffer[] = [];
 	let size = 0;
@@ -189,14 +201,29 @@ async function readBody(res: http.IncomingMessage, decompressor: Transform | nul
 		write(chunk: Buffer, _encoding, callback) {
 			size += chunk.length;
 			if (size > maxSize) {
-				callback(new Error(`maxSize exceeded (${size} > ${maxSize}) on response`));
+				callback(maxSizeExceeded(size, maxSize));
 				return;
 			}
 			chunks.push(chunk);
 			callback();
 		},
 	});
-	await (decompressor ? pipeline(res, decompressor, sink) : pipeline(res, sink));
+	if (decompressor) {
+		let wireSize = 0;
+		const wireCounter = new Transform({
+			transform(chunk: Buffer, _encoding, callback) {
+				wireSize += chunk.length;
+				if (wireSize > maxSize) {
+					callback(maxSizeExceeded(wireSize, maxSize));
+					return;
+				}
+				callback(null, chunk);
+			},
+		});
+		await pipeline(res, wireCounter, decompressor, sink);
+	} else {
+		await pipeline(res, sink);
+	}
 	return Buffer.concat(chunks, size);
 }
 

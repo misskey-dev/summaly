@@ -1,6 +1,8 @@
 import dns from 'node:dns';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
+import https from 'node:https';
+import type net from 'node:net';
 import zlib from 'node:zlib';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { StatusError } from '@/http/status-error.js';
@@ -27,6 +29,18 @@ async function serve(handler: http.RequestListener, host?: string): Promise<Test
 
 const localTransport = () => createTransport({ allowedPrivateNetworks: ['127.0.0.0/8', '::1/128'] });
 
+/** An http.Agent whose createConnection calls are counted. */
+function hookedAgent(): { agent: http.Agent; calls: () => number } {
+	const agent = new http.Agent();
+	let calls = 0;
+	const original = agent.createConnection.bind(agent);
+	agent.createConnection = ((...args: Parameters<typeof original>) => {
+		calls++;
+		return original(...args);
+	}) as typeof agent.createConnection;
+	return { agent, calls: () => calls };
+}
+
 function request(url: string, overrides: Partial<FetchRequest> = {}): FetchRequest {
 	return {
 		url,
@@ -48,10 +62,30 @@ describe('createTransport', () => {
 		expect(t.agents).toEqual({});
 	});
 
-	test('agent を渡すと guard なし、proxy は無視する', () => {
+	test('既定では transport 専用の guard 付き agent を持つ', () => {
+		const t = createTransport({}, {});
+		expect(t.guardedAgents?.http).toBeInstanceOf(http.Agent);
+		expect(t.guardedAgents?.http).not.toBe(http.globalAgent);
+		expect(t.guardedAgents?.https).not.toBe(https.globalAgent);
+		expect(createTransport({}, {}).guardedAgents?.http).not.toBe(t.guardedAgents?.http);
+	});
+
+	test('http と https の両方の agent を渡すと guard なし、proxy は無視する', () => {
+		const agent = new http.Agent();
+		const secureAgent = new https.Agent();
+		const t = createTransport({ agent: { http: agent, https: secureAgent }, proxy: { http: 'http://p:8080' } }, {});
+		expect(t.guard).toBeNull();
+		expect(t.guardedAgents).toBeNull();
+		expect(t.agents.http).toBe(agent);
+		expect(t.agents.https).toBe(secureAgent);
+		expect(t.proxy).toBeNull();
+	});
+
+	test('片方の scheme だけ agent を渡すと、もう片方のために guard は残る', () => {
 		const agent = new http.Agent();
 		const t = createTransport({ agent: { http: agent }, proxy: { http: 'http://p:8080' } }, {});
-		expect(t.guard).toBeNull();
+		expect(t.guard).not.toBeNull();
+		expect(t.guardedAgents).not.toBeNull();
 		expect(t.agents.http).toBe(agent);
 		expect(t.proxy).toBeNull();
 	});
@@ -64,6 +98,7 @@ describe('createTransport', () => {
 
 	test('SUMMALY_ALLOW_PRIVATE_IP=true なら guard なし', () => {
 		expect(createTransport({}, { SUMMALY_ALLOW_PRIVATE_IP: 'true' }).guard).toBeNull();
+		expect(createTransport({ agent: { http: new http.Agent() } }, { SUMMALY_ALLOW_PRIVATE_IP: 'true' }).guard).toBeNull();
 	});
 });
 
@@ -199,7 +234,7 @@ describe('fetchResponse', () => {
 		expect(hits).toBe(0);
 	});
 
-	test('リダイレクト先がプライベート IP なら StatusError(400) で拒否する', async () => {
+	test('リダイレクト先がプライベート IP なら StatusError(400) で拒否する', async ({ skip }) => {
 		let targetHits = 0;
 		const target = await serve((_req, res) => {
 			targetHits++;
@@ -208,12 +243,55 @@ describe('fetchResponse', () => {
 		const origin = await serve((_req, res) => {
 			res.writeHead(302, { location: `http://127.0.0.1:${new URL(target.url).port}/` });
 			res.end();
-		}, '127.0.0.2');
+		}, '127.0.0.2').catch((e: NodeJS.ErrnoException) => {
+			if (e.code === 'EADDRNOTAVAIL') {
+				skip('cannot bind 127.0.0.2 on this host (e.g. macOS has no 127.0.0.0/8 loopback aliases); covered on Linux CI');
+			}
+			throw e;
+		});
 		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.2/32'] }, {});
 		const e = await fetchResponse(transport, request(origin.url)).catch(e => e);
 		expect(e).toBeInstanceOf(StatusError);
 		expect(e.statusCode).toBe(400);
 		expect(targetHits).toBe(0);
+	});
+
+	test('http の agent だけ渡したとき、https へのリダイレクトは guard で拒否する', async () => {
+		const { agent, calls } = hookedAgent();
+		const server = await serve((_req, res) => {
+			res.writeHead(302, { location: `https://127.0.0.1:${new URL(server.url).port}/` });
+			res.end();
+		});
+		const e = await fetchResponse(createTransport({ agent: { http: agent } }, {}), request(server.url)).catch(e => e);
+		agent.destroy();
+		// The http hop went through the caller's agent (guard handed off); the https hop is rejected before connecting.
+		expect(calls()).toBeGreaterThan(0);
+		expect(e).toBeInstanceOf(StatusError);
+		expect(e.statusCode).toBe(400);
+		expect(e.message).toBe('Private IP rejected 127.0.0.1');
+	});
+
+	test('http.globalAgent に溜まった同じ宛先のソケットを、guard 付きの接続では使い回さない', async () => {
+		const sockets = new Set<net.Socket>();
+		const server = await serve((req, res) => {
+			sockets.add(req.socket);
+			res.end('ok');
+		});
+		// Leave a keep-alive socket in the process-wide pool, opened without the guarded lookup.
+		await new Promise<void>((resolve, reject) => {
+			http.get(server.url, { agent: http.globalAgent }, res => {
+				res.resume();
+				res.on('end', resolve);
+			}).on('error', reject);
+		});
+		await new Promise(resolve => setImmediate(resolve));
+		const name = http.globalAgent.getName({ host: '127.0.0.1', port: Number(new URL(server.url).port) });
+		expect(http.globalAgent.freeSockets[name]?.length).toBe(1);
+
+		const result = await fetchResponse(localTransport(), request(server.url));
+		expect(result.body.toString()).toBe('ok');
+		expect(sockets.size).toBe(2);
+		expect(http.globalAgent.freeSockets[name]?.length).toBe(1);
 	});
 
 	test('404 は statusCode 404 の StatusError', async () => {
@@ -281,6 +359,20 @@ describe('fetchResponse', () => {
 			.rejects.toThrow(/^maxSize exceeded \(\d+ > 65536\) on response$/);
 	});
 
+	test('content-length なしで空の gzip メンバーが続く応答は、受信量で打ち切る', async () => {
+		const chunk = Buffer.concat(Array.from({ length: 50 }, () => zlib.gzipSync(Buffer.alloc(0))));
+		const server = await serve((_req, res) => {
+			res.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' });
+			// Decompresses to nothing and never ends.
+			const timer = setInterval(() => res.write(chunk), 5);
+			res.on('close', () => clearInterval(timer));
+		});
+		const started = Date.now();
+		await expect(fetchResponse(localTransport(), request(server.url, { contentLengthLimit: 4096, operationTimeout: 3000 })))
+			.rejects.toThrow(/^maxSize exceeded \(\d+ > 4096\) on response$/);
+		expect(Date.now() - started).toBeLessThan(1000);
+	});
+
 	test('contentLengthRequired=true で content-length がなければエラー', async () => {
 		const server = await serve((_req, res) => {
 			res.writeHead(200, { 'content-type': 'text/html' });
@@ -315,6 +407,22 @@ describe('fetchResponse', () => {
 		expect(result.body.toString()).toBe('ok');
 	});
 
+	test('事前確認の後に名前解決の結果が変わっても、接続時の名前解決で拒否する (DNS rebinding)', async () => {
+		let hits = 0;
+		const server = await serve((_req, res) => {
+			hits++;
+			res.end('secret');
+		});
+		// The pre-check sees a public address; the connect-time lookup then resolves localhost to loopback.
+		vi.spyOn(dns.promises, 'lookup').mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
+		const url = new URL(server.url);
+		url.hostname = 'localhost';
+		const e = await fetchResponse(createTransport({}, {}), request(url.href)).catch(e => e);
+		expect(e).toBeInstanceOf(StatusError);
+		expect(e.statusCode).toBe(400);
+		expect(hits).toBe(0);
+	});
+
 	test('受信が止まったら responseTimeout でエラーになる', async () => {
 		const server = await serve((_req, res) => {
 			res.writeHead(200, { 'content-type': 'text/html' });
@@ -327,16 +435,10 @@ describe('fetchResponse', () => {
 
 	test('渡した agent が実際に使われる', async () => {
 		const server = await serve((_req, res) => res.end('ok'));
-		const agent = new http.Agent();
-		let calls = 0;
-		const original = agent.createConnection.bind(agent);
-		agent.createConnection = ((...args: Parameters<typeof original>) => {
-			calls++;
-			return original(...args);
-		}) as typeof agent.createConnection;
+		const { agent, calls } = hookedAgent();
 		const result = await fetchResponse(createTransport({ agent: { http: agent } }, {}), request(server.url));
 		expect(result.body.toString()).toBe('ok');
-		expect(calls).toBeGreaterThan(0);
+		expect(calls()).toBeGreaterThan(0);
 		agent.destroy();
 	});
 });
