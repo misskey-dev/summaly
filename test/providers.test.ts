@@ -6,8 +6,10 @@ import { amazon } from '@/providers/amazon.js';
 import { bluesky } from '@/providers/bluesky.js';
 import { branchioDeeplinks } from '@/providers/branchio-deeplinks.js';
 import { builtinProviders } from '@/providers/index.js';
+import { nvd } from '@/providers/nvd.js';
 import { fromPlugin } from '@/providers/provider.js';
 import { wikipedia } from '@/providers/wikipedia.js';
+import { StatusError } from '@/http/status-error.js';
 import type { GeneralScrapingOptions, SummaryPlugin } from '@/types.js';
 import { loopbackAgents } from './helpers/loopback-agent.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
@@ -90,12 +92,29 @@ describe('test()', () => {
 	test.each(cases)('%s: %s → %s', (_name, provider, host, expected) => {
 		expect(provider.test(new URL(`https://${host}/path`))).toBe(expected);
 	});
+
+	const nvdCases: [string, boolean][] = [
+		['https://nvd.nist.gov/vuln/detail/CVE-2026-16478', true],
+		['https://nvd.nist.gov/vuln/detail/cve-2026-16478', true],
+		['https://nvd.nist.gov/vuln/detail/CVE-2026-16478/', true],
+		['http://nvd.nist.gov/vuln/detail/CVE-2026-16478', true],
+		['https://nvd.nist.gov/vuln/detail/CVE-2026-16478?x=1#y', true],
+		['https://nvd.nist.gov/vuln/search', false],
+		['https://nvd.nist.gov/vuln/detail/CVE-2026-16478/change-record', false],
+		['https://nvd.nist.gov/vuln/detail/CVE-26-1', false],
+		['https://www.nvd.nist.gov/vuln/detail/CVE-2026-16478', false],
+		['https://nvd.nist.gov.example.com/vuln/detail/CVE-2026-16478', false],
+	];
+
+	test.each(nvdCases)('nvd: %s → %s', (url, expected) => {
+		expect(nvd.test(new URL(url))).toBe(expected);
+	});
 });
 
 describe('builtinProviders', () => {
-	test('並び順は本家と同じ (amazon, bluesky, wikipedia, branchio)', () => {
-		expect(builtinProviders).toEqual([amazon, bluesky, wikipedia, branchioDeeplinks]);
-		expect(builtinProviders.map(p => p.name)).toEqual(['amazon', 'bluesky', 'wikipedia', 'branchio-deeplinks']);
+	test('本家と同じ順の 4 つ (amazon, bluesky, wikipedia, branchio) の後に chiramiss 独自の nvd', () => {
+		expect(builtinProviders).toEqual([amazon, bluesky, wikipedia, branchioDeeplinks, nvd]);
+		expect(builtinProviders.map(p => p.name)).toEqual(['amazon', 'bluesky', 'wikipedia', 'branchio-deeplinks', 'nvd']);
 	});
 });
 
@@ -211,6 +230,125 @@ describe('branchio-deeplinks', () => {
 
 		expect(query.get('foo')).toBe('1');
 		expect(query.get('$web_only')).toBe('true');
+	});
+});
+
+describe('nvd', () => {
+	type Metric = { type?: string; cvssData?: { baseScore?: number; baseSeverity?: string }; baseSeverity?: string };
+
+	function cveBody(cve: { descriptions?: { lang: string; value: string }[]; metrics?: Record<string, Metric[]> }): string {
+		return JSON.stringify({ totalResults: 1, vulnerabilities: [{ cve: { id: 'CVE-2026-16478', ...cve } }] });
+	}
+
+	async function summarizeWith(body: string) {
+		const { ctx } = await loopback((_req, res) => send(res, body, 'application/json'));
+
+		return await nvd.summarize(ctx, new URL('https://nvd.nist.gov/vuln/detail/cve-2026-16478'));
+	}
+
+	test('ID を大文字にして API を ctx の transport で 1 回だけ取得し、深刻度とスコアを title に入れる', async () => {
+		const body = cveBody({
+			descriptions: [{ lang: 'en', value: 'Permissive list of allowed inputs vulnerability.\n\nThis issue affects pardus-nvidia-installer: before 2.0.1.' }],
+			metrics: {
+				cvssMetricV31: [{ type: 'Primary', cvssData: { baseScore: 7, baseSeverity: 'HIGH' } }],
+			},
+		});
+		const { ctx, received } = await loopback((_req, res) => send(res, body, 'application/json'));
+
+		const summary = await nvd.summarize(ctx, new URL('https://nvd.nist.gov/vuln/detail/cve-2026-16478'));
+
+		expect(summary).toEqual({
+			title: 'CVE-2026-16478 (HIGH 7.0)',
+			icon: 'https://nvd.nist.gov/favicon.ico',
+			description: 'Permissive list of allowed inputs vulnerability. This issue affects pardus-nvidia-installer: before 2.0.1.',
+			thumbnail: null,
+			thumbnailStyle: null,
+			player: { url: null, width: null, height: null, allow: [] },
+			sitename: 'NVD',
+			activityPub: null,
+			fediverseCreator: null,
+		});
+		expect(received).toHaveLength(1);
+		expect(received[0]).toMatchObject({ method: 'GET', host: 'services.nvd.nist.gov', url: '/rest/json/cves/2.0?cveId=CVE-2026-16478' });
+		expect(received[0].headers['user-agent']).toBe(ctx.options.userAgent);
+	});
+
+	test('V4.0 と V3.1 があれば V4.0、Primary と Secondary があれば Primary を使う', async () => {
+		const summary = await summarizeWith(cveBody({
+			metrics: {
+				cvssMetricV40: [
+					{ type: 'Secondary', cvssData: { baseScore: 5.3, baseSeverity: 'MEDIUM' } },
+					{ type: 'Primary', cvssData: { baseScore: 9.3, baseSeverity: 'CRITICAL' } },
+				],
+				cvssMetricV31: [{ type: 'Primary', cvssData: { baseScore: 7, baseSeverity: 'HIGH' } }],
+			},
+		}));
+
+		expect(summary?.title).toBe('CVE-2026-16478 (CRITICAL 9.3)');
+	});
+
+	test('cvssMetricV40 が空なら V3.1 に進み、Primary がなければ先頭を使う', async () => {
+		const summary = await summarizeWith(cveBody({
+			metrics: {
+				cvssMetricV40: [],
+				cvssMetricV31: [
+					{ type: 'Secondary', cvssData: { baseScore: 6.5, baseSeverity: 'MEDIUM' } },
+					{ type: 'Secondary', cvssData: { baseScore: 8.8, baseSeverity: 'HIGH' } },
+				],
+			},
+		}));
+
+		expect(summary?.title).toBe('CVE-2026-16478 (MEDIUM 6.5)');
+	});
+
+	test('V3.0 しかなければ V3.0 を使う', async () => {
+		const summary = await summarizeWith(cveBody({
+			metrics: { cvssMetricV30: [{ type: 'Primary', cvssData: { baseScore: 10, baseSeverity: 'CRITICAL' } }] },
+		}));
+
+		expect(summary?.title).toBe('CVE-2026-16478 (CRITICAL 10.0)');
+	});
+
+	test('V2 は深刻度を metric の直下から取り、深刻度がなければスコアだけを出す', async () => {
+		const withSeverity = await summarizeWith(cveBody({
+			metrics: { cvssMetricV2: [{ type: 'Primary', cvssData: { baseScore: 5 }, baseSeverity: 'MEDIUM' }] },
+		}));
+		const withoutSeverity = await summarizeWith(cveBody({
+			metrics: { cvssMetricV2: [{ type: 'Primary', cvssData: { baseScore: 5 } }] },
+		}));
+
+		expect(withSeverity?.title).toBe('CVE-2026-16478 (MEDIUM 5.0)');
+		expect(withoutSeverity?.title).toBe('CVE-2026-16478 (5.0)');
+	});
+
+	test('CVSS がないか baseScore がなければ title は ID だけ', async () => {
+		expect((await summarizeWith(cveBody({ metrics: {} })))?.title).toBe('CVE-2026-16478');
+		expect((await summarizeWith(cveBody({})))?.title).toBe('CVE-2026-16478');
+		expect((await summarizeWith(cveBody({ metrics: { cvssMetricV31: [{ type: 'Primary', cvssData: { baseSeverity: 'HIGH' } }] } })))?.title).toBe('CVE-2026-16478');
+	});
+
+	test('description は en を優先し、300 文字で切る。説明がなければ null', async () => {
+		const long = 'a'.repeat(310);
+		const summary = await summarizeWith(cveBody({ descriptions: [{ lang: 'es', value: 'español' }, { lang: 'en', value: long }] }));
+		const onlyEs = await summarizeWith(cveBody({ descriptions: [{ lang: 'es', value: 'español' }] }));
+		const none = await summarizeWith(cveBody({ descriptions: [] }));
+
+		expect(summary?.description).toBe('a'.repeat(300) + '...');
+		expect(onlyEs?.description).toBe('español');
+		expect(none?.description).toBeNull();
+	});
+
+	test('該当する CVE がなければ CVE not found', async () => {
+		await expect(summarizeWith(JSON.stringify({ totalResults: 0, vulnerabilities: [] }))).rejects.toThrow('CVE not found');
+	});
+
+	test('API が 403 (レート制限) なら StatusError で失敗し、汎用の抽出には戻らない', async () => {
+		const { ctx, received } = await loopback((_req, res) => {
+			res.writeHead(403).end();
+		});
+
+		await expect(nvd.summarize(ctx, new URL('https://nvd.nist.gov/vuln/detail/CVE-2026-16478'))).rejects.toBeInstanceOf(StatusError);
+		expect(received.map(r => r.host)).toEqual(['services.nvd.nist.gov']);
 	});
 });
 

@@ -309,6 +309,48 @@ describe('chiramiss additions', () => {
 		expect(requests).toEqual(['GET www.amazon.co.jp/dp/OLD', 'GET www.amazon.co.jp/dp/B000000000']);
 	});
 
+	test('NVD の CVE ページはリダイレクト後の URL で nvd プロバイダに渡り、API から要約する', async () => {
+		const body = Buffer.from(JSON.stringify({
+			vulnerabilities: [{
+				cve: {
+					descriptions: [{ lang: 'en', value: 'A vulnerability.' }],
+					metrics: { cvssMetricV31: [{ type: 'Primary', cvssData: { baseScore: 7, baseSeverity: 'HIGH' } }] },
+				},
+			}],
+		}));
+		const requests: string[] = [];
+		const server = await serve((req, res) => {
+			requests.push(`${req.method} ${req.headers.host}${req.url}`);
+			if (req.url === '/vuln/detail/CVE-2026-16478') {
+				// nvd.nist.gov redirects the uppercase ID to the lowercase one.
+				res.writeHead(301, { location: '/vuln/detail/cve-2026-16478' }).end();
+			} else if (req.url === '/vuln/detail/cve-2026-16478') {
+				res.writeHead(200, { 'content-type': 'text/html' }).end();
+			} else if (req.url === '/rest/json/cves/2.0?cveId=CVE-2026-16478') {
+				res.writeHead(200, { 'content-type': 'application/json', 'content-length': body.byteLength }).end(body);
+			} else {
+				res.writeHead(404).end();
+			}
+		});
+		const agents = loopbackAgents(Number(new URL(server).port));
+
+		cleanups.push(() => agents.destroy());
+
+		const summary = await summarize('https://nvd.nist.gov/vuln/detail/CVE-2026-16478', { agent: { http: agents.http, https: agents.https } });
+
+		expect(summary).toMatchObject({
+			title: 'CVE-2026-16478 (HIGH 7.0)',
+			description: 'A vulnerability.',
+			sitename: 'NVD',
+			url: 'https://nvd.nist.gov/vuln/detail/cve-2026-16478',
+		});
+		expect(requests).toEqual([
+			'HEAD nvd.nist.gov/vuln/detail/CVE-2026-16478',
+			'HEAD nvd.nist.gov/vuln/detail/cve-2026-16478',
+			'GET services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2026-16478',
+		]);
+	});
+
 	test('設定の違う agent を並行に渡しても互いに干渉しない', async () => {
 		const pageA = Buffer.from('<html><head><title>A</title></head></html>');
 		const pageB = Buffer.from('<html><head><title>B</title></head></html>');
