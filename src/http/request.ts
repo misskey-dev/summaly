@@ -41,6 +41,7 @@ export async function fetchResponse(transport: Transport, req: FetchRequest): Pr
 	const timer = req.operationTimeout > 0
 		? setTimeout(() => controller.abort(new Error(`Timeout awaiting 'request' for ${req.operationTimeout}ms`)), req.operationTimeout)
 		: undefined;
+
 	try {
 		return await fetchFollowingRedirects(transport, req, controller.signal);
 	} catch (e) {
@@ -55,9 +56,11 @@ export async function fetchResponse(transport: Transport, req: FetchRequest): Pr
 
 async function fetchFollowingRedirects(transport: Transport, req: FetchRequest, signal: AbortSignal): Promise<FetchResult> {
 	let url = parseHttpUrl(req.url);
+
 	for (let redirects = 0; ; redirects++) {
 		const { res, timeoutError } = await sendRequest(transport, req, url, signal);
 		const location = res.headers.location;
+
 		if (req.followRedirects && location && REDIRECT_CODES.has(res.statusCode ?? 0)) {
 			res.destroy();
 			if (redirects >= MAX_REDIRECTS) {
@@ -76,20 +79,24 @@ async function fetchFollowingRedirects(transport: Transport, req: FetchRequest, 
 
 function parseHttpUrl(input: string): URL {
 	const url = new URL(input);
+
 	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
 		throw new Error(`Unsupported protocol: ${url.protocol}`);
 	}
+
 	return url;
 }
 
 function buildHeaders(headers: FetchRequest['headers']): http.OutgoingHttpHeaders {
 	const result: http.OutgoingHttpHeaders = {};
+
 	for (const [name, value] of Object.entries(headers)) {
 		if (value !== undefined && name.toLowerCase() !== 'accept-encoding') {
 			result[name] = value;
 		}
 	}
 	result['accept-encoding'] = 'gzip, deflate, br';
+
 	return result;
 }
 
@@ -100,8 +107,10 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 	const callerAgent = isHttps ? transport.agents.https : transport.agents.http;
 	let agent: http.Agent | undefined = callerAgent;
 	let tunnelTarget: TunnelTarget | undefined;
+
 	if (!callerAgent) {
 		let validated: string[] | undefined;
+
 		if (transport.guard) {
 			// Gate every hop before connecting or asking the proxy. This is the only check of the target when
 			// it is an IP literal (net.connect skips `lookup`) or when the hop goes through the proxy.
@@ -123,12 +132,14 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		agent,
 		signal,
 	};
+
 	if (tunnelTarget) {
 		options[TUNNEL_TARGET] = tunnelTarget;
 	}
 	// The guarded agents set a timeout on their sockets for idle ones (see createGuardedAgents); a request on them must
 	// replace it with its own (0 turns it off), or it would be cut while waiting for the server.
 	const guardedHop = agent !== undefined && (agent === transport.guardedAgents?.http || agent === transport.guardedAgents?.https);
+
 	if (req.responseTimeout > 0 || guardedHop) {
 		options.timeout = req.responseTimeout;
 	}
@@ -142,6 +153,7 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 			signal.removeEventListener('abort', onAbort);
 			resolve(r);
 		});
+
 		if (guardedHop) {
 			// Node sets the request's timeout on a reused socket only when it differs from the agent's timeout, but
 			// the idle socket may hold a shorter one: Node cuts it to the server's `Keep-Alive: timeout` hint. Set it
@@ -154,6 +166,7 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 			reject(signal.reason);
 			request.destroy(signal.reason as Error);
 		};
+
 		signal.addEventListener('abort', onAbort, { once: true });
 		request.on('timeout', () => {
 			timeoutError = new Error(`Timeout awaiting 'socket' for ${req.responseTimeout}ms`);
@@ -164,6 +177,7 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		request.on('error', err => {
 			signal.removeEventListener('abort', onAbort);
 			const first = !failed;
+
 			failed = true;
 			// A reused keep-alive socket can fail before any response: the server closed it while it sat idle
 			// (ECONNRESET), or bytes left over from the previous response reached it after this request went out
@@ -173,6 +187,7 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 			if (first && response === undefined && request.reusedSocket && isStaleSocketError(err)
 				&& !signal.aborted && timeoutError === undefined) {
 				send().then(resolve, reject);
+
 				return;
 			}
 			reject(err);
@@ -180,12 +195,14 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		request.end();
 	});
 	const res = await send();
+
 	return { res, timeoutError: () => timeoutError };
 }
 
 /** An error of a reused socket that says nothing about the server's answer to this request (see sendRequest). */
 function isStaleSocketError(err: Error): boolean {
 	const code = (err as NodeJS.ErrnoException).code;
+
 	return code === 'ECONNRESET' || (code?.startsWith('HPE_') ?? false);
 }
 
@@ -195,24 +212,29 @@ async function receiveResponse(req: FetchRequest, url: URL, res: http.IncomingMe
 	const statusMessage = res.statusMessage !== undefined && res.statusMessage !== ''
 		? res.statusMessage
 		: http.STATUS_CODES[statusCode] ?? '';
+
 	try {
 		// Status check (same rule as got: with followRedirects, unfollowed 3xx other than 304 are errors)
 		const okLimit = req.followRedirects ? 299 : 399;
+
 		if (!((statusCode >= 200 && statusCode <= okLimit) || statusCode === 304)) {
 			throw new StatusError(`${statusCode} ${statusMessage}`, statusCode, statusMessage);
 		}
 
 		// Check html
 		const contentType = res.headers['content-type'];
+
 		if (req.typeFilter && !contentType?.match(req.typeFilter)) {
 			throw new Error(`Rejected by type filter ${contentType}`);
 		}
 
 		// Size check by the response header
 		const contentLength = res.headers['content-length'];
+
 		if (contentLength) {
 			const maxSize = req.contentLengthLimit;
 			const size = Number(contentLength);
+
 			if (size > maxSize) {
 				throw new Error(`maxSize exceeded (${size} > ${maxSize}) on response`);
 			}
@@ -232,6 +254,7 @@ async function receiveResponse(req: FetchRequest, url: URL, res: http.IncomingMe
 	const body = await readBody(res, decompressor, req.contentLengthLimit);
 
 	let headers = res.headers;
+
 	if (decompressor) {
 		// Like got: headers describe the decompressed body.
 		headers = { ...res.headers };
@@ -240,8 +263,10 @@ async function receiveResponse(req: FetchRequest, url: URL, res: http.IncomingMe
 	}
 
 	const finalUrl = new URL(url);
+
 	finalUrl.username = '';
 	finalUrl.password = '';
+
 	return { url: finalUrl.href, statusCode, headers, body };
 }
 
@@ -282,6 +307,7 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 			size += chunk.length;
 			if (size > maxSize) {
 				fail(maxSizeExceeded(size, maxSize));
+
 				return;
 			}
 			chunks.push(chunk);
@@ -307,10 +333,12 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 		if (!decompressor) {
 			res.on('data', collect);
 			res.on('end', done);
+
 			return;
 		}
 
 		let wireSize = 0;
+
 		decompressor.on('error', fail);
 		decompressor.on('data', collect);
 		decompressor.on('end', done);
@@ -321,6 +349,7 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 			wireSize += chunk.length;
 			if (wireSize > maxSize) {
 				fail(maxSizeExceeded(wireSize, maxSize));
+
 				return;
 			}
 			if (!decompressor.write(chunk)) {
@@ -338,7 +367,9 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 
 function prematureClose(): Error {
 	const err: NodeJS.ErrnoException = new Error('Premature close');
+
 	err.code = 'ERR_STREAM_PREMATURE_CLOSE';
+
 	return err;
 }
 
@@ -375,12 +406,14 @@ class Decompressor extends Transform {
 		if (this.#encoding === 'deflate' && (first.readUInt8(0) & 0x08) === 0) {
 			return zlib.createInflateRaw();
 		}
+
 		return zlib.createUnzip();
 	}
 
 	override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
 		if (!this.#inner) {
 			const inner = this.#createInner(chunk);
+
 			inner.on('data', (data: Buffer) => this.push(data));
 			inner.on('error', err => this.destroy(err));
 			this.#inner = inner;
@@ -391,6 +424,7 @@ class Decompressor extends Transform {
 	override _flush(callback: TransformCallback) {
 		if (!this.#inner) {
 			callback();
+
 			return;
 		}
 		this.#inner.once('end', () => callback());
@@ -412,8 +446,10 @@ function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 	if (signal.aborted) {
 		return Promise.reject(signal.reason);
 	}
+
 	return new Promise<T>((resolve, reject) => {
 		const onAbort = () => reject(signal.reason);
+
 		signal.addEventListener('abort', onAbort, { once: true });
 		promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
 	});

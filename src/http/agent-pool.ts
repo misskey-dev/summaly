@@ -61,6 +61,7 @@ export function createGuardedAgents(guard: AddressGuard, options: GuardedAgentOp
 		timeout: options.idleTimeout ?? IDLE_SOCKET_TIMEOUT,
 		maxFreeSockets: options.maxFreeSockets ?? MAX_FREE_SOCKETS_PER_HOST,
 	};
+
 	return {
 		http: new http.Agent(agentOptions),
 		https: new https.Agent(agentOptions),
@@ -103,6 +104,7 @@ export class GuardedAgentPool {
 		const guard = createAddressGuard(allowedNetworks);
 		const key = guardKey(guard);
 		let entry = this.#entries.get(key);
+
 		if (entry) {
 			// Re-inserted below, so the Map's order is least recently used first.
 			this.#entries.delete(key);
@@ -112,10 +114,12 @@ export class GuardedAgentPool {
 		this.#entries.set(key, entry);
 		if (this.#entries.size > this.#maxEntries) {
 			const oldest = this.#entries.keys().next();
+
 			if (!oldest.done) {
 				this.#entries.delete(oldest.value);
 			}
 		}
+
 		return entry;
 	}
 }

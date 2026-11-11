@@ -10,6 +10,7 @@ import { ServerConfigError, loadServerConfig, type ServerConfig } from './config
 
 async function main(): Promise<void> {
 	let config: ServerConfig;
+
 	try {
 		config = loadServerConfig(process.env);
 	} catch (err) {
@@ -24,6 +25,7 @@ async function main(): Promise<void> {
 	const fastify = buildApp(config, {}, { logger: true });
 
 	let closing = false;
+
 	// A response sent during shutdown closes its connection: otherwise a keep-alive client's socket, idle once the
 	// in-flight request is answered, would hold fastify.close() open until the keep-alive timeout.
 	fastify.addHook('onSend', async (_request, reply) => {
@@ -45,6 +47,7 @@ async function main(): Promise<void> {
 		}
 		process.exit(0);
 	};
+
 	process.once('SIGINT', (signal) => void shutdown(signal));
 	process.once('SIGTERM', (signal) => void shutdown(signal));
 

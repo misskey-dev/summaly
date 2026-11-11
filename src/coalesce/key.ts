@@ -14,10 +14,12 @@ const PROCESS_NONCE = randomUUID();
 /** A number unique to `obj` for as long as it lives, so objects that cannot be serialized (agents, plugins) can be part of a key. */
 export function objectId(obj: object): number {
 	let id = ids.get(obj);
+
 	if (id === undefined) {
 		id = nextId++;
 		ids.set(obj, id);
 	}
+
 	return id;
 }
 
@@ -49,6 +51,7 @@ function canonical(value: unknown): string {
 		case 'object': {
 			const record = value as Record<string, unknown>;
 			const fields = Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonical(record[key])}`);
+
 			return `{${fields.join(',')}}`;
 		}
 		case 'bigint': return `b${value.toString()}`;

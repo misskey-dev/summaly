@@ -14,6 +14,7 @@ export const wikipedia: Provider = {
 		if (!url.hostname) {
 			return false;
 		}
+
 		return url.hostname.endsWith('.wikipedia.org');
 	},
 
@@ -26,6 +27,7 @@ export const wikipedia: Provider = {
 		const body = JSON.parse(res.body.toString('utf-8')) as QueryResponse;
 
 		const pages = body.query?.pages;
+
 		if (!pages) {
 			throw new Error('fetch failed');
 		}

@@ -10,6 +10,7 @@ export const bluesky: Provider = {
 	async summarize(ctx, url) {
 		// Fetched with GET only: bsky.app answers HEAD with 404.
 		const page = await fetchPage(ctx, url);
+
 		return await summarizePage(ctx, url, page);
 	},
 };

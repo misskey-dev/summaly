@@ -36,11 +36,13 @@ type OEmbed = {
  */
 export async function fetchOEmbedPlayer(ctx: ScrapeContext, head: HeadInfo, pageUrl: URL): Promise<Player | null> {
 	const href = linkHref(head, { type: 'application/json+oembed' });
+
 	if (!href) {
 		return null;
 	}
 
 	let oEmbedUrl: URL;
+
 	try {
 		oEmbedUrl = new URL(href, pageUrl);
 	} catch {
@@ -51,12 +53,14 @@ export async function fetchOEmbedPlayer(ctx: ScrapeContext, head: HeadInfo, page
 		res => parseJson(res.body.toString('utf-8')),
 		() => null,
 	);
+
 	return body ? toPlayer(body) : null;
 }
 
 function parseJson(text: string): OEmbed | null {
 	try {
 		const value: unknown = JSON.parse(text);
+
 		return typeof value === 'object' && value !== null ? value as OEmbed : null;
 	} catch {
 		return null;
@@ -76,12 +80,14 @@ function toPlayer(body: OEmbed): Player | null {
 
 	const document = parseDocument(body.html);
 	const iframes = DomUtils.getElementsByTagName('iframe', document);
+
 	if (iframes.length !== 1) {
 		// Somehow we either have multiple iframes or none
 		return null;
 	}
 
 	const iframe = iframes[0];
+
 	if (iframe.parent !== document) {
 		// Should be at the top level (upstream: only the body and html elements as the parents)
 		return null;
@@ -89,6 +95,7 @@ function toPlayer(body: OEmbed): Player | null {
 
 	const attrs = iframe.attribs;
 	const url = attrs['src'];
+
 	if (!url) {
 		// No src?
 		return null;
@@ -112,10 +119,12 @@ function toPlayer(body: OEmbed): Player | null {
 	// Spotify gives `width: 100%, height: 152px` for iframe while `width: 456,
 	// height: 152` for oEmbed data, and we treat any percentages as null here.
 	let width: number | null = Number(attrs['width'] ?? body.width);
+
 	if (Number.isNaN(width)) {
 		width = null;
 	}
 	const height = Math.min(Number(attrs['height'] ?? body.height), MAX_HEIGHT);
+
 	if (Number.isNaN(height)) {
 		// No proper height info
 		return null;
@@ -124,6 +133,7 @@ function toPlayer(body: OEmbed): Player | null {
 	const allowedPermissions = (attrs['allow'] ?? '').split(/\s*;\s*/g)
 		.filter(s => s)
 		.filter(s => !IGNORED_PERMISSIONS.includes(s));
+
 	if (attrs['allowfullscreen'] === '') {
 		allowedPermissions.push('fullscreen');
 	}

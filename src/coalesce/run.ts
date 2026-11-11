@@ -25,12 +25,14 @@ function serializeError(error: unknown): SerializedError {
 	}
 	const serialized: SerializedError = { name: error.name, message: clip(error.message) };
 	const { statusCode, statusMessage } = error as Partial<StatusError>;
+
 	if (typeof statusCode === 'number') {
 		serialized.statusCode = statusCode;
 	}
 	if (typeof statusMessage === 'string') {
 		serialized.statusMessage = statusMessage;
 	}
+
 	return serialized;
 }
 
@@ -38,7 +40,9 @@ function restoreError(serialized: SerializedError): Error {
 	const error = serialized.statusCode === undefined
 		? new Error(serialized.message)
 		: new StatusError(serialized.message, serialized.statusCode, serialized.statusMessage);
+
 	error.name = serialized.name;
+
 	return error;
 }
 
@@ -60,6 +64,7 @@ function isSummaryEntry(entry: unknown): entry is SummaryEntry {
 	if (entry.kind === 'error') {
 		return isObject(entry.error);
 	}
+
 	return false;
 }
 
@@ -72,6 +77,7 @@ function settle(entry: SummaryEntry): SummaryResult {
 	if (entry.kind === 'error') {
 		throw restoreError(entry.error);
 	}
+
 	return structuredClone(entry.value);
 }
 
@@ -108,6 +114,7 @@ type Use<E extends CacheEntry, T> = {
  */
 async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => string, use: Use<E, T>): Promise<T> {
 	const { cache, coordinator } = deps;
+
 	if (cache === null && coordinator === null) {
 		return use.settle(await use.run());
 	}
@@ -115,10 +122,12 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 
 	const lookup = async (): Promise<E | undefined> => {
 		const entry = await cache?.get(requestKey);
+
 		return use.accepts(entry) ? entry : undefined;
 	};
 
 	const cached = await lookup();
+
 	if (cached !== undefined) {
 		return use.settle(cached);
 	}
@@ -128,6 +137,7 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 		// and getting the slot. Without one there is no slot to wait for, so the lookup above is enough.
 		if (coordinator !== null) {
 			const latest = await lookup();
+
 			if (latest !== undefined) {
 				return latest;
 			}
@@ -135,6 +145,7 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 
 		const entry = await use.run();
 		const ttl = use.succeeded(entry) ? deps.cacheTtl : deps.errorCacheTtl;
+
 		if (cache !== null && ttl > 0) {
 			// Storing is best effort: a failed set must not throw away work already done, nor make the callers
 			// sharing it (or the favicon check's fallback) do it again.
@@ -144,6 +155,7 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 				// Not stored; the callers still get the entry.
 			}
 		}
+
 		return entry;
 	};
 

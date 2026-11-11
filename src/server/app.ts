@@ -40,6 +40,7 @@ export function buildApp(config: ServerConfig, deps: AppDeps = {}, options: AppO
 	app.get('/', async (req, reply) => {
 		const query = req.query as Record<string, unknown>;
 		const url = query.url;
+
 		if (typeof url !== 'string') {
 			return reply.status(400).send({
 				error: 'url is required',

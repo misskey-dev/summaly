@@ -9,6 +9,7 @@ import { type ScrapeContext, fetchSubresource } from '@/context.js';
  */
 export async function resolveIcon(ctx: ScrapeContext, href: string, pageUrl: URL): Promise<string | null> {
 	let target: string;
+
 	try {
 		target = new URL(href, pageUrl).href;
 	} catch {
@@ -18,6 +19,7 @@ export async function resolveIcon(ctx: ScrapeContext, href: string, pageUrl: URL
 	// At most one HEAD per call: the fallback below reuses this call's check if it already ran.
 	let checked: Promise<string | null> | undefined;
 	const check = (): Promise<string | null> => (checked ??= checkIcon(ctx, target));
+
 	try {
 		return await runCoalescedIcon(ctx.coalesce, () => ctx.iconKey(target), check);
 	} catch {
@@ -31,6 +33,7 @@ export async function resolveIcon(ctx: ScrapeContext, href: string, pageUrl: URL
 async function checkIcon(ctx: ScrapeContext, url: string): Promise<string | null> {
 	try {
 		await fetchSubresource(ctx, url, 'HEAD');
+
 		return url;
 	} catch {
 		return null;

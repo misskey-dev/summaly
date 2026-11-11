@@ -23,6 +23,7 @@ function nonNegative(name: string, value: number): number {
 	if (!(value >= 0)) {
 		throw new RangeError(`${name} must be a non-negative number: ${value}`);
 	}
+
 	return value;
 }
 
@@ -68,13 +69,16 @@ export class MemorySummaryCache implements SummaryCache {
 
 	async get(key: string): Promise<CacheEntry | undefined> {
 		const stored = this.#entries.get(key);
+
 		if (stored === undefined) {
 			return undefined;
 		}
 		if (performance.now() >= stored.expiresAt) {
 			this.#delete(key);
+
 			return undefined;
 		}
+
 		return stored.entry;
 	}
 
@@ -83,6 +87,7 @@ export class MemorySummaryCache implements SummaryCache {
 		// does not leave the previous one behind).
 		this.#delete(key);
 		const bytes = estimateBytes(key, entry);
+
 		if (bytes === null || bytes > this.#maxEntryBytes || bytes > this.#maxBytes) {
 			return;
 		}
@@ -99,6 +104,7 @@ export class MemorySummaryCache implements SummaryCache {
 
 	#delete(key: string): void {
 		const stored = this.#entries.get(key);
+
 		if (stored === undefined) {
 			return;
 		}

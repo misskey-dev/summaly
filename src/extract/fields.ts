@@ -20,10 +20,12 @@ type MetaKey = Parameters<HeadInfo['meta']>[0];
 export function metaContent(head: HeadInfo, ...keys: MetaKey[]): string | undefined {
 	for (const key of keys) {
 		const value = head.meta(key);
+
 		if (value) {
 			return decode(value, { scope: 'attribute' });
 		}
 	}
+
 	return undefined;
 }
 
@@ -35,6 +37,7 @@ export function linkHref(head: HeadInfo, match: { rel?: string; type?: string })
 	const link = head.links.find(l =>
 		(match.rel === undefined || l.rel?.toLowerCase() === match.rel) &&
 		(match.type === undefined || l.type?.toLowerCase() === match.type));
+
 	return link?.href ? decode(link.href, { scope: 'attribute' }) : undefined;
 }
 
@@ -55,6 +58,7 @@ export function pickTitle(head: HeadInfo): string {
 	const title =
 		metaContent(head, 'property:og:title', 'name:twitter:title', 'property:twitter:title') ??
 		decode(head.title ?? '');
+
 	return clip(decode(title), 100);
 }
 
@@ -64,6 +68,7 @@ export function pickDescription(head: HeadInfo): string | null {
 		'name:twitter:description',
 		'property:twitter:description',
 		'name:description');
+
 	return description ? clip(decode(description), 300) : null;
 }
 
@@ -74,11 +79,13 @@ export function pickImage(head: HeadInfo, base: URL): string | null {
 		linkHref(head, { rel: 'image_src' }) ??
 		linkHref(head, { rel: 'apple-touch-icon' }) ??
 		linkHref(head, { rel: 'apple-touch-icon image_src' });
+
 	return image ? resolveUrl(image, base) : null;
 }
 
 export function pickThumbnailStyle(head: HeadInfo): Summary['thumbnailStyle'] {
 	const card = twitterCard(head);
+
 	return card === 'summary_large_image' ? 'summary_large_image' :
 		card === 'summary' ? 'summary' :
 		null;

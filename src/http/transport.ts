@@ -84,6 +84,7 @@ export function createTransport(
 	const proxy = proxyWithoutCallerSchemes(opts.proxy, agents);
 	// A guarded transport never lets the proxy resolve a target name: its agents CONNECT only to validated addresses.
 	const proxyAgents = proxy ? createProxyAgents(proxy, { requireAddress: guard != null }) : {};
+
 	return {
 		agents: hasAgent ? agents : {},
 		guard,
@@ -110,6 +111,7 @@ function proxyWithoutCallerSchemes(
 		return null;
 	}
 	const result: ProxyOptions = {};
+
 	if (proxy.http && agents.http == null) {
 		result.http = proxy.http;
 	}
@@ -122,6 +124,7 @@ function proxyWithoutCallerSchemes(
 	if (proxy.noProxy) {
 		result.noProxy = proxy.noProxy;
 	}
+
 	return result;
 }
 
@@ -132,25 +135,31 @@ function proxyWithoutCallerSchemes(
  */
 export function selectOwnedAgent(transport: Transport, url: URL): http.Agent | undefined {
 	const isHttps = url.protocol === 'https:';
+
 	if (transport.proxy && selectProxyUrl(url, transport.proxy) !== null) {
 		const agent = isHttps ? transport.proxyAgents.https : transport.proxyAgents.http;
+
 		if (!agent) {
 			throw new Error('Proxied transport has no proxy agent');
 		}
+
 		return agent;
 	}
 	if (!transport.guard) {
 		return undefined;
 	}
 	const agent = isHttps ? transport.guardedAgents?.https : transport.guardedAgents?.http;
+
 	if (!agent) {
 		throw new Error('Guarded transport has no guarded agent');
 	}
+
 	return agent;
 }
 
 /** A guard and agents built for one transport, destroyed by its close. */
 function ownGuardedAgents(allowedNetworks: string[] | undefined): GuardedAgentSet {
 	const guard = createAddressGuard(allowedNetworks);
+
 	return { guard, agents: createGuardedAgents(guard) };
 }

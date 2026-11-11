@@ -11,6 +11,7 @@ export function clip(s: string, max: number): string {
 	}
 
 	const trimmed = s.trim();
+
 	return trimmed.length > max ? trimmed.slice(0, max) + '...' : trimmed;
 }
 
@@ -27,10 +28,12 @@ function escapeRegExpFallback(s: string): string {
 /** Removes a trailing site name such as `Title | Site` or `Title - Site` from the title. */
 export function cleanupTitle(title: string, siteName?: string | null): string {
 	const trimmed = title.trim();
+
 	if (!siteName) {
 		return trimmed;
 	}
 
 	const pattern = new RegExp(`^(.+?)\\s?[\\-\\|:・]\\s?${escapeRegExp(siteName.trim())}$`);
+
 	return pattern.exec(trimmed)?.[1] ?? trimmed;
 }

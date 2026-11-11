@@ -26,6 +26,7 @@ export default function summaryPlugin(fastify: FastifyLike, options: SummarizeOp
 	fastify.get('/', async (req, reply) => {
 		const query = req.query as { url?: string; lang?: string };
 		const url = query.url;
+
 		if (url == null) {
 			return reply.status(400).send({
 				error: 'url is required',

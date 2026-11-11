@@ -63,6 +63,7 @@ export class TunnelingHttpAgent extends http.Agent {
 				callback?.(null, socket);
 			}
 		});
+
 		return undefined;
 	}
 }
@@ -85,15 +86,18 @@ export class TunnelingHttpsAgent extends https.Agent {
 		openTunnel(this, options, (err, socket) => {
 			if (err || !socket) {
 				callbackError(callback, err ?? new Error('Proxy tunnel failed'));
+
 				return;
 			}
 			let tlsSocket: Duplex | null | undefined;
+
 			try {
 				// https.Agent#createConnection runs tls.connect with the request's servername, ca, etc.
 				tlsSocket = super.createConnection({ ...options, socket } as https.RequestOptions);
 			} catch (e) {
 				socket.destroy();
 				callbackError(callback, e as Error);
+
 				return;
 			}
 			if (tlsSocket) {
@@ -103,6 +107,7 @@ export class TunnelingHttpsAgent extends https.Agent {
 				callbackError(callback, new Error('TLS connection over the proxy tunnel failed'));
 			}
 		});
+
 		return undefined;
 	}
 }
@@ -123,8 +128,10 @@ function openTunnel(
 	const target = options[TUNNEL_TARGET];
 	const signal = target?.signal;
 	const addresses = target?.addresses ?? [];
+
 	if (addresses.length === 0 && agent.requireAddress) {
 		callback(new Error('Proxy tunnel refused: no validated address for the target (guarded transport)'));
+
 		return;
 	}
 	// Only an unguarded transport gets here without addresses: the proxy resolves the name.
@@ -134,6 +141,7 @@ function openTunnel(
 		connectOnce(agent.proxy, hosts[index], options, signal, (err, socket) => {
 			if (!err) {
 				callback(null, socket);
+
 				return;
 			}
 			index++;
@@ -144,6 +152,7 @@ function openTunnel(
 			}
 		});
 	};
+
 	attempt();
 }
 
@@ -155,12 +164,15 @@ function openTunnel(
 function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, signal: AbortSignal | undefined, callback: TunnelCallback): void {
 	if (signal?.aborted) {
 		callback(abortReason(signal));
+
 		return;
 	}
 	const authority = `${host.includes(':') ? `[${host}]` : host}:${options.port}`;
 	const headers: http.OutgoingHttpHeaders = { host: authority, connection: 'close' };
+
 	if (proxy.username || proxy.password) {
 		const credentials = `${safeDecode(proxy.username)}:${safeDecode(proxy.password)}`;
+
 		headers['proxy-authorization'] = `Basic ${Buffer.from(credentials).toString('base64')}`;
 	}
 	const proxyHost = proxy.hostname.replace(/^\[|\]$/g, '');
@@ -174,6 +186,7 @@ function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, si
 		headers,
 		agent: false,
 	};
+
 	if (isHttpsProxy && !net.isIP(proxyHost)) {
 		requestOptions.servername = proxyHost;
 	}
@@ -185,6 +198,7 @@ function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, si
 		? setTimeout(() => fail(new Error(`Timeout awaiting 'connect' for ${timeout}ms`)), timeout)
 		: undefined;
 	const onAbort = () => fail(abortReason(signal));
+
 	signal?.addEventListener('abort', onAbort, { once: true });
 
 	function settle(): boolean {
@@ -194,6 +208,7 @@ function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, si
 		settled = true;
 		clearTimeout(timer);
 		signal?.removeEventListener('abort', onAbort);
+
 		return true;
 	}
 
@@ -207,9 +222,11 @@ function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, si
 
 	request.once('connect', (res: http.IncomingMessage, socket: net.Socket, head: Buffer) => {
 		const status = res.statusCode ?? 0;
+
 		if (settled || status < 200 || status > 299) {
 			socket.destroy();
 			fail(new Error(`Bad response: ${status}`));
+
 			return;
 		}
 		settle();
@@ -234,6 +251,7 @@ function safeDecode(value: string): string {
 
 function abortReason(signal: AbortSignal | undefined): Error {
 	const reason: unknown = signal?.reason;
+
 	return reason instanceof Error ? reason : new Error('The operation was aborted');
 }
 
@@ -245,11 +263,13 @@ function abortReason(signal: AbortSignal | undefined): Error {
  */
 export function createProxyAgents(proxy: ProxyOptions, options: TunnelingAgentOptions = {}): { http?: http.Agent; https?: https.Agent } {
 	const agents: { http?: http.Agent; https?: https.Agent } = {};
+
 	if (proxy.http) {
 		agents.http = new TunnelingHttpAgent(parseProxyUrl(proxy.http, 'http'), options);
 	}
 	if (proxy.https) {
 		agents.https = new TunnelingHttpsAgent(parseProxyUrl(proxy.https, 'https'), options);
 	}
+
 	return agents;
 }

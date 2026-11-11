@@ -55,6 +55,7 @@ export function createScrapeContext(
 	agentPool?: GuardedAgentPool,
 ): ScrapeContext {
 	const fixed = fixOptions(opts);
+
 	return {
 		options: resolveOptions(fixed),
 		scrapingOptions: toScrapingOptions(fixed),
@@ -78,6 +79,7 @@ type ContextRequest = Pick<FetchRequest, 'url' | 'method' | 'headers'> & Partial
  */
 export function fetchWithContext(ctx: ScrapeContext, req: ContextRequest): Promise<FetchResult> {
 	const { options } = ctx;
+
 	return fetchResponse(ctx.transport, {
 		followRedirects: options.followRedirects,
 		responseTimeout: options.responseTimeout,

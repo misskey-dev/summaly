@@ -33,6 +33,7 @@ export function resolveRequestOptions(query: Record<string, unknown>, envOptions
 		operationTimeout: tightenTimeout(operationTimeout, envOptions.operationTimeout ?? LIB_DEFAULT_OPERATION_TIMEOUT),
 		contentLengthLimit: tighten(contentLengthLimit, envOptions.contentLengthLimit ?? LIB_DEFAULT_CONTENT_LENGTH_LIMIT),
 	};
+
 	if (contentLengthRequired === true) {
 		options.contentLengthRequired = true;
 	}
@@ -59,36 +60,43 @@ export function parseQueryOptions(query: Record<string, unknown>): Partial<Summa
 	const options: Partial<SummarizeOptions> = {};
 
 	const lang = readString(query, 'lang');
+
 	if (lang != null) {
 		options.lang = lang;
 	}
 
 	const followRedirects = readBoolean(query, 'followRedirects');
+
 	if (followRedirects != null) {
 		options.followRedirects = followRedirects;
 	}
 
 	const userAgent = readString(query, 'userAgent');
+
 	if (userAgent != null && userAgent !== '') {
 		options.userAgent = userAgent;
 	}
 
 	const responseTimeout = readInteger(query, 'responseTimeout', MAX_TIMEOUT);
+
 	if (responseTimeout != null) {
 		options.responseTimeout = responseTimeout;
 	}
 
 	const operationTimeout = readInteger(query, 'operationTimeout', MAX_TIMEOUT);
+
 	if (operationTimeout != null) {
 		options.operationTimeout = operationTimeout;
 	}
 
 	const contentLengthLimit = readInteger(query, 'contentLengthLimit');
+
 	if (contentLengthLimit != null) {
 		options.contentLengthLimit = contentLengthLimit;
 	}
 
 	const contentLengthRequired = readBoolean(query, 'contentLengthRequired');
+
 	if (contentLengthRequired != null) {
 		options.contentLengthRequired = contentLengthRequired;
 	}
@@ -98,6 +106,7 @@ export function parseQueryOptions(query: Record<string, unknown>): Partial<Summa
 
 function readString(query: Record<string, unknown>, name: string): string | undefined {
 	const value = query[name];
+
 	return typeof value === 'string' ? value : undefined;
 }
 
@@ -115,5 +124,6 @@ function readBoolean(query: Record<string, unknown>, name: string): boolean | un
 
 function readInteger(query: Record<string, unknown>, name: string, max?: number): number | undefined {
 	const value = readString(query, name);
+
 	return value != null ? toNonNegativeInteger(value, max) : undefined;
 }

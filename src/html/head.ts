@@ -39,6 +39,7 @@ export function parseHead(html: string): HeadInfo {
 					inTitle = true;
 					titleText = '';
 				}
+
 				return;
 			}
 			if (state.headDone) {
@@ -49,21 +50,25 @@ export function parseHead(html: string): HeadInfo {
 				stopIfDone();
 			} else if (name === 'meta') {
 				const content = attrs['content'];
+
 				if (content === undefined) {
 					return;
 				}
 				for (const attr of ['name', 'property'] as const) {
 					const value = attrs[attr];
+
 					if (value === undefined) {
 						continue;
 					}
 					const key = `${attr}:${value}`;
+
 					if (!metas.has(key)) {
 						metas.set(key, content);
 					}
 				}
 			} else if (name === 'link') {
 				const href = attrs['href'];
+
 				if (href === undefined) {
 					return;
 				}

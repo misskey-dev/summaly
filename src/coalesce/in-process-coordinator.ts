@@ -8,6 +8,7 @@ export class InProcessCoordinator implements InflightCoordinator {
 
 	run<T>(key: string, task: () => Promise<T>): Promise<T> {
 		const running = this.#inflight.get(key);
+
 		if (running !== undefined) {
 			return running as Promise<T>;
 		}
@@ -17,7 +18,9 @@ export class InProcessCoordinator implements InflightCoordinator {
 				this.#inflight.delete(key);
 			}
 		});
+
 		this.#inflight.set(key, promise);
+
 		return promise;
 	}
 }

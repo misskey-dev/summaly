@@ -85,6 +85,7 @@ export function createSummarizer(base: SummarizeOptions = {}): (url: string, opt
 			cacheTtl: options.cacheTtl ?? base.cacheTtl ?? DEFAULT_CACHE_TTL,
 			errorCacheTtl: options.errorCacheTtl ?? base.errorCacheTtl ?? DEFAULT_ERROR_CACHE_TTL,
 		};
+
 		return runCoalesced(
 			deps,
 			() => buildRequestKey(url, opts, allowPrivateIp),
@@ -122,6 +123,7 @@ async function summarizeUncached(
 	agentPool: GuardedAgentPool,
 ): Promise<SummaryResult> {
 	const ctx = createScrapeContext(opts, deps, allowPrivateIp, agentPool);
+
 	// The requests of this call share the transport's connections. Guarded connections that completed their responses
 	// stay idle in the summarizer's pool for later calls; proxy connections end with the call (see Transport#close).
 	try {
@@ -132,6 +134,7 @@ async function summarizeUncached(
 		const match = providers.find(provider => provider.test(target));
 
 		const summary = match ? await match.summarize(ctx, target) : await scrapeGeneral(ctx, target);
+
 		if (summary == null) {
 			throw new Error('failed summarize');
 		}
@@ -162,6 +165,7 @@ async function resolveFinalUrl(ctx: ScrapeContext, url: string): Promise<string>
 			contentLengthLimit: Number.POSITIVE_INFINITY,
 			contentLengthRequired: false,
 		});
+
 		return res.url;
 	} catch {
 		return url;

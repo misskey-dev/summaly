@@ -23,6 +23,7 @@ export function createAddressGuard(allowedNetworks: string[] = []): AddressGuard
  */
 export function guardKey(guard: AddressGuard): string {
 	const networks = new Set(guard.allowedNetworks.map(([addr, bits]) => `${addr.toString()}/${bits}`));
+
 	return [...networks].sort().join(',');
 }
 
@@ -39,6 +40,7 @@ export function guardKey(guard: AddressGuard): string {
  */
 function parseAllowedNetwork(cidr: string): Network {
 	let network: Network;
+
 	try {
 		// Same result as ipaddr.parseCIDR, which tries IPv6 first and builds and catches an Error for every IPv4 CIDR
 		// (this runs on every summary). An IPv6 CIDR always contains ':' and an IPv4 one never does.
@@ -47,19 +49,23 @@ function parseAllowedNetwork(cidr: string): Network {
 		throw new TypeError(`Invalid CIDR: ${cidr}`);
 	}
 	const [addr, bits] = network;
+
 	if (addr.kind() === 'ipv4') {
 		if (!ipaddr.IPv4.isValidCIDRFourPartDecimal(cidr)) {
 			throw new TypeError(`Invalid CIDR: ${cidr}`);
 		}
 	} else if ((addr as ipaddr.IPv6).isIPv4MappedAddress()) {
 		const ipv4 = bits >= 96 ? ` (${(addr as ipaddr.IPv6).toIPv4Address().toString()}/${bits - 96})` : '';
+
 		throw new TypeError(`IPv4-mapped IPv6 CIDRs never match, write it in IPv4 form${ipv4}: ${cidr}`);
 	}
+
 	return network;
 }
 
 export function isAddressAllowed(guard: AddressGuard, ip: string): boolean {
 	let addr: ipaddr.IPv4 | ipaddr.IPv6;
+
 	try {
 		addr = ipaddr.process(ip.replace(/^\[|\]$/g, ''));
 	} catch {
@@ -67,9 +73,11 @@ export function isAddressAllowed(guard: AddressGuard, ip: string): boolean {
 	}
 	// IPv4-compatible IPv6 (::/96) is deprecated and notation-dependent; treat the whole range as non-public.
 	const compat = addr.kind() === 'ipv6' && (addr as ipaddr.IPv6).parts.slice(0, 6).every(p => p === 0);
+
 	if (!compat && addr.range() === 'unicast') {
 		return true;
 	}
+
 	return guard.allowedNetworks.some(([net, bits]) => addr.kind() === net.kind() && addr.match(net, bits));
 }
 
@@ -88,6 +96,7 @@ function rejected(ip: string): StatusError {
  */
 export async function assertHostAllowed(guard: AddressGuard, hostname: string): Promise<string[]> {
 	const host = hostname.replace(/^\[|\]$/g, '');
+
 	if (host === '') {
 		throw noAddress(hostname);
 	}
@@ -95,10 +104,12 @@ export async function assertHostAllowed(guard: AddressGuard, hostname: string): 
 		if (!isAddressAllowed(guard, host)) {
 			throw rejected(host);
 		}
+
 		// Canonical form, so the address handed to the proxy is exactly the one checked here.
 		return [ipaddr.parse(host).toString()];
 	}
 	const results = await dns.promises.lookup(host, { all: true });
+
 	if (results.length === 0) {
 		throw noAddress(host);
 	}
@@ -107,6 +118,7 @@ export async function assertHostAllowed(guard: AddressGuard, hostname: string): 
 			throw rejected(address);
 		}
 	}
+
 	return results.map(r => r.address);
 }
 
@@ -115,21 +127,26 @@ export function createGuardedLookup(guard: AddressGuard): net.LookupFunction {
 	return (hostname, options, callback) => {
 		// On failure Node reads only the error, so the callback is called with it alone (as dns.lookup does).
 		const fail = callback as (err: NodeJS.ErrnoException) => void;
+
 		dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
 			if (err) {
 				fail(err);
+
 				return;
 			}
 			if (addresses.length === 0) {
 				const e: NodeJS.ErrnoException & { hostname?: string } = new Error(`getaddrinfo ENOTFOUND ${hostname}`);
+
 				e.code = 'ENOTFOUND';
 				e.hostname = hostname;
 				fail(e);
+
 				return;
 			}
 			for (const { address } of addresses) {
 				if (!isAddressAllowed(guard, address)) {
 					fail(rejected(address));
+
 					return;
 				}
 			}
@@ -149,5 +166,6 @@ export function createGuardedLookup(guard: AddressGuard): net.LookupFunction {
 export function privateIpAllowedByEnv(env: NodeJS.ProcessEnv = process.env): boolean {
 	const chiramiss = env.CHIRAMISS_ALLOW_PRIVATE_IP;
 	const value = chiramiss != null && chiramiss !== '' ? chiramiss : env.SUMMALY_ALLOW_PRIVATE_IP;
+
 	return value === 'true';
 }

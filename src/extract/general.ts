@@ -39,6 +39,7 @@ export async function fetchPage(ctx: ScrapeContext, url: URL): Promise<Page> {
 		},
 		typeFilter: /^(text\/html|application\/xhtml\+xml)/,
 	});
+
 	return {
 		url: new URL(res.url),
 		html: decodeHtml(res.body, res.headers['content-type']),
@@ -79,6 +80,7 @@ export async function summarizePage(ctx: ScrapeContext, url: URL, page: Pick<Pag
 /** Fetches `url` and summarizes it with the generic (non-provider) rules. */
 export async function scrapeGeneral(ctx: ScrapeContext, url: URL): Promise<Summary | null> {
 	const page = await fetchPage(ctx, url);
+
 	// Like upstream general(), the requested URL (not the post-redirect one) is the base.
 	return await summarizePage(ctx, url, page);
 }

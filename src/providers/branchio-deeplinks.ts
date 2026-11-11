@@ -12,7 +12,9 @@ export const branchioDeeplinks: Provider = {
 		// https://help.branch.io/using-branch/docs/creating-a-deep-link#redirections
 		// Forcing the web redirect keeps branch.io from serving its own interstitial page.
 		const target = new URL(url);
+
 		target.searchParams.append('$web_only', 'true');
+
 		return await scrapeGeneral(ctx, target);
 	},
 };

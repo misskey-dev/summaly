@@ -35,40 +35,48 @@ function fromBom(body: Buffer): string | null {
 	if (body[0] === 0xfe && body[1] === 0xff) {
 		return 'utf-16be';
 	}
+
 	return null;
 }
 
 function fromContentType(contentType: string | undefined): string | null {
 	const label = contentType?.match(headerCharset)?.[1];
+
 	return label ? canonicalEncoding(label) : null;
 }
 
 /** The charset a `<meta>` tag declares: its `charset` attribute, or the `content` of `http-equiv="content-type"`. */
 function metaTagCharset(tag: string): string | null {
 	const attrs = new Map<string, string>();
+
 	for (const match of tag.slice('<meta'.length).matchAll(attribute)) {
 		const key = (match.at(1) ?? '').toLowerCase();
 		const value = (match.at(2) ?? '').replace(/^(["'])(.*)\1$/s, '$2');
+
 		if (!attrs.has(key)) {
 			attrs.set(key, value);
 		}
 	}
 	const charset = attrs.get('charset');
+
 	if (charset) {
 		return charset.trim();
 	}
 	if (attrs.get('http-equiv')?.toLowerCase() === 'content-type') {
 		return attrs.get('content')?.match(headerCharset)?.[1] ?? null;
 	}
+
 	return null;
 }
 
 function fromMeta(body: Buffer): string | null {
 	// latin1 maps every byte to one character, so ASCII markup is readable whatever the real encoding is.
 	const head = body.subarray(0, META_PRESCAN_BYTES).toString('latin1').replace(comment, '');
+
 	for (const [tag] of head.matchAll(metaTag)) {
 		const label = metaTagCharset(tag);
 		const encoding = label ? canonicalEncoding(label) : null;
+
 		if (!encoding) {
 			continue;
 		}
@@ -79,14 +87,17 @@ function fromMeta(body: Buffer): string | null {
 		if (encoding === 'x-user-defined') {
 			return 'windows-1252';
 		}
+
 		return encoding;
 	}
+
 	return null;
 }
 
 function isValidUtf8(body: Buffer): boolean {
 	try {
 		strictUtf8TextDecoder.decode(body);
+
 		return true;
 	} catch {
 		return false;
@@ -98,6 +109,7 @@ function fromDetection(body: Buffer): string | null {
 		return null;
 	}
 	const sampled = detect(body.subarray(0, CHARDET_SAMPLE_BYTES));
+
 	if (sampled?.toLowerCase() !== 'ascii') {
 		return sampled ? canonicalEncoding(sampled) : null;
 	}
@@ -107,6 +119,7 @@ function fromDetection(body: Buffer): string | null {
 		return 'utf-8';
 	}
 	const whole = detect(body);
+
 	return whole ? canonicalEncoding(whole) : null;
 }
 
@@ -127,6 +140,7 @@ export function detectEncoding(body: Buffer, contentType?: string): string {
 export function toUtf8(body: Buffer, encoding: string): string {
 	try {
 		const decoder = encoding === 'utf-8' ? utf8TextDecoder : new TextDecoder(encoding, { fatal: true });
+
 		return decoder.decode(body);
 	} catch {
 		// Fallback
