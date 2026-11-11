@@ -7,10 +7,17 @@ const SRC = new URL('../../src/', import.meta.url);
 
 export async function resolve(specifier, context, next) {
 	let target = specifier;
-	if (target.startsWith('@/')) target = new URL(target.slice(2), SRC).href;
+
+	if (target.startsWith('@/')) {
+		target = new URL(target.slice(2), SRC).href;
+	}
 	if (target.endsWith('.js') && (target.startsWith('.') || target.startsWith('file:')) && context.parentURL) {
 		const ts = new URL(target.replace(/\.js$/, '.ts'), context.parentURL);
-		if (existsSync(fileURLToPath(ts))) return next(ts.href, context);
+
+		if (existsSync(fileURLToPath(ts))) {
+			return next(ts.href, context);
+		}
 	}
+
 	return next(target, context);
 }

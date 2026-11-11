@@ -12,13 +12,18 @@ const patterns = [
 function* walk(dir) {
 	for (const name of readdirSync(dir)) {
 		const p = join(dir, name);
-		if (statSync(p).isDirectory()) yield* walk(p);
-		else if (/\.d\.m?ts$/.test(name)) yield p;
+
+		if (statSync(p).isDirectory()) {
+			yield* walk(p);
+		} else if (/\.d\.m?ts$/.test(name)) {
+			yield p;
+		}
 	}
 }
 
 let found = false;
 let count = 0;
+
 for (const file of walk(root)) {
 	count++;
 	readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
