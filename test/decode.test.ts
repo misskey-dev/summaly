@@ -86,7 +86,7 @@ describe('detectEncoding', () => {
 
 		expect(detectEncoding(large)).toBe('shift_jis');
 		expect(detectSpy).toHaveBeenCalledTimes(1);
-		expect(detectSpy.mock.calls[0]![0].length).toBeLessThanOrEqual(16 * 1024);
+		expect(detectSpy.mock.calls[0][0].length).toBeLessThanOrEqual(16 * 1024);
 	});
 
 	test('先頭 16KB が ASCII だけでも、後ろに UTF-8 があれば utf-8 として読む', () => {

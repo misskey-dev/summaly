@@ -26,7 +26,7 @@ afterEach(async () => {
  * Starts a test server routed like the upstream fastify tests: `'/path'` serves GET and HEAD for that path,
  * `'*'` serves every path, and anything else is 404. Returns the origin (e.g. `http://127.0.0.1:12345`).
  */
-async function serve(routes: Record<string, Handler>, host?: string): Promise<string> {
+async function serve(routes: Partial<Record<string, Handler>>, host?: string): Promise<string> {
 	let origin = '';
 	const server = await startTestServer((req, res) => {
 		const path = new URL(req.url ?? '/', 'http://localhost').pathname;

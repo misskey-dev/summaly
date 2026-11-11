@@ -10,6 +10,18 @@ import {
 	privateIpAllowedByEnv,
 } from '@/http/address-guard.js';
 
+/** What a net.LookupFunction passes to its callback. */
+type LookupResult = { e: NodeJS.ErrnoException | null; a: string | dns.LookupAddress[]; f?: number };
+
+// vi.spyOn types the spy from the last overload of lookup (one address). These are the same objects (dns.promises
+// and dns), typed with only the `all: true` overload that the code under test calls, so the mocks can return arrays.
+const promisesLookupAll = dns.promises as {
+	lookup: (hostname: string, options: dns.LookupAllOptions) => Promise<dns.LookupAddress[]>;
+};
+const callbackLookupAll = dns as {
+	lookup: (hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) => void;
+};
+
 describe('AddressGuard', () => {
 	test.each([
 		'127.0.0.1', '10.0.0.1', '192.168.1.1', '169.254.169.254', '::1', 'fc00::1',
@@ -82,10 +94,10 @@ describe('AddressGuard', () => {
 	});
 
 	test('assertHostAllowed は検証したアドレスを解決順に返す', async () => {
-		const spy = vi.spyOn(dns.promises, 'lookup').mockResolvedValue([
+		const spy = vi.spyOn(promisesLookupAll, 'lookup').mockResolvedValue([
 			{ address: '93.184.216.34', family: 4 },
 			{ address: '2606:2800:220:1:248:1893:25c8:1946', family: 6 },
-		] as any);
+		]);
 		const addresses = await assertHostAllowed(createAddressGuard(), 'example.test');
 
 		spy.mockRestore();
@@ -94,18 +106,18 @@ describe('AddressGuard', () => {
 
 	test('createGuardedLookup は接続時の名前解決でも拒否する', async () => {
 		const lookup = createGuardedLookup(createAddressGuard());
-		const err = await new Promise<any>(resolve => lookup('localhost', {}, e => resolve(e)));
+		const err = await new Promise<NodeJS.ErrnoException | null>(resolve => lookup('localhost', {}, e => resolve(e)));
 
 		expect(err).toBeInstanceOf(StatusError);
-		expect(err.statusCode).toBe(400);
+		expect(err).toHaveProperty('statusCode', 400);
 	});
 
 	test('createGuardedLookup は例外ネットワークなら通す', async () => {
 		const lookup = createGuardedLookup(createAddressGuard(['127.0.0.0/8', '::1/128']));
-		const err = await new Promise<any>(resolve => lookup('localhost', { all: true }, e => resolve(e)));
+		const err = await new Promise<NodeJS.ErrnoException | null>(resolve => lookup('localhost', { all: true }, e => resolve(e)));
 
 		expect(err).toBeNull();
-		const addrs = await new Promise<any>(resolve => lookup('localhost', { all: true }, (e, a) => resolve(a)));
+		const addrs = await new Promise<dns.LookupAddress[]>(resolve => lookup('localhost', { all: true }, (e, a) => resolve(a as dns.LookupAddress[])));
 
 		expect(Array.isArray(addrs)).toBe(true);
 		expect(addrs.length).toBeGreaterThan(0);
@@ -117,7 +129,7 @@ describe('AddressGuard', () => {
 
 	test('createGuardedLookup all:false 成功時は文字列 address と family を返す', async () => {
 		const lookup = createGuardedLookup(createAddressGuard(['127.0.0.0/8', '::1/128']));
-		const r = await new Promise<any>(resolve => lookup('localhost', {}, (e, a, f) => resolve({ e, a, f })));
+		const r = await new Promise<LookupResult>(resolve => lookup('localhost', {}, (e, a, f) => resolve({ e, a, f })));
 
 		expect(r.e).toBeNull();
 		expect(typeof r.a).toBe('string');
@@ -132,20 +144,20 @@ describe('AddressGuard', () => {
 	});
 
 	test('空の解決結果は fail-closed (assertHostAllowed / createGuardedLookup)', async () => {
-		const spy = vi.spyOn(dns.promises, 'lookup').mockResolvedValue([] as any);
+		const spy = vi.spyOn(promisesLookupAll, 'lookup').mockResolvedValue([]);
 		const e = await assertHostAllowed(createAddressGuard(), 'example.test').catch(e => e);
 
 		spy.mockRestore();
 		expect(e).toBeInstanceOf(StatusError);
 		expect(e.statusCode).toBe(400);
 
-		const spy2 = vi.spyOn(dns, 'lookup').mockImplementation(((_h: any, _o: any, cb: any) => cb(null, [])) as any);
+		const spy2 = vi.spyOn(callbackLookupAll, 'lookup').mockImplementation((_hostname, _options, callback) => callback(null, []));
 		const lookup = createGuardedLookup(createAddressGuard());
-		const err = await new Promise<any>(resolve => lookup('example.test', {}, e => resolve(e)));
+		const err = await new Promise<NodeJS.ErrnoException | null>(resolve => lookup('example.test', {}, e => resolve(e)));
 
 		spy2.mockRestore();
 		expect(err).toBeInstanceOf(Error);
-		expect(err.code).toBe('ENOTFOUND');
+		expect(err).toHaveProperty('code', 'ENOTFOUND');
 	});
 
 	test('StatusError は JSON 化しても statusCode 等を保持する', () => {

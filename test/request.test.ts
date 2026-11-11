@@ -9,6 +9,7 @@ import { StatusError } from '@/http/status-error.js';
 import { createTransport } from '@/http/transport.js';
 import { fetchResponse, type FetchRequest } from '@/http/request.js';
 import { decodeHtml } from '@/http/decode.js';
+import { defined } from './helpers/defined.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 import { LOOPBACK_CERT, LOOPBACK_KEY } from './helpers/tls-cert.js';
 
@@ -226,7 +227,7 @@ describe('fetchResponse', () => {
 
 	function redirectChain(length: number): http.RequestListener {
 		return (req, res) => {
-			const n = Number(req.url!.slice(1) || 0);
+			const n = Number((req.url ?? '/').slice(1) || 0);
 
 			if (n < length) {
 				res.writeHead(302, { location: `/${n + 1}` });
@@ -620,7 +621,7 @@ describe('transport 内の接続の再利用', () => {
 			const url = `https://127.0.0.1:${(secure.address() as net.AddressInfo).port}/`;
 			const transport = localTransport();
 
-			transport.guardedAgents!.https.options.ca = LOOPBACK_CERT;
+			defined(transport.guardedAgents).https.options.ca = LOOPBACK_CERT;
 			await fetchResponse(transport, request(url, { method: 'HEAD' }));
 			const result = await fetchResponse(transport, request(url));
 

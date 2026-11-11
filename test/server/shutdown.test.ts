@@ -63,8 +63,8 @@ async function startServerProcess(): Promise<{ child: ChildProcess; url: string;
 	const url = await new Promise<string>((resolve, reject) => {
 		let output = '';
 
-		child.stdout?.setEncoding('utf8');
-		child.stdout?.on('data', (chunk: string) => {
+		child.stdout.setEncoding('utf8');
+		child.stdout.on('data', (chunk: string) => {
 			output += chunk;
 			// fastify's logger prints e.g. {"msg":"Server listening at http://127.0.0.1:12345"}
 			const match = /Server listening at (http:\/\/127\.0\.0\.1:\d+)/.exec(output);

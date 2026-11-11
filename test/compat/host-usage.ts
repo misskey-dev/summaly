@@ -32,7 +32,7 @@ export async function fetchSummary(url: string, lang?: string): Promise<SummalyR
 	});
 }
 
-export const botUserAgent: string = `SummalyBot/${version}`;
+export const botUserAgent = `SummalyBot/${version}`;
 
 // Frontend side: only the result type is used.
 export function previewTitle(summary: SummalyResult): string | null {

@@ -10,6 +10,7 @@ import {
 } from '@/http/agent-pool.js';
 import { fetchResponse, type FetchRequest } from '@/http/request.js';
 import { createTransport } from '@/http/transport.js';
+import { defined } from './helpers/defined.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
 const servers: TestServer[] = [];
@@ -152,7 +153,7 @@ describe('GuardedAgentPool', () => {
 		});
 		const pool = new GuardedAgentPool();
 		const transport = createTransport({ allowedPrivateNetworks: LOCAL, agentPool: pool }, {});
-		const destroy = vi.spyOn(transport.guardedAgents!.http, 'destroy');
+		const destroy = vi.spyOn(defined(transport.guardedAgents).http, 'destroy');
 		const pending = fetchResponse(transport, request(origin.url));
 
 		await vi.waitFor(() => expect(origin.connections()).toBe(1));
@@ -178,7 +179,7 @@ describe('pool を使う transport', () => {
 
 		await fetchResponse(first, request(origin.url));
 		first.close();
-		expect(freeSockets(first.guardedAgents!.http)).toHaveLength(1);
+		expect(freeSockets(defined(first.guardedAgents).http)).toHaveLength(1);
 		const second = createTransport({ allowedPrivateNetworks: [...LOCAL], agentPool: pool }, {});
 
 		expect(second.guardedAgents).toBe(first.guardedAgents);
@@ -210,9 +211,9 @@ describe('pool を使う transport', () => {
 	test('close はプロキシ用の agent だけを destroy する', () => {
 		const pool = new GuardedAgentPool();
 		const transport = createTransport({ allowedPrivateNetworks: LOCAL, proxy: { http: 'http://proxy.example:8080' }, agentPool: pool }, {});
-		const guardedDestroy = vi.spyOn(transport.guardedAgents!.http, 'destroy');
-		const guardedSecureDestroy = vi.spyOn(transport.guardedAgents!.https, 'destroy');
-		const proxyDestroy = vi.spyOn(transport.proxyAgents.http!, 'destroy');
+		const guardedDestroy = vi.spyOn(defined(transport.guardedAgents).http, 'destroy');
+		const guardedSecureDestroy = vi.spyOn(defined(transport.guardedAgents).https, 'destroy');
+		const proxyDestroy = vi.spyOn(defined(transport.proxyAgents.http), 'destroy');
 
 		transport.close();
 		expect(proxyDestroy).toHaveBeenCalled();
@@ -241,11 +242,11 @@ describe('pool を使う transport', () => {
 		transport.close();
 		const [serverSide] = origin.sockets;
 
-		expect(freeSockets(transport.guardedAgents!.http)).toHaveLength(1);
+		expect(freeSockets(defined(transport.guardedAgents).http)).toHaveLength(1);
 		const closed = new Promise(resolve => serverSide.once('close', resolve));
 
 		await closed;
-		await vi.waitFor(() => expect(freeSockets(transport.guardedAgents!.http)).toHaveLength(0));
+		await vi.waitFor(() => expect(freeSockets(defined(transport.guardedAgents).http)).toHaveLength(0));
 	});
 
 	test('待機中のソケットはホストごとに上限までしか残さない', async () => {
@@ -260,8 +261,8 @@ describe('pool を使う transport', () => {
 
 		await Promise.all(Array.from({ length: 5 }, () => fetchResponse(transport, request(origin.url))));
 		expect(origin.connections()).toBe(5);
-		expect(freeSockets(transport.guardedAgents!.http)).toHaveLength(2);
-		transport.guardedAgents!.http.destroy();
+		expect(freeSockets(defined(transport.guardedAgents).http)).toHaveLength(2);
+		defined(transport.guardedAgents).http.destroy();
 	});
 
 	test.each([
@@ -286,7 +287,7 @@ describe('pool を使う transport', () => {
 
 		expect(result.body.toString()).toBe('ok');
 		expect(origin.connections()).toBe(1);
-		transport.guardedAgents!.http.destroy();
+		defined(transport.guardedAgents).http.destroy();
 	});
 
 	test('responseTimeout を指定すれば、再利用した接続でもその値で切る', async () => {
@@ -303,7 +304,7 @@ describe('pool を使う transport', () => {
 		await fetchResponse(transport, request(origin.url, { method: 'HEAD' }));
 		await expect(fetchResponse(transport, request(origin.url, { responseTimeout: 100 })))
 			.rejects.toThrow("Timeout awaiting 'socket' for 100ms");
-		expect(freeSockets(transport.guardedAgents!.http)).toHaveLength(0);
+		expect(freeSockets(defined(transport.guardedAgents).http)).toHaveLength(0);
 	});
 
 	test('responseTimeout が待機中の timeout と同じ値でも、再利用した接続ではサーバの Keep-Alive のヒントで縮んだ timeout で切らない', async () => {
@@ -338,6 +339,6 @@ describe('pool を使う transport', () => {
 
 		expect(result.body.toString()).toBe('ok');
 		expect(sockets.size).toBe(1);
-		transport.guardedAgents!.http.destroy();
+		defined(transport.guardedAgents).http.destroy();
 	}, 10_000);
 });

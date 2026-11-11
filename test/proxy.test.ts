@@ -166,7 +166,7 @@ afterEach(async () => {
 async function proxy(options?: TestProxyOptions): Promise<TestProxy> {
 	const p = await startTestProxy(options);
 
-	closers.push(p.close);
+	closers.push(() => p.close());
 
 	return p;
 }
@@ -174,7 +174,7 @@ async function proxy(options?: TestProxyOptions): Promise<TestProxy> {
 async function serve(handler: http.RequestListener, host?: string) {
 	const server = await startTestServer(handler, host);
 
-	closers.push(server.close);
+	closers.push(() => server.close());
 
 	return server;
 }
@@ -413,7 +413,7 @@ describe('fetchResponse through a proxy: timeouts', () => {
 	async function hanging(): Promise<HangingProxy> {
 		const p = await startHangingProxy();
 
-		closers.push(p.close);
+		closers.push(() => p.close());
 
 		return p;
 	}
@@ -491,8 +491,10 @@ describe('fetchResponse through a proxy: CONNECT authority', () => {
 	/** Resolves the given names in `assertHostAllowed` (dns.promises.lookup); other names resolve normally. */
 	function fakeDns(records: Record<string, { address: string; family: number }[]>) {
 		const original = dns.promises.lookup.bind(dns.promises);
-		const spy = vi.spyOn(dns.promises, 'lookup').mockImplementation(((hostname: string, options: any) =>
-			hostname in records ? Promise.resolve(records[hostname]) : original(hostname, options)) as any);
+		// vi.spyOn types the spy from the last overload of lookup (hostname only); type the same object with the one called here.
+		const promises = dns.promises as { lookup: (hostname: string, options: dns.LookupOptions) => Promise<dns.LookupAddress | dns.LookupAddress[]> };
+		const spy = vi.spyOn(promises, 'lookup').mockImplementation((hostname, options) =>
+			hostname in records ? Promise.resolve(records[hostname]) : original(hostname, options));
 
 		closers.push(async () => spy.mockRestore());
 
@@ -584,7 +586,7 @@ describe('fetchResponse through a proxy: CONNECT authority', () => {
 		fakeDns({ 'multi.test': [{ address: '127.0.0.1', family: 4 }, { address: '127.0.0.2', family: 4 }, { address: '127.0.0.3', family: 4 }] });
 		const p = await startHangingProxy();
 
-		closers.push(p.close);
+		closers.push(() => p.close());
 		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8'], proxy: { http: p.url } }, {});
 		const started = Date.now();
 		// Each attempt gives up after responseTimeout (200ms); the operation ends at 300ms, during the second attempt

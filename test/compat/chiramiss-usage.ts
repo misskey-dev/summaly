@@ -43,7 +43,7 @@ export const summarizeWithPlugin: (url: string, options?: SummarizeOptions) => P
 	plugins: [plugin],
 });
 
-export const botUserAgent: string = `ChiramissBot/${version}`;
+export const botUserAgent = `ChiramissBot/${version}`;
 
 export function previewTitle(summary: SummaryResult): string | null {
 	return summary.title;
