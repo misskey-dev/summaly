@@ -11,7 +11,9 @@ export const wikipedia: Provider = {
 	name: 'wikipedia',
 
 	test(url) {
-		if (!url.hostname) return false;
+		if (!url.hostname) {
+			return false;
+		}
 		return url.hostname.endsWith('.wikipedia.org');
 	},
 

@@ -26,9 +26,15 @@ function canonicalEncoding(label: string): string | null {
 }
 
 function fromBom(body: Buffer): string | null {
-	if (body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf) return 'utf-8';
-	if (body[0] === 0xff && body[1] === 0xfe) return 'utf-16le';
-	if (body[0] === 0xfe && body[1] === 0xff) return 'utf-16be';
+	if (body[0] === 0xef && body[1] === 0xbb && body[2] === 0xbf) {
+		return 'utf-8';
+	}
+	if (body[0] === 0xff && body[1] === 0xfe) {
+		return 'utf-16le';
+	}
+	if (body[0] === 0xfe && body[1] === 0xff) {
+		return 'utf-16be';
+	}
 	return null;
 }
 
@@ -43,10 +49,14 @@ function metaTagCharset(tag: string): string | null {
 	for (const match of tag.slice('<meta'.length).matchAll(attribute)) {
 		const key = (match.at(1) ?? '').toLowerCase();
 		const value = (match.at(2) ?? '').replace(/^(["'])(.*)\1$/s, '$2');
-		if (!attrs.has(key)) attrs.set(key, value);
+		if (!attrs.has(key)) {
+			attrs.set(key, value);
+		}
 	}
 	const charset = attrs.get('charset');
-	if (charset) return charset.trim();
+	if (charset) {
+		return charset.trim();
+	}
 	if (attrs.get('http-equiv')?.toLowerCase() === 'content-type') {
 		return attrs.get('content')?.match(headerCharset)?.[1] ?? null;
 	}
@@ -59,10 +69,16 @@ function fromMeta(body: Buffer): string | null {
 	for (const [tag] of head.matchAll(metaTag)) {
 		const label = metaTagCharset(tag);
 		const encoding = label ? canonicalEncoding(label) : null;
-		if (!encoding) continue;
+		if (!encoding) {
+			continue;
+		}
 		// A document that could be read as ASCII to find its meta cannot really be UTF-16 (HTML spec).
-		if (encoding === 'utf-16le' || encoding === 'utf-16be') return 'utf-8';
-		if (encoding === 'x-user-defined') return 'windows-1252';
+		if (encoding === 'utf-16le' || encoding === 'utf-16be') {
+			return 'utf-8';
+		}
+		if (encoding === 'x-user-defined') {
+			return 'windows-1252';
+		}
 		return encoding;
 	}
 	return null;
@@ -78,12 +94,18 @@ function isValidUtf8(body: Buffer): boolean {
 }
 
 function fromDetection(body: Buffer): string | null {
-	if (body.length === 0) return null;
+	if (body.length === 0) {
+		return null;
+	}
 	const sampled = detect(body.subarray(0, CHARDET_SAMPLE_BYTES));
-	if (sampled?.toLowerCase() !== 'ascii') return sampled ? canonicalEncoding(sampled) : null;
+	if (sampled?.toLowerCase() !== 'ascii') {
+		return sampled ? canonicalEncoding(sampled) : null;
+	}
 	// An ASCII-only sample says nothing about the rest. Most such pages are UTF-8, which is cheap to confirm;
 	// otherwise fall back to detecting on the whole body (slow, but only for undeclared non-UTF-8 pages).
-	if (isValidUtf8(body)) return 'utf-8';
+	if (isValidUtf8(body)) {
+		return 'utf-8';
+	}
 	const whole = detect(body);
 	return whole ? canonicalEncoding(whole) : null;
 }

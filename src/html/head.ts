@@ -26,7 +26,9 @@ export function parseHead(html: string): HeadInfo {
 	// Nothing after this point can change the result. pause() stops the tokenizer right after the current
 	// tag, even in the middle of the string written, so the rest of the page is never tokenized.
 	const stopIfDone = () => {
-		if (state.headDone && state.title !== null) parser.pause();
+		if (state.headDone && state.title !== null) {
+			parser.pause();
+		}
 	};
 
 	const parser = new Parser({
@@ -39,27 +41,39 @@ export function parseHead(html: string): HeadInfo {
 				}
 				return;
 			}
-			if (state.headDone) return;
+			if (state.headDone) {
+				return;
+			}
 			if (name === 'body') {
 				state.headDone = true;
 				stopIfDone();
 			} else if (name === 'meta') {
 				const content = attrs['content'];
-				if (content === undefined) return;
+				if (content === undefined) {
+					return;
+				}
 				for (const attr of ['name', 'property'] as const) {
 					const value = attrs[attr];
-					if (value === undefined) continue;
+					if (value === undefined) {
+						continue;
+					}
 					const key = `${attr}:${value}`;
-					if (!metas.has(key)) metas.set(key, content);
+					if (!metas.has(key)) {
+						metas.set(key, content);
+					}
 				}
 			} else if (name === 'link') {
 				const href = attrs['href'];
-				if (href === undefined) return;
+				if (href === undefined) {
+					return;
+				}
 				links.push({ rel: attrs['rel'] ?? null, type: attrs['type'] ?? null, href });
 			}
 		},
 		ontext(text) {
-			if (inTitle) titleText += text;
+			if (inTitle) {
+				titleText += text;
+			}
 		},
 		onclosetag(name) {
 			if (name === 'title' && inTitle) {

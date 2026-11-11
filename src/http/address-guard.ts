@@ -48,7 +48,9 @@ function parseAllowedNetwork(cidr: string): Network {
 	}
 	const [addr, bits] = network;
 	if (addr.kind() === 'ipv4') {
-		if (!ipaddr.IPv4.isValidCIDRFourPartDecimal(cidr)) throw new TypeError(`Invalid CIDR: ${cidr}`);
+		if (!ipaddr.IPv4.isValidCIDRFourPartDecimal(cidr)) {
+			throw new TypeError(`Invalid CIDR: ${cidr}`);
+		}
 	} else if ((addr as ipaddr.IPv6).isIPv4MappedAddress()) {
 		const ipv4 = bits >= 96 ? ` (${(addr as ipaddr.IPv6).toIPv4Address().toString()}/${bits - 96})` : '';
 		throw new TypeError(`IPv4-mapped IPv6 CIDRs never match, write it in IPv4 form${ipv4}: ${cidr}`);
@@ -65,7 +67,9 @@ export function isAddressAllowed(guard: AddressGuard, ip: string): boolean {
 	}
 	// IPv4-compatible IPv6 (::/96) is deprecated and notation-dependent; treat the whole range as non-public.
 	const compat = addr.kind() === 'ipv6' && (addr as ipaddr.IPv6).parts.slice(0, 6).every(p => p === 0);
-	if (!compat && addr.range() === 'unicast') return true;
+	if (!compat && addr.range() === 'unicast') {
+		return true;
+	}
 	return guard.allowedNetworks.some(([net, bits]) => addr.kind() === net.kind() && addr.match(net, bits));
 }
 
@@ -84,16 +88,24 @@ function rejected(ip: string): StatusError {
  */
 export async function assertHostAllowed(guard: AddressGuard, hostname: string): Promise<string[]> {
 	const host = hostname.replace(/^\[|\]$/g, '');
-	if (host === '') throw noAddress(hostname);
+	if (host === '') {
+		throw noAddress(hostname);
+	}
 	if (ipaddr.isValid(host)) {
-		if (!isAddressAllowed(guard, host)) throw rejected(host);
+		if (!isAddressAllowed(guard, host)) {
+			throw rejected(host);
+		}
 		// Canonical form, so the address handed to the proxy is exactly the one checked here.
 		return [ipaddr.parse(host).toString()];
 	}
 	const results = await dns.promises.lookup(host, { all: true });
-	if (results.length === 0) throw noAddress(host);
+	if (results.length === 0) {
+		throw noAddress(host);
+	}
 	for (const { address } of results) {
-		if (!isAddressAllowed(guard, address)) throw rejected(address);
+		if (!isAddressAllowed(guard, address)) {
+			throw rejected(address);
+		}
 	}
 	return results.map(r => r.address);
 }

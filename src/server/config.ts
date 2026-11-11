@@ -46,7 +46,9 @@ export class ServerConfigError extends Error {
  */
 function readEnv(env: NodeJS.ProcessEnv, name: string): string | undefined {
 	const value = env[name];
-	if (value == null || value === '') return undefined;
+	if (value == null || value === '') {
+		return undefined;
+	}
 	return value;
 }
 
@@ -56,7 +58,9 @@ function readEnv(env: NodeJS.ProcessEnv, name: string): string | undefined {
 function readFirstEnv(env: NodeJS.ProcessEnv, names: string[]): { name: string; value: string } | undefined {
 	for (const name of names) {
 		const value = readEnv(env, name);
-		if (value != null) return { name, value };
+		if (value != null) {
+			return { name, value };
+		}
 	}
 	return undefined;
 }
@@ -83,17 +87,23 @@ function parseBoolean(name: string, value: string): boolean {
  * Only plain digits are accepted (no sign, exponent, fraction or surrounding spaces).
  */
 export function toNonNegativeInteger(value: string, max = Number.MAX_SAFE_INTEGER): number | undefined {
-	if (!/^\d+$/.test(value)) return undefined;
+	if (!/^\d+$/.test(value)) {
+		return undefined;
+	}
 
 	const parsed = Number(value);
-	if (!Number.isSafeInteger(parsed) || parsed > max) return undefined;
+	if (!Number.isSafeInteger(parsed) || parsed > max) {
+		return undefined;
+	}
 
 	return parsed;
 }
 
 function parseNonNegativeInteger(name: string, value: string, max = Number.MAX_SAFE_INTEGER): number {
 	const parsed = toNonNegativeInteger(value, max);
-	if (parsed == null) throw invalidValue(name, value, `an integer between 0 and ${max}`);
+	if (parsed == null) {
+		throw invalidValue(name, value, `an integer between 0 and ${max}`);
+	}
 	return parsed;
 }
 
@@ -104,10 +114,14 @@ function parseNonNegativeInteger(name: string, value: string, max = Number.MAX_S
 function parseCidrList(name: string, value: string): string[] {
 	const cidrs = value.split(',').map(entry => entry.trim()).filter(entry => entry !== '');
 	const expected = 'a comma-separated list of CIDRs such as 10.0.0.0/8,fd00::/8';
-	if (cidrs.length === 0) throw invalidValue(name, value, expected);
+	if (cidrs.length === 0) {
+		throw invalidValue(name, value, expected);
+	}
 	for (const cidr of cidrs) {
 		const problem = checkCidr(cidr);
-		if (problem === 'invalid') throw invalidValue(name, value, expected);
+		if (problem === 'invalid') {
+			throw invalidValue(name, value, expected);
+		}
 		if (problem != null) {
 			throw new ServerConfigError(`Invalid value for ${name}: ${JSON.stringify(value)} (${cidr} is an IPv4-mapped IPv6 CIDR, which never matches; write it in IPv4 form${problem.ipv4 != null ? ` (${problem.ipv4})` : ''})`);
 		}
@@ -166,7 +180,9 @@ function parseProxyUrl(name: string, value: string): string {
  */
 function redactUserinfo(value: string): string {
 	const at = value.lastIndexOf('@');
-	if (at === -1) return value;
+	if (at === -1) {
+		return value;
+	}
 	const scheme = /^[a-z][a-z0-9+.-]*:\/\//i.exec(value);
 	const start = scheme && scheme[0].length <= at ? scheme[0].length : 0;
 	return `${value.slice(0, start)}***${value.slice(at)}`;
@@ -180,13 +196,19 @@ function loadProxyOptions(env: NodeJS.ProcessEnv): ProxyOptions | undefined {
 	const proxy: ProxyOptions = {};
 
 	const http = readFirstEnv(env, ['HTTP_PROXY', 'http_proxy']);
-	if (http != null) proxy.http = parseProxyUrl(http.name, http.value);
+	if (http != null) {
+		proxy.http = parseProxyUrl(http.name, http.value);
+	}
 
 	const https = readFirstEnv(env, ['HTTPS_PROXY', 'https_proxy']);
-	if (https != null) proxy.https = parseProxyUrl(https.name, https.value);
+	if (https != null) {
+		proxy.https = parseProxyUrl(https.name, https.value);
+	}
 
 	const noProxy = readFirstEnv(env, ['NO_PROXY', 'no_proxy']);
-	if (noProxy != null) proxy.noProxy = noProxy.value;
+	if (noProxy != null) {
+		proxy.noProxy = noProxy.value;
+	}
 
 	return Object.keys(proxy).length > 0 ? proxy : undefined;
 }
@@ -217,37 +239,59 @@ export function loadServerConfig(env: NodeJS.ProcessEnv): ServerConfig {
 	const summarizeOptions: SummarizeOptions = {};
 
 	const lang = readSetting(env, 'LANG');
-	if (lang != null) summarizeOptions.lang = lang.value;
+	if (lang != null) {
+		summarizeOptions.lang = lang.value;
+	}
 
 	const userAgent = readSetting(env, 'USER_AGENT');
-	if (userAgent != null) summarizeOptions.userAgent = userAgent.value;
+	if (userAgent != null) {
+		summarizeOptions.userAgent = userAgent.value;
+	}
 
 	const followRedirects = readSetting(env, 'FOLLOW_REDIRECTS');
-	if (followRedirects != null) summarizeOptions.followRedirects = parseBoolean(followRedirects.name, followRedirects.value);
+	if (followRedirects != null) {
+		summarizeOptions.followRedirects = parseBoolean(followRedirects.name, followRedirects.value);
+	}
 
 	const responseTimeout = readSetting(env, 'RESPONSE_TIMEOUT');
-	if (responseTimeout != null) summarizeOptions.responseTimeout = parseNonNegativeInteger(responseTimeout.name, responseTimeout.value, MAX_TIMEOUT);
+	if (responseTimeout != null) {
+		summarizeOptions.responseTimeout = parseNonNegativeInteger(responseTimeout.name, responseTimeout.value, MAX_TIMEOUT);
+	}
 
 	const operationTimeout = readSetting(env, 'OPERATION_TIMEOUT');
-	if (operationTimeout != null) summarizeOptions.operationTimeout = parseNonNegativeInteger(operationTimeout.name, operationTimeout.value, MAX_TIMEOUT);
+	if (operationTimeout != null) {
+		summarizeOptions.operationTimeout = parseNonNegativeInteger(operationTimeout.name, operationTimeout.value, MAX_TIMEOUT);
+	}
 
 	const contentLengthLimit = readSetting(env, 'CONTENT_LENGTH_LIMIT');
-	if (contentLengthLimit != null) summarizeOptions.contentLengthLimit = parseNonNegativeInteger(contentLengthLimit.name, contentLengthLimit.value);
+	if (contentLengthLimit != null) {
+		summarizeOptions.contentLengthLimit = parseNonNegativeInteger(contentLengthLimit.name, contentLengthLimit.value);
+	}
 
 	const contentLengthRequired = readSetting(env, 'CONTENT_LENGTH_REQUIRED');
-	if (contentLengthRequired != null) summarizeOptions.contentLengthRequired = parseBoolean(contentLengthRequired.name, contentLengthRequired.value);
+	if (contentLengthRequired != null) {
+		summarizeOptions.contentLengthRequired = parseBoolean(contentLengthRequired.name, contentLengthRequired.value);
+	}
 
 	const allowedPrivateNetworks = readSetting(env, 'ALLOWED_PRIVATE_NETWORKS');
-	if (allowedPrivateNetworks != null) summarizeOptions.allowedPrivateNetworks = parseCidrList(allowedPrivateNetworks.name, allowedPrivateNetworks.value);
+	if (allowedPrivateNetworks != null) {
+		summarizeOptions.allowedPrivateNetworks = parseCidrList(allowedPrivateNetworks.name, allowedPrivateNetworks.value);
+	}
 
 	const proxy = loadProxyOptions(env);
-	if (proxy != null) summarizeOptions.proxy = proxy;
+	if (proxy != null) {
+		summarizeOptions.proxy = proxy;
+	}
 
 	const cacheTtl = readSetting(env, 'CACHE_TTL');
-	if (cacheTtl != null) summarizeOptions.cacheTtl = parseNonNegativeInteger(cacheTtl.name, cacheTtl.value);
+	if (cacheTtl != null) {
+		summarizeOptions.cacheTtl = parseNonNegativeInteger(cacheTtl.name, cacheTtl.value);
+	}
 
 	const errorCacheTtl = readSetting(env, 'ERROR_CACHE_TTL');
-	if (errorCacheTtl != null) summarizeOptions.errorCacheTtl = parseNonNegativeInteger(errorCacheTtl.name, errorCacheTtl.value);
+	if (errorCacheTtl != null) {
+		summarizeOptions.errorCacheTtl = parseNonNegativeInteger(errorCacheTtl.name, errorCacheTtl.value);
+	}
 
 	return { host, port, summarizeOptions };
 }

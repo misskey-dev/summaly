@@ -10,7 +10,9 @@ export const DEFAULT_PORTS: Record<string, string> = { 'http:': '80', 'https:': 
 export function assertProxyOptions(proxy: ProxyOptions): void {
 	for (const scheme of ['http', 'https'] as const) {
 		const value = proxy[scheme];
-		if (value) parseProxyUrl(value, scheme);
+		if (value) {
+			parseProxyUrl(value, scheme);
+		}
 	}
 }
 
@@ -37,7 +39,9 @@ export function parseProxyUrl(value: string, scheme: 'http' | 'https'): URL {
  */
 function redactUserinfo(value: string): string {
 	const at = value.lastIndexOf('@');
-	if (at === -1) return value;
+	if (at === -1) {
+		return value;
+	}
 	const scheme = /^[a-z][a-z0-9+.-]*:\/\//i.exec(value);
 	const start = scheme && scheme[0].length <= at ? scheme[0].length : 0;
 	return `${value.slice(0, start)}***${value.slice(at)}`;

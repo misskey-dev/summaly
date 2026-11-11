@@ -33,9 +33,15 @@ function identity(value: unknown): unknown {
  * and object keys are sorted so the result does not depend on property order.
  */
 function canonical(value: unknown): string {
-	if (value === undefined) return 'u';
-	if (value === null) return 'n';
-	if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+	if (value === undefined) {
+		return 'u';
+	}
+	if (value === null) {
+		return 'n';
+	}
+	if (Array.isArray(value)) {
+		return `[${value.map(canonical).join(',')}]`;
+	}
 	switch (typeof value) {
 		case 'string': return `s${JSON.stringify(value)}`;
 		case 'number': return `d${String(value)}`;

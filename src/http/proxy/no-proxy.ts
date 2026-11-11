@@ -9,8 +9,12 @@ import { DEFAULT_PORTS } from './proxy-url.js';
  */
 export function selectProxyUrl(target: URL, proxy: ProxyOptions): string | null {
 	const proxyUrl = target.protocol === 'https:' ? proxy.https : target.protocol === 'http:' ? proxy.http : undefined;
-	if (!proxyUrl) return null;
-	if (proxy.noProxy && isBypassed(target, proxy.noProxy)) return null;
+	if (!proxyUrl) {
+		return null;
+	}
+	if (proxy.noProxy && isBypassed(target, proxy.noProxy)) {
+		return null;
+	}
 	return proxyUrl;
 }
 
@@ -19,10 +23,16 @@ function isBypassed(target: URL, noProxy: string): boolean {
 	const port = target.port || DEFAULT_PORTS[target.protocol];
 	return noProxy.split(',').some(raw => {
 		const entry = raw.trim().toLowerCase();
-		if (entry === '') return false;
-		if (entry === '*') return true;
+		if (entry === '') {
+			return false;
+		}
+		if (entry === '*') {
+			return true;
+		}
 		const parsed = parseEntry(entry);
-		if (parsed.port !== null && parsed.port !== port) return false;
+		if (parsed.port !== null && parsed.port !== port) {
+			return false;
+		}
 		const domain = parsed.host.replace(/^\./, '');
 		return domain !== '' && (host === domain || host.endsWith(`.${domain}`));
 	});
@@ -37,6 +47,8 @@ function parseEntry(entry: string): { host: string; port: string | null } {
 	}
 	const colon = entry.indexOf(':');
 	// More than one colon without brackets is a bare IPv6 address.
-	if (colon === -1 || colon !== entry.lastIndexOf(':')) return { host: entry, port: null };
+	if (colon === -1 || colon !== entry.lastIndexOf(':')) {
+		return { host: entry, port: null };
+	}
 	return { host: entry.slice(0, colon), port: entry.slice(colon + 1) };
 }

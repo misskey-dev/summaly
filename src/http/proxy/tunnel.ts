@@ -57,8 +57,11 @@ export class TunnelingHttpAgent extends http.Agent {
 
 	override createConnection(options: TunnelRequestOptions, callback?: ConnectionCallback): undefined {
 		openTunnel(this, options, (err, socket) => {
-			if (err || !socket) callbackError(callback, err ?? new Error('Proxy tunnel failed'));
-			else callback?.(null, socket);
+			if (err || !socket) {
+				callbackError(callback, err ?? new Error('Proxy tunnel failed'));
+			} else {
+				callback?.(null, socket);
+			}
 		});
 		return undefined;
 	}
@@ -93,8 +96,9 @@ export class TunnelingHttpsAgent extends https.Agent {
 				callbackError(callback, e as Error);
 				return;
 			}
-			if (tlsSocket) callback?.(null, tlsSocket);
-			else {
+			if (tlsSocket) {
+				callback?.(null, tlsSocket);
+			} else {
 				socket.destroy();
 				callbackError(callback, new Error('TLS connection over the proxy tunnel failed'));
 			}
@@ -133,8 +137,11 @@ function openTunnel(
 				return;
 			}
 			index++;
-			if (signal?.aborted || index >= hosts.length) callback(err);
-			else attempt();
+			if (signal?.aborted || index >= hosts.length) {
+				callback(err);
+			} else {
+				attempt();
+			}
 		});
 	};
 	attempt();
@@ -167,7 +174,9 @@ function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, si
 		headers,
 		agent: false,
 	};
-	if (isHttpsProxy && !net.isIP(proxyHost)) requestOptions.servername = proxyHost;
+	if (isHttpsProxy && !net.isIP(proxyHost)) {
+		requestOptions.servername = proxyHost;
+	}
 	const request = (isHttpsProxy ? https : http).request(requestOptions);
 
 	let settled = false;
@@ -179,7 +188,9 @@ function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, si
 	signal?.addEventListener('abort', onAbort, { once: true });
 
 	function settle(): boolean {
-		if (settled) return false;
+		if (settled) {
+			return false;
+		}
 		settled = true;
 		clearTimeout(timer);
 		signal?.removeEventListener('abort', onAbort);
@@ -187,7 +198,9 @@ function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, si
 	}
 
 	function fail(err: Error) {
-		if (!settle()) return;
+		if (!settle()) {
+			return;
+		}
 		request.destroy();
 		callback(err);
 	}
@@ -200,7 +213,9 @@ function connectOnce(proxy: URL, host: string, options: TunnelRequestOptions, si
 			return;
 		}
 		settle();
-		if (head.length > 0) socket.unshift(head);
+		if (head.length > 0) {
+			socket.unshift(head);
+		}
 		callback(null, socket);
 	});
 	// Stays attached: errors after settling (e.g. from destroy) must not go unhandled.
@@ -230,7 +245,11 @@ function abortReason(signal: AbortSignal | undefined): Error {
  */
 export function createProxyAgents(proxy: ProxyOptions, options: TunnelingAgentOptions = {}): { http?: http.Agent; https?: https.Agent } {
 	const agents: { http?: http.Agent; https?: https.Agent } = {};
-	if (proxy.http) agents.http = new TunnelingHttpAgent(parseProxyUrl(proxy.http, 'http'), options);
-	if (proxy.https) agents.https = new TunnelingHttpsAgent(parseProxyUrl(proxy.https, 'https'), options);
+	if (proxy.http) {
+		agents.http = new TunnelingHttpAgent(parseProxyUrl(proxy.http, 'http'), options);
+	}
+	if (proxy.https) {
+		agents.https = new TunnelingHttpsAgent(parseProxyUrl(proxy.https, 'https'), options);
+	}
 	return agents;
 }

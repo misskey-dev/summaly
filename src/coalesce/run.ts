@@ -25,8 +25,12 @@ function serializeError(error: unknown): SerializedError {
 	}
 	const serialized: SerializedError = { name: error.name, message: clip(error.message) };
 	const { statusCode, statusMessage } = error as Partial<StatusError>;
-	if (typeof statusCode === 'number') serialized.statusCode = statusCode;
-	if (typeof statusMessage === 'string') serialized.statusMessage = statusMessage;
+	if (typeof statusCode === 'number') {
+		serialized.statusCode = statusCode;
+	}
+	if (typeof statusMessage === 'string') {
+		serialized.statusMessage = statusMessage;
+	}
 	return serialized;
 }
 
@@ -47,9 +51,15 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 /** Only what `settle` can turn back into a result: a cache may hand back another use's entry, or anything at all. */
 function isSummaryEntry(entry: unknown): entry is SummaryEntry {
-	if (!isObject(entry)) return false;
-	if (entry.kind === 'ok') return isObject(entry.value);
-	if (entry.kind === 'error') return isObject(entry.error);
+	if (!isObject(entry)) {
+		return false;
+	}
+	if (entry.kind === 'ok') {
+		return isObject(entry.value);
+	}
+	if (entry.kind === 'error') {
+		return isObject(entry.error);
+	}
 	return false;
 }
 
@@ -59,7 +69,9 @@ function isIconEntry(entry: unknown): entry is IconEntry {
 
 /** Gives the caller its own copy: the host app rewrites results it receives (icon, thumbnail). */
 function settle(entry: SummaryEntry): SummaryResult {
-	if (entry.kind === 'error') throw restoreError(entry.error);
+	if (entry.kind === 'error') {
+		throw restoreError(entry.error);
+	}
 	return structuredClone(entry.value);
 }
 
@@ -96,7 +108,9 @@ type Use<E extends CacheEntry, T> = {
  */
 async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => string, use: Use<E, T>): Promise<T> {
 	const { cache, coordinator } = deps;
-	if (cache === null && coordinator === null) return use.settle(await use.run());
+	if (cache === null && coordinator === null) {
+		return use.settle(await use.run());
+	}
 	const requestKey = key();
 
 	const lookup = async (): Promise<E | undefined> => {
@@ -105,14 +119,18 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 	};
 
 	const cached = await lookup();
-	if (cached !== undefined) return use.settle(cached);
+	if (cached !== undefined) {
+		return use.settle(cached);
+	}
 
 	const execute = async (): Promise<E> => {
 		// With a coordinator, check again: work for this key may have finished between the lookup above
 		// and getting the slot. Without one there is no slot to wait for, so the lookup above is enough.
 		if (coordinator !== null) {
 			const latest = await lookup();
-			if (latest !== undefined) return latest;
+			if (latest !== undefined) {
+				return latest;
+			}
 		}
 
 		const entry = await use.run();

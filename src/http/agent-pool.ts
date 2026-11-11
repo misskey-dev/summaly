@@ -112,7 +112,9 @@ export class GuardedAgentPool {
 		this.#entries.set(key, entry);
 		if (this.#entries.size > this.#maxEntries) {
 			const oldest = this.#entries.keys().next();
-			if (!oldest.done) this.#entries.delete(oldest.value);
+			if (!oldest.done) {
+				this.#entries.delete(oldest.value);
+			}
 		}
 		return entry;
 	}

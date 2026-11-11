@@ -44,7 +44,9 @@ export async function fetchResponse(transport: Transport, req: FetchRequest): Pr
 	try {
 		return await fetchFollowingRedirects(transport, req, controller.signal);
 	} catch (e) {
-		if (controller.signal.aborted) throw controller.signal.reason;
+		if (controller.signal.aborted) {
+			throw controller.signal.reason;
+		}
 		throw e;
 	} finally {
 		clearTimeout(timer);
@@ -83,7 +85,9 @@ function parseHttpUrl(input: string): URL {
 function buildHeaders(headers: FetchRequest['headers']): http.OutgoingHttpHeaders {
 	const result: http.OutgoingHttpHeaders = {};
 	for (const [name, value] of Object.entries(headers)) {
-		if (value !== undefined && name.toLowerCase() !== 'accept-encoding') result[name] = value;
+		if (value !== undefined && name.toLowerCase() !== 'accept-encoding') {
+			result[name] = value;
+		}
 	}
 	result['accept-encoding'] = 'gzip, deflate, br';
 	return result;
@@ -119,11 +123,15 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		agent,
 		signal,
 	};
-	if (tunnelTarget) options[TUNNEL_TARGET] = tunnelTarget;
+	if (tunnelTarget) {
+		options[TUNNEL_TARGET] = tunnelTarget;
+	}
 	// The guarded agents set a timeout on their sockets for idle ones (see createGuardedAgents); a request on them must
 	// replace it with its own (0 turns it off), or it would be cut while waiting for the server.
 	const guardedHop = agent !== undefined && (agent === transport.guardedAgents?.http || agent === transport.guardedAgents?.https);
-	if (req.responseTimeout > 0 || guardedHop) options.timeout = req.responseTimeout;
+	if (req.responseTimeout > 0 || guardedHop) {
+		options.timeout = req.responseTimeout;
+	}
 
 	let timeoutError: Error | undefined;
 	const send = () => new Promise<http.IncomingMessage>((resolve, reject) => {
@@ -259,14 +267,18 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 		let resEnded = false;
 
 		const fail = (err: Error) => {
-			if (settled) return;
+			if (settled) {
+				return;
+			}
 			settled = true;
 			res.destroy();
 			decompressor?.destroy();
 			reject(err);
 		};
 		const collect = (chunk: Buffer) => {
-			if (settled) return;
+			if (settled) {
+				return;
+			}
 			size += chunk.length;
 			if (size > maxSize) {
 				fail(maxSizeExceeded(size, maxSize));
@@ -275,7 +287,9 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 			chunks.push(chunk);
 		};
 		const done = () => {
-			if (settled) return;
+			if (settled) {
+				return;
+			}
 			settled = true;
 			resolve(Buffer.concat(chunks, size));
 		};
@@ -285,7 +299,9 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 			resEnded = true;
 		});
 		res.on('close', () => {
-			if (!resEnded) fail(prematureClose());
+			if (!resEnded) {
+				fail(prematureClose());
+			}
 		});
 
 		if (!decompressor) {
@@ -299,7 +315,9 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 		decompressor.on('data', collect);
 		decompressor.on('end', done);
 		res.on('data', (chunk: Buffer) => {
-			if (settled) return;
+			if (settled) {
+				return;
+			}
 			wireSize += chunk.length;
 			if (wireSize > maxSize) {
 				fail(maxSizeExceeded(wireSize, maxSize));
@@ -311,7 +329,9 @@ function readBody(res: http.IncomingMessage, decompressor: Transform | null, max
 			}
 		});
 		res.on('end', () => {
-			if (!settled) decompressor.end();
+			if (!settled) {
+				decompressor.end();
+			}
 		});
 	});
 }
@@ -349,8 +369,12 @@ class Decompressor extends Transform {
 	}
 
 	#createInner(first: Buffer) {
-		if (this.#encoding === 'br') return zlib.createBrotliDecompress();
-		if (this.#encoding === 'deflate' && (first.readUInt8(0) & 0x08) === 0) return zlib.createInflateRaw();
+		if (this.#encoding === 'br') {
+			return zlib.createBrotliDecompress();
+		}
+		if (this.#encoding === 'deflate' && (first.readUInt8(0) & 0x08) === 0) {
+			return zlib.createInflateRaw();
+		}
 		return zlib.createUnzip();
 	}
 
@@ -385,7 +409,9 @@ function ipv4First(addresses: string[]): string[] {
 }
 
 function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-	if (signal.aborted) return Promise.reject(signal.reason);
+	if (signal.aborted) {
+		return Promise.reject(signal.reason);
+	}
 	return new Promise<T>((resolve, reject) => {
 		const onAbort = () => reject(signal.reason);
 		signal.addEventListener('abort', onAbort, { once: true });

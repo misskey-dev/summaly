@@ -70,7 +70,9 @@ export function createTransport(
 	env: NodeJS.ProcessEnv = process.env,
 ): Transport {
 	// Public input: reject unusable proxy URLs (any scheme, even one a caller agent replaces) up front.
-	if (opts.proxy) assertProxyOptions(opts.proxy);
+	if (opts.proxy) {
+		assertProxyOptions(opts.proxy);
+	}
 	const agents = { http: opts.agent?.http, https: opts.agent?.https };
 	const hasAgent = agents.http != null || agents.https != null;
 	// The guard is handed off per scheme: only a scheme whose agent the caller supplied leaves blocking to the caller.
@@ -104,12 +106,22 @@ function proxyWithoutCallerSchemes(
 	proxy: ProxyOptions | undefined,
 	agents: { http?: http.Agent; https?: https.Agent },
 ): ProxyOptions | null {
-	if (!proxy) return null;
+	if (!proxy) {
+		return null;
+	}
 	const result: ProxyOptions = {};
-	if (proxy.http && agents.http == null) result.http = proxy.http;
-	if (proxy.https && agents.https == null) result.https = proxy.https;
-	if (!result.http && !result.https) return null;
-	if (proxy.noProxy) result.noProxy = proxy.noProxy;
+	if (proxy.http && agents.http == null) {
+		result.http = proxy.http;
+	}
+	if (proxy.https && agents.https == null) {
+		result.https = proxy.https;
+	}
+	if (!result.http && !result.https) {
+		return null;
+	}
+	if (proxy.noProxy) {
+		result.noProxy = proxy.noProxy;
+	}
 	return result;
 }
 
@@ -122,12 +134,18 @@ export function selectOwnedAgent(transport: Transport, url: URL): http.Agent | u
 	const isHttps = url.protocol === 'https:';
 	if (transport.proxy && selectProxyUrl(url, transport.proxy) !== null) {
 		const agent = isHttps ? transport.proxyAgents.https : transport.proxyAgents.http;
-		if (!agent) throw new Error('Proxied transport has no proxy agent');
+		if (!agent) {
+			throw new Error('Proxied transport has no proxy agent');
+		}
 		return agent;
 	}
-	if (!transport.guard) return undefined;
+	if (!transport.guard) {
+		return undefined;
+	}
 	const agent = isHttps ? transport.guardedAgents?.https : transport.guardedAgents?.http;
-	if (!agent) throw new Error('Guarded transport has no guarded agent');
+	if (!agent) {
+		throw new Error('Guarded transport has no guarded agent');
+	}
 	return agent;
 }
 

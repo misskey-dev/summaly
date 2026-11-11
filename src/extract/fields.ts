@@ -20,7 +20,9 @@ type MetaKey = Parameters<HeadInfo['meta']>[0];
 export function metaContent(head: HeadInfo, ...keys: MetaKey[]): string | undefined {
 	for (const key of keys) {
 		const value = head.meta(key);
-		if (value) return decode(value, { scope: 'attribute' });
+		if (value) {
+			return decode(value, { scope: 'attribute' });
+		}
 	}
 	return undefined;
 }

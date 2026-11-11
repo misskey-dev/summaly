@@ -68,7 +68,9 @@ export class MemorySummaryCache implements SummaryCache {
 
 	async get(key: string): Promise<CacheEntry | undefined> {
 		const stored = this.#entries.get(key);
-		if (stored === undefined) return undefined;
+		if (stored === undefined) {
+			return undefined;
+		}
 		if (performance.now() >= stored.expiresAt) {
 			this.#delete(key);
 			return undefined;
@@ -81,19 +83,25 @@ export class MemorySummaryCache implements SummaryCache {
 		// does not leave the previous one behind).
 		this.#delete(key);
 		const bytes = estimateBytes(key, entry);
-		if (bytes === null || bytes > this.#maxEntryBytes || bytes > this.#maxBytes) return;
+		if (bytes === null || bytes > this.#maxEntryBytes || bytes > this.#maxBytes) {
+			return;
+		}
 
 		this.#entries.set(key, { entry, expiresAt: performance.now() + ttlMs, bytes });
 		this.#bytes += bytes;
 		for (const oldest of this.#entries.keys()) {
-			if (this.#entries.size <= this.#maxEntries && this.#bytes <= this.#maxBytes) break;
+			if (this.#entries.size <= this.#maxEntries && this.#bytes <= this.#maxBytes) {
+				break;
+			}
 			this.#delete(oldest);
 		}
 	}
 
 	#delete(key: string): void {
 		const stored = this.#entries.get(key);
-		if (stored === undefined) return;
+		if (stored === undefined) {
+			return;
+		}
 		this.#entries.delete(key);
 		this.#bytes -= stored.bytes;
 	}
