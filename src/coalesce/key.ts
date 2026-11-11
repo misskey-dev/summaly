@@ -45,19 +45,26 @@ function canonical(value: unknown): string {
 		return `[${value.map(canonical).join(',')}]`;
 	}
 	switch (typeof value) {
-		case 'string': return `s${JSON.stringify(value)}`;
-		case 'number': return `d${String(value)}`;
-		case 'boolean': return value ? 't' : 'f';
+		case 'string':
+			return `s${JSON.stringify(value)}`;
+		case 'number':
+			return `d${String(value)}`;
+		case 'boolean':
+			return value ? 't' : 'f';
 		case 'object': {
 			const record = value as Record<string, unknown>;
 			const fields = Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonical(record[key])}`);
 
 			return `{${fields.join(',')}}`;
 		}
-		case 'bigint': return `b${value.toString()}`;
-		case 'symbol': return `y${value.toString()}`;
-		case 'function': return `f${PROCESS_NONCE}:${objectId(value)}`;
-		default: return `${typeof value}`;
+		case 'bigint':
+			return `b${value.toString()}`;
+		case 'symbol':
+			return `y${value.toString()}`;
+		case 'function':
+			return `f${PROCESS_NONCE}:${objectId(value)}`;
+		default:
+			return `${typeof value}`;
 	}
 }
 
