@@ -7,7 +7,7 @@ import { type ScrapeContext, createScrapeContext, fetchWithContext } from '@/con
 import { scrapeGeneral } from '@/extract/general.js';
 import { builtinProviders } from '@/providers/index.js';
 import { fromPlugin } from '@/providers/provider.js';
-import type { SummalyOptions, SummalyResult } from '@/types.js';
+import type { SummarizeOptions, SummaryResult } from '@/types.js';
 import { VERSION } from '@/version.js';
 
 export const version: string = VERSION;
@@ -24,6 +24,9 @@ export type {
 	Player,
 	ProxyOptions,
 	Summary,
+	SummarizeOptions,
+	SummaryPlugin,
+	SummaryResult,
 	SummalyOptions,
 	SummalyPlugin,
 	SummalyResult,
@@ -35,26 +38,34 @@ export type {
 	SummaryCache,
 } from '@/coalesce/types.js';
 
-export const summalyDefaultOptions: SummalyOptions = {
+/**
+ * Defaults merged under the options of every call.
+ */
+export const defaultSummarizeOptions: SummarizeOptions = {
 	lang: null,
 	followRedirects: true,
 	plugins: [],
 };
 
+/**
+ * Alias of `defaultSummarizeOptions`, kept for summaly compatibility.
+ */
+export const summalyDefaultOptions: SummarizeOptions = defaultSummarizeOptions;
+
 const DEFAULT_CACHE_TTL = 5 * 60 * 1000;
 const DEFAULT_ERROR_CACHE_TTL = 30 * 1000;
 
 /**
- * Creates a summaly function with its own result cache and in-flight sharing.
+ * Creates a summarize function with its own result cache and in-flight sharing.
  * Options given per call are merged over `base`. `cache: false` / `coordinator: false` (in either) turns that part off.
  */
-export function createSummaly(base: SummalyOptions = {}): (url: string, options?: SummalyOptions) => Promise<SummalyResult> {
+export function createSummarizer(base: SummarizeOptions = {}): (url: string, options?: SummarizeOptions) => Promise<SummaryResult> {
 	const memoryCache = new MemorySummaryCache();
 	const inProcessCoordinator = new InProcessCoordinator();
 
 	return (url, options = {}) => {
-		const opts: SummalyOptions = {
-			...summalyDefaultOptions,
+		const opts: SummarizeOptions = {
+			...defaultSummarizeOptions,
 			...base,
 			...options,
 		};
@@ -71,14 +82,24 @@ export function createSummaly(base: SummalyOptions = {}): (url: string, options?
 }
 
 /**
+ * Alias of `createSummarizer`, kept for summaly compatibility.
+ */
+export const createSummaly: (base?: SummarizeOptions) => (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = createSummarizer;
+
+/**
  * Summarize an web page
  */
-export const summaly: (url: string, options?: SummalyOptions) => Promise<SummalyResult> = createSummaly();
+export const summarize: (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = createSummarizer();
+
+/**
+ * Alias of `summarize`, kept for summaly compatibility.
+ */
+export const summaly: (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = summarize;
 
 /**
  * The whole summary without caching or sharing: final URL, provider match, scraping.
  */
-async function summarizeUncached(url: string, opts: SummalyOptions): Promise<SummalyResult> {
+async function summarizeUncached(url: string, opts: SummarizeOptions): Promise<SummaryResult> {
 	const ctx = createScrapeContext(opts);
 
 	const actualUrl = opts.followRedirects ? await resolveFinalUrl(ctx, url) : url;

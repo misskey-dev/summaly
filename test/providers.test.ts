@@ -8,7 +8,7 @@ import { branchioDeeplinks } from '@/providers/branchio-deeplinks.js';
 import { builtinProviders } from '@/providers/index.js';
 import { fromPlugin } from '@/providers/provider.js';
 import { wikipedia } from '@/providers/wikipedia.js';
-import type { GeneralScrapingOptions, SummalyPlugin } from '@/types.js';
+import type { GeneralScrapingOptions, SummaryPlugin } from '@/types.js';
 import { loopbackAgents } from './helpers/loopback-agent.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
@@ -201,7 +201,7 @@ describe('branchio-deeplinks', () => {
 describe('fromPlugin', () => {
 	test('test() をそのまま使い、summarize() に本家と同じ GeneralScrapingOptions を渡す', async () => {
 		let received: { url: URL; opts?: GeneralScrapingOptions } | undefined;
-		const plugin: SummalyPlugin = {
+		const plugin: SummaryPlugin = {
 			test: url => url.hostname === 'custom.example',
 			summarize: async (url, opts) => {
 				received = { url, opts };

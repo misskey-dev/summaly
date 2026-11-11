@@ -55,12 +55,17 @@ export type Summary = {
 	fediverseCreator: string | null;
 };
 
-export type SummalyResult = Summary & {
+export type SummaryResult = Summary & {
 	/**
 	 * The actual url of that web page
 	 */
 	url: string;
 };
+
+/**
+ * Alias of `SummaryResult`, kept for summaly compatibility.
+ */
+export type SummalyResult = SummaryResult;
 
 export type Player = {
 	/**
@@ -94,10 +99,15 @@ export type GeneralScrapingOptions = {
 	contentLengthRequired?: boolean;
 };
 
-export interface SummalyPlugin {
+export interface SummaryPlugin {
 	test(url: URL): boolean;
 	summarize(url: URL, opts?: GeneralScrapingOptions): Promise<Summary | null>;
 }
+
+/**
+ * Alias of `SummaryPlugin`, kept for summaly compatibility.
+ */
+export type SummalyPlugin = SummaryPlugin;
 
 export type ProxyOptions = {
 	/**
@@ -116,7 +126,7 @@ export type ProxyOptions = {
 	noProxy?: string;
 };
 
-export type SummalyOptions = {
+export type SummarizeOptions = {
 	/**
 	 * Accept-Language for the request
 	 */
@@ -130,7 +140,7 @@ export type SummalyOptions = {
 	/**
 	 * Custom Plugins
 	 */
-	plugins?: SummalyPlugin[];
+	plugins?: SummaryPlugin[];
 
 	/**
 	 * Custom HTTP agent
@@ -196,3 +206,8 @@ export type SummalyOptions = {
 	 */
 	coordinator?: InflightCoordinator | false;
 };
+
+/**
+ * Alias of `SummarizeOptions`, kept for summaly compatibility.
+ */
+export type SummalyOptions = SummarizeOptions;

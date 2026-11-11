@@ -1,5 +1,5 @@
 // Derived from misskey-dev/summaly (MIT)
-import type { SummalyOptions } from '@/types.js';
+import type { SummarizeOptions } from '@/types.js';
 import { DEFAULT_BOT_UA } from '@/version.js';
 
 export const DEFAULT_RESPONSE_TIMEOUT = 20 * 1000;
@@ -21,7 +21,7 @@ export type ResolvedOptions = {
 // Same check as upstream general(): a comma-separated list of language tags.
 const LANG_PATTERN = /^[\w-]+(\s*,\s*[\w-]+)*$/;
 
-export function resolveOptions(opts: SummalyOptions): ResolvedOptions {
+export function resolveOptions(opts: SummarizeOptions): ResolvedOptions {
 	return {
 		lang: opts.lang && LANG_PATTERN.test(opts.lang) ? opts.lang : null,
 		userAgent: opts.userAgent ?? DEFAULT_BOT_UA,

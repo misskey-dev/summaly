@@ -2,7 +2,7 @@ import { type FetchRequest, type FetchResult, fetchResponse } from '@/http/reque
 import { type Transport, createTransport } from '@/http/transport.js';
 import { type ResolvedOptions, resolveOptions } from '@/options.js';
 import { toScrapingOptions } from '@/providers/provider.js';
-import type { GeneralScrapingOptions, SummalyOptions } from '@/types.js';
+import type { GeneralScrapingOptions, SummarizeOptions } from '@/types.js';
 
 /** Everything one summary needs to make requests. Built per call; holds no global state. */
 export type ScrapeContext = {
@@ -12,7 +12,7 @@ export type ScrapeContext = {
 	transport: Transport;
 };
 
-export function createScrapeContext(opts: SummalyOptions): ScrapeContext {
+export function createScrapeContext(opts: SummarizeOptions): ScrapeContext {
 	return {
 		options: resolveOptions(opts),
 		scrapingOptions: toScrapingOptions(opts),

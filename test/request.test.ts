@@ -100,6 +100,11 @@ describe('createTransport', () => {
 		expect(createTransport({}, { SUMMALY_ALLOW_PRIVATE_IP: 'true' }).guard).toBeNull();
 		expect(createTransport({ agent: { http: new http.Agent() } }, { SUMMALY_ALLOW_PRIVATE_IP: 'true' }).guard).toBeNull();
 	});
+
+	test('CHIRAMISS_ALLOW_PRIVATE_IP=true なら guard なし、CHIRAMISS_ALLOW_PRIVATE_IP=false は SUMMALY_ALLOW_PRIVATE_IP=true より優先', () => {
+		expect(createTransport({}, { CHIRAMISS_ALLOW_PRIVATE_IP: 'true' }).guard).toBeNull();
+		expect(createTransport({}, { CHIRAMISS_ALLOW_PRIVATE_IP: 'false', SUMMALY_ALLOW_PRIVATE_IP: 'true' }).guard).not.toBeNull();
+	});
 });
 
 describe('fetchResponse', () => {

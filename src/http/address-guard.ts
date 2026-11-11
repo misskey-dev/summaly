@@ -116,7 +116,12 @@ export function createGuardedLookup(guard: AddressGuard): net.LookupFunction {
 	};
 }
 
-/** Whether the environment turns the private IP block off (upstream compatible `SUMMALY_ALLOW_PRIVATE_IP=true`). */
+/**
+ * Whether the environment turns the private IP block off: `CHIRAMISS_ALLOW_PRIVATE_IP=true`, or the upstream
+ * compatible `SUMMALY_ALLOW_PRIVATE_IP=true`. `CHIRAMISS_ALLOW_PRIVATE_IP` wins when set; an empty string counts as unset.
+ */
 export function privateIpAllowedByEnv(env: NodeJS.ProcessEnv = process.env): boolean {
-	return env.SUMMALY_ALLOW_PRIVATE_IP === 'true';
+	const chiramiss = env.CHIRAMISS_ALLOW_PRIVATE_IP;
+	const value = chiramiss != null && chiramiss !== '' ? chiramiss : env.SUMMALY_ALLOW_PRIVATE_IP;
+	return value === 'true';
 }

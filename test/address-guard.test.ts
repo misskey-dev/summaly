@@ -136,4 +136,17 @@ describe('AddressGuard', () => {
 		expect(privateIpAllowedByEnv({ SUMMALY_ALLOW_PRIVATE_IP: 'TRUE' })).toBe(false);
 		expect(privateIpAllowedByEnv({ SUMMALY_ALLOW_PRIVATE_IP: '1' })).toBe(false);
 	});
+
+	test('privateIpAllowedByEnv: CHIRAMISS_ALLOW_PRIVATE_IP が true のときも true', () => {
+		expect(privateIpAllowedByEnv({ CHIRAMISS_ALLOW_PRIVATE_IP: 'true' })).toBe(true);
+		expect(privateIpAllowedByEnv({ CHIRAMISS_ALLOW_PRIVATE_IP: 'false' })).toBe(false);
+		expect(privateIpAllowedByEnv({ CHIRAMISS_ALLOW_PRIVATE_IP: 'TRUE' })).toBe(false);
+		expect(privateIpAllowedByEnv({ CHIRAMISS_ALLOW_PRIVATE_IP: '1' })).toBe(false);
+	});
+
+	test('privateIpAllowedByEnv: 両方あれば CHIRAMISS_ALLOW_PRIVATE_IP が優先、空文字なら SUMMALY_ALLOW_PRIVATE_IP を使う', () => {
+		expect(privateIpAllowedByEnv({ CHIRAMISS_ALLOW_PRIVATE_IP: 'false', SUMMALY_ALLOW_PRIVATE_IP: 'true' })).toBe(false);
+		expect(privateIpAllowedByEnv({ CHIRAMISS_ALLOW_PRIVATE_IP: 'true', SUMMALY_ALLOW_PRIVATE_IP: 'false' })).toBe(true);
+		expect(privateIpAllowedByEnv({ CHIRAMISS_ALLOW_PRIVATE_IP: '', SUMMALY_ALLOW_PRIVATE_IP: 'true' })).toBe(true);
+	});
 });

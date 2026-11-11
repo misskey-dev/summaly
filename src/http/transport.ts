@@ -1,6 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
-import type { ProxyOptions, SummalyOptions } from '@/types.js';
+import type { ProxyOptions, SummarizeOptions } from '@/types.js';
 import { type AddressGuard, createAddressGuard, createGuardedLookup, privateIpAllowedByEnv } from './address-guard.js';
 import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy/index.js';
 
@@ -14,7 +14,7 @@ export type Transport = {
 	agents: { http?: http.Agent; https?: https.Agent };
 	/**
 	 * Private IP guard, applied per hop to schemes without a caller-supplied agent.
-	 * null when SUMMALY_ALLOW_PRIVATE_IP=true, or when the caller supplies agents for both schemes.
+	 * null when the environment allows private IPs (see privateIpAllowedByEnv), or when the caller supplies agents for both schemes.
 	 */
 	guard: AddressGuard | null;
 	/**
@@ -38,7 +38,7 @@ export type Transport = {
 };
 
 export function createTransport(
-	opts: { agent?: SummalyOptions['agent']; allowedPrivateNetworks?: string[]; proxy?: ProxyOptions },
+	opts: { agent?: SummarizeOptions['agent']; allowedPrivateNetworks?: string[]; proxy?: ProxyOptions },
 	env: NodeJS.ProcessEnv = process.env,
 ): Transport {
 	// Public input: reject unusable proxy URLs (any scheme, even one a caller agent replaces) up front.

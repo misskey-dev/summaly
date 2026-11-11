@@ -1,6 +1,6 @@
 // Derived from misskey-dev/summaly (MIT)
-import { summaly } from '@/index.js';
-import type { SummalyOptions } from '@/types.js';
+import { summarize } from '@/index.js';
+import type { SummarizeOptions } from '@/types.js';
 
 type ReplyLike = {
 	status(code: number): { send(payload: unknown): unknown };
@@ -22,7 +22,7 @@ export type FastifyLike = {
 /**
  * Fastify plugin compatible with upstream summaly's default export.
  */
-export default function summalyPlugin(fastify: FastifyLike, options: SummalyOptions, done: (err?: Error) => void): void {
+export default function summaryPlugin(fastify: FastifyLike, options: SummarizeOptions, done: (err?: Error) => void): void {
 	fastify.get('/', async (req, reply) => {
 		const query = req.query as { url?: string; lang?: string };
 		const url = query.url;
@@ -33,7 +33,7 @@ export default function summalyPlugin(fastify: FastifyLike, options: SummalyOpti
 		}
 
 		try {
-			return await summaly(url, {
+			return await summarize(url, {
 				lang: query.lang,
 				followRedirects: false,
 				...options,

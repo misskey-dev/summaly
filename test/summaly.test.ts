@@ -3,15 +3,15 @@ import { readFileSync } from 'node:fs';
 import http, { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { createSummaly, summalyDefaultOptions } from '@/index.js';
+import { createSummarizer, defaultSummarizeOptions } from '@/index.js';
 import { StatusError } from '@/http/status-error.js';
-import type { GeneralScrapingOptions, Summary, SummalyPlugin } from '@/types.js';
+import type { GeneralScrapingOptions, Summary, SummaryPlugin } from '@/types.js';
 import { DEFAULT_BOT_UA } from '@/version.js';
 import { loopbackAgents } from './helpers/loopback-agent.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
 /** These tests serve different content at the same URL, so results must not be cached across calls. */
-const summaly = createSummaly({ cache: false });
+const summarize = createSummarizer({ cache: false });
 
 /** Replaces upstream's SUMMALY_ALLOW_PRIVATE_IP=true for tests that do not exercise the env var itself. */
 const allowedPrivateNetworks = ['127.0.0.0/8', '::1/128'];
@@ -20,15 +20,18 @@ type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
 
 const servers: TestServer[] = [];
 const cleanups: (() => void)[] = [];
-const originalAllowPrivateIp = process.env.SUMMALY_ALLOW_PRIVATE_IP;
+const ALLOW_PRIVATE_IP_VARS = ['CHIRAMISS_ALLOW_PRIVATE_IP', 'SUMMALY_ALLOW_PRIVATE_IP'] as const;
+const originalAllowPrivateIp = ALLOW_PRIVATE_IP_VARS.map(name => [name, process.env[name]] as const);
 
 beforeEach(() => {
-	delete process.env.SUMMALY_ALLOW_PRIVATE_IP;
+	for (const name of ALLOW_PRIVATE_IP_VARS) delete process.env[name];
 });
 
 afterEach(async () => {
-	if (originalAllowPrivateIp === undefined) delete process.env.SUMMALY_ALLOW_PRIVATE_IP;
-	else process.env.SUMMALY_ALLOW_PRIVATE_IP = originalAllowPrivateIp;
+	for (const [name, value] of originalAllowPrivateIp) {
+		if (value === undefined) delete process.env[name];
+		else process.env[name] = value;
+	}
 	for (const cleanup of cleanups.splice(0)) cleanup();
 	await Promise.all(servers.splice(0).map(s => s.close()));
 });
@@ -82,7 +85,7 @@ describe('network tests', () => {
 		const content = fixture('htmls/basic.html');
 		const host = await serve((_req, res) => sendWithLength(res, content));
 
-		const summary = await summaly(host).catch((e: StatusError) => e);
+		const summary = await summarize(host).catch((e: StatusError) => e);
 
 		if (summary instanceof StatusError) {
 			expect(summary.name).toBe('StatusError');
@@ -105,7 +108,7 @@ describe('local tests', () => {
 		});
 
 		test('private ipなサーバーの情報を取得できない', async () => {
-			const summary = await summaly(host).catch((e: StatusError) => e);
+			const summary = await summarize(host).catch((e: StatusError) => e);
 			if (summary instanceof StatusError) {
 				expect(summary.name).toBe('StatusError');
 			} else {
@@ -122,12 +125,12 @@ describe('local tests', () => {
 				agent.http.destroy();
 				agent.https.destroy();
 			});
-			const summary = await summaly(host, { agent });
+			const summary = await summarize(host, { agent });
 			expect(summary.title).toBe('Strawberry Pasta');
 		});
 
 		test('agentが空のオブジェクトの場合はprivate ipを許可しない', async () => {
-			const summary = await summaly(host, { agent: {} }).catch((e: StatusError) => e);
+			const summary = await summarize(host, { agent: {} }).catch((e: StatusError) => e);
 			if (summary instanceof StatusError) {
 				expect(summary.name).toBe('StatusError');
 			} else {
@@ -145,7 +148,7 @@ describe('local tests', () => {
 				ua = req.headers['user-agent'];
 				sendWithLength(res, content);
 			}));
-			await summaly(host, { userAgent: 'test-ua', allowedPrivateNetworks });
+			await summarize(host, { userAgent: 'test-ua', allowedPrivateNetworks });
 
 			expect(ua).toBe('test-ua');
 		});
@@ -154,13 +157,13 @@ describe('local tests', () => {
 	describe('options', () => {
 		test('指定したオプションが以降の呼び出しに引き継がれないこと', async () => {
 			const content = fixture('htmls/basic.html');
-			const defaults = { ...summalyDefaultOptions };
+			const defaults = { ...defaultSummarizeOptions };
 
 			const host = await serve(onlyRoot((_req, res) => sendWithLength(res, content)));
 
-			await expect(summaly(host, { contentLengthLimit: content.byteLength - 1, userAgent: 'test-ua', allowedPrivateNetworks })).rejects.toThrow();
-			expect(summalyDefaultOptions).toEqual(defaults);
-			expect(await summaly(host, { allowedPrivateNetworks })).toBeDefined();
+			await expect(summarize(host, { contentLengthLimit: content.byteLength - 1, userAgent: 'test-ua', allowedPrivateNetworks })).rejects.toThrow();
+			expect(defaultSummarizeOptions).toEqual(defaults);
+			expect(await summarize(host, { allowedPrivateNetworks })).toBeDefined();
 		});
 	});
 
@@ -169,21 +172,21 @@ describe('local tests', () => {
 			const content = fixture('htmls/basic.html');
 			const host = await serve(onlyRoot((_req, res) => sendWithLength(res, content)));
 
-			expect(await summaly(host, { contentLengthLimit: content.byteLength, allowedPrivateNetworks })).toBeDefined();
+			expect(await summarize(host, { contentLengthLimit: content.byteLength, allowedPrivateNetworks })).toBeDefined();
 		});
 
 		test('content-lengthの上限を超えているとエラーになる事', async () => {
 			const content = fixture('htmls/basic.html');
 			const host = await serve(onlyRoot((_req, res) => sendWithLength(res, content)));
 
-			await expect(summaly(host, { contentLengthLimit: content.byteLength - 1, allowedPrivateNetworks })).rejects.toThrow();
+			await expect(summarize(host, { contentLengthLimit: content.byteLength - 1, allowedPrivateNetworks })).rejects.toThrow();
 		});
 
 		test('content-lengthなしのストリーム受信中に上限を超えるとエラーになること', async () => {
 			const chunk = Buffer.alloc(32, 'a');
 			const host = await serve(onlyRoot((_req, res) => sendStream(res, [chunk, chunk])));
 
-			await expect(summaly(host, { contentLengthLimit: 16, allowedPrivateNetworks })).rejects.toThrow(/maxSize exceeded \(\d+ > 16\) on response/);
+			await expect(summarize(host, { contentLengthLimit: 16, allowedPrivateNetworks })).rejects.toThrow(/maxSize exceeded \(\d+ > 16\) on response/);
 		});
 	});
 
@@ -192,28 +195,28 @@ describe('local tests', () => {
 			const content = fixture('htmls/basic.html');
 			const host = await serve(onlyRoot((_req, res) => sendWithLength(res, content)));
 
-			expect(await summaly(host, { contentLengthRequired: true, contentLengthLimit: content.byteLength, allowedPrivateNetworks })).toBeDefined();
+			expect(await summarize(host, { contentLengthRequired: true, contentLengthLimit: content.byteLength, allowedPrivateNetworks })).toBeDefined();
 		});
 
 		test('[オプション有効化時] content-lengthが返されない場合はエラーとなること', async () => {
 			const content = fixture('htmls/basic.html');
 			const host = await serve(onlyRoot((_req, res) => sendStream(res, [content])));
 
-			await expect(summaly(host, { contentLengthRequired: true, allowedPrivateNetworks })).rejects.toThrow();
+			await expect(summarize(host, { contentLengthRequired: true, allowedPrivateNetworks })).rejects.toThrow();
 		});
 
 		test('[オプション無効化時] content-lengthが返された場合はエラーとならないこと', async () => {
 			const content = fixture('htmls/basic.html');
 			const host = await serve(onlyRoot((_req, res) => sendWithLength(res, content)));
 
-			expect(await summaly(host, { contentLengthRequired: false, contentLengthLimit: content.byteLength, allowedPrivateNetworks })).toBeDefined();
+			expect(await summarize(host, { contentLengthRequired: false, contentLengthLimit: content.byteLength, allowedPrivateNetworks })).toBeDefined();
 		});
 
 		test('[オプション無効化時] content-lengthが返されなくてもエラーとならないこと', async () => {
 			const content = fixture('htmls/basic.html');
 			const host = await serve(onlyRoot((_req, res) => sendStream(res, [content])));
 
-			expect(await summaly(host, { contentLengthRequired: false, allowedPrivateNetworks })).toBeDefined();
+			expect(await summarize(host, { contentLengthRequired: false, allowedPrivateNetworks })).toBeDefined();
 		});
 	});
 });
@@ -225,9 +228,30 @@ describe('chiramiss additions', () => {
 		const content = fixture('htmls/og-title.html');
 		const host = await serve((_req, res) => sendWithLength(res, content));
 
-		const summary = await summaly(host);
+		const summary = await summarize(host);
 
 		expect(summary.title).toBe('Strawberry Pasta');
+	});
+
+	test('CHIRAMISS_ALLOW_PRIVATE_IP=true でも allowedPrivateNetworks や agent なしでローカルサーバーを要約できる', async () => {
+		// The top-level afterEach restores the original values.
+		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'true';
+		const content = fixture('htmls/og-title.html');
+		const host = await serve((_req, res) => sendWithLength(res, content));
+
+		const summary = await summarize(host);
+
+		expect(summary.title).toBe('Strawberry Pasta');
+	});
+
+	test('CHIRAMISS_ALLOW_PRIVATE_IP=false と SUMMALY_ALLOW_PRIVATE_IP=true が両方あれば CHIRAMISS_ALLOW_PRIVATE_IP が優先され、ローカルサーバーは拒否される', async () => {
+		// The top-level afterEach restores the original values.
+		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'false';
+		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
+		const content = fixture('htmls/og-title.html');
+		const host = await serve((_req, res) => sendWithLength(res, content));
+
+		await expect(summarize(host)).rejects.toThrow(StatusError);
 	});
 
 	test('Amazon のページ取得は followRedirects: false / contentLengthRequired: true を指定しても本家と同じくリダイレクトに従い content-length を要求しない', async () => {
@@ -247,7 +271,7 @@ describe('chiramiss additions', () => {
 		const agents = loopbackAgents(Number(new URL(server).port));
 		cleanups.push(() => agents.destroy());
 
-		const summary = await summaly('https://www.amazon.co.jp/dp/OLD', {
+		const summary = await summarize('https://www.amazon.co.jp/dp/OLD', {
 			followRedirects: false,
 			contentLengthRequired: true,
 			agent: { http: agents.http, https: agents.https },
@@ -272,8 +296,8 @@ describe('chiramiss additions', () => {
 		const b = hookedAgent();
 
 		const [summaryA, summaryB] = await Promise.all([
-			summaly(hostA, { agent: { http: a.agent }, userAgent: 'ua-a' }),
-			summaly(hostB, { agent: { http: b.agent }, userAgent: 'ua-b' }),
+			summarize(hostA, { agent: { http: a.agent }, userAgent: 'ua-a' }),
+			summarize(hostB, { agent: { http: b.agent }, userAgent: 'ua-b' }),
 		]);
 
 		expect(summaryA.title).toBe('A');
@@ -309,7 +333,7 @@ describe('chiramiss additions', () => {
 			throw e;
 		});
 
-		const summary = await summaly(`${origin}/`, { allowedPrivateNetworks: ['127.0.0.2/32'] });
+		const summary = await summarize(`${origin}/`, { allowedPrivateNetworks: ['127.0.0.2/32'] });
 
 		// The HEAD's redirect to 127.0.0.1 is rejected before connecting, so the original URL is used (as upstream does on HEAD failure).
 		expect(methods[0]).toBe('HEAD /');
@@ -326,7 +350,7 @@ describe('chiramiss additions', () => {
 			sendWithLength(res, content);
 		}));
 
-		await summaly(host, { allowedPrivateNetworks });
+		await summarize(host, { allowedPrivateNetworks });
 
 		expect(DEFAULT_BOT_UA).toMatch(/^ChiramissBot\//);
 		expect(uas.length).toBeGreaterThanOrEqual(2);
@@ -346,7 +370,7 @@ describe('chiramiss additions', () => {
 			fediverseCreator: null,
 		};
 		const calls: { url: string; opts?: GeneralScrapingOptions }[] = [];
-		const plugin: SummalyPlugin = {
+		const plugin: SummaryPlugin = {
 			test: () => true,
 			summarize: async (url, opts) => {
 				calls.push({ url: url.href, opts });
@@ -355,9 +379,9 @@ describe('chiramiss additions', () => {
 		};
 
 		// A URL no builtin matches goes to the plugin, with the GeneralScrapingOptions upstream builds:
-		// the caller's raw values merged over summalyDefaultOptions, so unset keys stay undefined and lang is not validated.
+		// the caller's raw values merged over defaultSummarizeOptions, so unset keys stay undefined and lang is not validated.
 		const host = await serve(onlyRoot((_req, res) => sendWithLength(res, Buffer.from('<html></html>'))));
-		const custom = await summaly(host, { plugins: [plugin], lang: 'not a valid lang!', allowedPrivateNetworks });
+		const custom = await summarize(host, { plugins: [plugin], lang: 'not a valid lang!', allowedPrivateNetworks });
 		expect(custom).toEqual({ ...pluginSummary, url: `${host}/` });
 		expect(calls).toHaveLength(1);
 		expect(calls[0].url).toBe(`${host}/`);
@@ -372,7 +396,7 @@ describe('chiramiss additions', () => {
 		});
 
 		// Values the caller does give are passed through as given.
-		const given = await summaly(host, {
+		const given = await summarize(host, {
 			plugins: [plugin],
 			lang: 'ja',
 			userAgent: 'test-ua',
@@ -403,7 +427,7 @@ describe('chiramiss additions', () => {
 		});
 		const agents = loopbackAgents(Number(new URL(wiki).port));
 		cleanups.push(() => agents.destroy());
-		const builtin = await summaly('https://ja.wikipedia.org/wiki/Wiki', { plugins: [plugin], agent: { http: agents.http, https: agents.https } });
+		const builtin = await summarize('https://ja.wikipedia.org/wiki/Wiki', { plugins: [plugin], agent: { http: agents.http, https: agents.https } });
 		expect(builtin).toMatchObject({ title: 'Wiki', description: 'text', sitename: 'Wikipedia', url: 'https://ja.wikipedia.org/wiki/Wiki' });
 		expect(calls).toHaveLength(2);
 	});

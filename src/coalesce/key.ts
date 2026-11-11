@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import type { SummalyOptions } from '@/types.js';
+import { privateIpAllowedByEnv } from '@/http/address-guard.js';
+import type { SummarizeOptions } from '@/types.js';
 
 const ids = new WeakMap<object, number>();
 let nextId = 1;
@@ -57,7 +58,7 @@ function canonical(value: unknown): string {
  * Returned as a SHA-256 hex digest, because the parts include proxy URLs that may carry credentials
  * and the key may be stored outside the process (e.g. Redis).
  */
-export function buildRequestKey(url: string, opts: SummalyOptions): string {
+export function buildRequestKey(url: string, opts: SummarizeOptions): string {
 	const parts = {
 		url,
 		lang: opts.lang,
@@ -78,7 +79,8 @@ export function buildRequestKey(url: string, opts: SummalyOptions): string {
 			https: identity(opts.agent?.https),
 		},
 		plugins: opts.plugins?.map(identity),
-		allowPrivateIp: process.env.SUMMALY_ALLOW_PRIVATE_IP,
+		// The resolved value, so that allowing private IPs by either variable name gives the same key.
+		allowPrivateIp: privateIpAllowedByEnv(),
 	};
 	return createHash('sha256').update(canonical(parts)).digest('hex');
 }

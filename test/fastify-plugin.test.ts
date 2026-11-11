@@ -1,7 +1,7 @@
 // Derived from misskey-dev/summaly (MIT)
 import Fastify from 'fastify';
 import { afterEach, describe, expect, test } from 'vitest';
-import summalyPlugin from '@/index.js';
+import summaryPlugin from '@/index.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
 const allowedPrivateNetworks = ['127.0.0.0/8', '::1/128'];
@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 async function setup(pluginOptions: Record<string, unknown> = {}) {
-	// The plugin uses the default cached summaly instance, so every test uses its own URL path.
+	// The plugin uses the default cached summarize instance, so every test uses its own URL path.
 	const server = await startTestServer((req, res) => {
 		if (req.url?.startsWith('/missing')) {
 			res.statusCode = 404;
@@ -44,7 +44,7 @@ async function setup(pluginOptions: Record<string, unknown> = {}) {
 	servers.push(server);
 	const app = Fastify();
 	apps.push(app);
-	await app.register(summalyPlugin, { allowedPrivateNetworks, ...pluginOptions });
+	await app.register(summaryPlugin, { allowedPrivateNetworks, ...pluginOptions });
 	return { app, origin: server.url.replace(/\/$/, '') };
 }
 

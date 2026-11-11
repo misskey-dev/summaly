@@ -1,6 +1,6 @@
 import type { CacheEntry, InflightCoordinator, SerializedError, SummaryCache } from '@/coalesce/types.js';
 import { StatusError } from '@/http/status-error.js';
-import type { SummalyResult } from '@/types.js';
+import type { SummaryResult } from '@/types.js';
 
 export type CoalesceDeps = {
 	cache: SummaryCache | null;
@@ -39,7 +39,7 @@ function restoreError(serialized: SerializedError): Error {
 }
 
 /** Gives the caller its own copy: the host app rewrites results it receives (icon, thumbnail). */
-function settle(entry: CacheEntry): SummalyResult {
+function settle(entry: CacheEntry): SummaryResult {
 	if (entry.kind === 'error') throw restoreError(entry.error);
 	return structuredClone(entry.value);
 }
@@ -52,8 +52,8 @@ function settle(entry: CacheEntry): SummalyResult {
 export async function runCoalesced(
 	deps: CoalesceDeps,
 	key: string,
-	task: () => Promise<SummalyResult>,
-): Promise<SummalyResult> {
+	task: () => Promise<SummaryResult>,
+): Promise<SummaryResult> {
 	const { cache, coordinator } = deps;
 
 	const cached = await cache?.get(key);
