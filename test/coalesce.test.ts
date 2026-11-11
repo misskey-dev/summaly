@@ -66,6 +66,49 @@ function newAgent(): http.Agent {
 	return agent;
 }
 
+/** A MemorySummaryCache that counts reads and records the kind of every entry stored. */
+function recordingCache(): SummaryCache & { gets: () => number; storedKinds: CacheEntry['kind'][] } {
+	const inner = new MemorySummaryCache();
+	let gets = 0;
+	const storedKinds: CacheEntry['kind'][] = [];
+	return {
+		get: key => {
+			gets++;
+			return inner.get(key);
+		},
+		set: (key, entry, ttlMs) => {
+			storedKinds.push(entry.kind);
+			return inner.set(key, entry, ttlMs);
+		},
+		gets: () => gets,
+		storedKinds,
+	};
+}
+
+/** A plugin that answers for `hostname` with a fixed summary plus `extra` fields, and counts its calls. */
+function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): SummalyPlugin & { calls: () => number } {
+	let calls = 0;
+	return {
+		test: url => url.hostname === hostname,
+		summarize: async () => {
+			calls++;
+			return {
+				title: 't',
+				icon: null,
+				description: null,
+				thumbnail: null,
+				thumbnailStyle: null,
+				sitename: null,
+				player: { url: null, width: null, height: null, allow: [] },
+				activityPub: null,
+				fediverseCreator: null,
+				...extra,
+			};
+		},
+		calls: () => calls,
+	};
+}
+
 /** A SummaryCache that keeps only JSON strings, like a Redis-backed implementation would. */
 class JsonCache implements SummaryCache {
 	readonly stored = new Map<string, string>();
@@ -276,6 +319,34 @@ describe('coalescing and caching', () => {
 		});
 
 		expect(cache.stored.size).toBe(2);
+	});
+
+	test('複製できない結果は ok として保存せず、エラーとしてキャッシュする', async () => {
+		// A function cannot go through structuredClone; storing it as 'ok' would make every cache hit throw.
+		const plugin = fixedPlugin('uncloneable.example', { extra: () => 'not cloneable' });
+		const cache = recordingCache();
+		const summaly = createSummaly({ plugins: [plugin], followRedirects: false, cache });
+		const url = 'https://uncloneable.example/';
+
+		const first = await summaly(url).catch((e: unknown) => e) as Error;
+		const second = await summaly(url).catch((e: unknown) => e) as Error;
+
+		expect(first).toBeInstanceOf(Error);
+		expect(second).toBeInstanceOf(Error);
+		expect(second).toMatchObject({ name: first.name, message: first.message });
+		expect(plugin.calls()).toBe(1);
+		expect(cache.storedKinds).toEqual(['error']);
+	});
+
+	test('coordinator: false ならキャッシュを1回だけ読む', async () => {
+		const plugin = fixedPlugin('plugin.example');
+		const cache = recordingCache();
+		const summaly = createSummaly({ plugins: [plugin], followRedirects: false, cache, coordinator: false });
+
+		await summaly('https://plugin.example/');
+		expect(plugin.calls()).toBe(1);
+		expect(cache.gets()).toBe(1);
+		expect(cache.storedKinds).toEqual(['ok']);
 	});
 });
 

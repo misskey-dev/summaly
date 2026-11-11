@@ -38,7 +38,7 @@ function settle(entry: CacheEntry): SummalyResult {
 
 /**
  * Runs `task` at most once per key at a time and caches the outcome, failures included.
- * Order: cache lookup → `task` through the coordinator → store in the cache → a separate copy for each caller.
+ * Order: cache lookup → `task` through the coordinator → a structuredClone copy stored in the cache → a separate copy for each caller.
  * Every caller, including the one whose call ran `task`, gets its result or error rebuilt from the same CacheEntry.
  */
 export async function runCoalesced(
@@ -52,13 +52,18 @@ export async function runCoalesced(
 	if (cached !== undefined) return settle(cached);
 
 	const execute = async (): Promise<CacheEntry> => {
-		// Check again: a task for this key may have finished between the lookup above and getting here.
-		const latest = await cache?.get(key);
-		if (latest !== undefined) return latest;
+		// With a coordinator, check again: a task for this key may have finished between the lookup above
+		// and getting the slot. Without one there is no slot to wait for, so the lookup above is enough.
+		if (coordinator !== null) {
+			const latest = await cache?.get(key);
+			if (latest !== undefined) return latest;
+		}
 
 		let entry: CacheEntry;
 		try {
-			entry = { kind: 'ok', value: await task() };
+			// Clone before storing: a value structuredClone cannot copy (e.g. a function from a plugin)
+			// becomes an error entry here instead of an 'ok' entry that would throw on every cache hit.
+			entry = { kind: 'ok', value: structuredClone(await task()) };
 		} catch (error) {
 			entry = { kind: 'error', error: serializeError(error) };
 		}
