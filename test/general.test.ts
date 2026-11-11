@@ -314,6 +314,33 @@ describe('local tests', () => {
 			expect(summary.player.allow).toStrictEqual(['autoplay']);
 		});
 
+		const setUpServerWithAllow = (allow: string) => serve({
+			'/': fixture('htmls/oembed.html'),
+			'/oembed.json': (_req, res) => sendBody(res, JSON.stringify({
+				version: '1.0',
+				type: 'rich',
+				html: `<iframe src='https://example.com/' allow='${allow}'></iframe>`,
+				width: 500,
+				height: 300,
+			}), 'application/json'),
+		});
+
+		test('whitespace around the separators of allow is dropped', async () => {
+			const host = await setUpServerWithAllow('autoplay ;fullscreen;  encrypted-media');
+			const summary = await summarize(host);
+
+			expect(summary.player.url).toBe('https://example.com/');
+			expect(summary.player.allow).toStrictEqual(['autoplay', 'fullscreen', 'encrypted-media']);
+		});
+
+		test('a long run of whitespace in allow does not block the event loop', async () => {
+			// Splitting with a pattern that rescans the run from each of its positions takes far longer than the test timeout.
+			const host = await setUpServerWithAllow(' '.repeat(300_000));
+			const summary = await summarize(host);
+
+			expect(summary.player.url).toBe(null);
+		});
+
 		test('oEmbed with relative path', async () => {
 			const host = await setUpServer('oembed.json', 'htmls/oembed-relative.html');
 			const summary = await summarize(host);

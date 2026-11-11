@@ -130,7 +130,15 @@ function toPlayer(body: OEmbed): Player | null {
 		return null;
 	}
 
-	const allowedPermissions = (attrs['allow'] ?? '').split(/\s*;\s*/g)
+	// Same parts as `split(/\s*;\s*/)`: whitespace is dropped only where it touches a `;`.
+	// The pattern is not used because, when no `;` follows a run of whitespace, it rescans the run
+	// from each of its positions, which is quadratic on a value the remote controls.
+	const allowedPermissions = (attrs['allow'] ?? '').split(';')
+		.map((s, i, parts) => {
+			const part = i > 0 ? s.trimStart() : s;
+
+			return i < parts.length - 1 ? part.trimEnd() : part;
+		})
 		.filter(s => s)
 		.filter(s => !IGNORED_PERMISSIONS.includes(s));
 
