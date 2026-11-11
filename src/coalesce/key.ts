@@ -56,7 +56,7 @@ function canonical(value: unknown): string {
  * Options that change how any request of a summary is sent or what it may reach, so they change every result
  * built from requests (the summary and each favicon check). Both keys take them from here, so they are listed once.
  */
-function requestParts(opts: SummarizeOptions): Record<string, unknown> {
+function requestParts(opts: SummarizeOptions, allowPrivateIp: boolean): Record<string, unknown> {
 	return {
 		userAgent: opts.userAgent,
 		responseTimeout: opts.responseTimeout,
@@ -73,7 +73,7 @@ function requestParts(opts: SummarizeOptions): Record<string, unknown> {
 			https: identity(opts.agent?.https),
 		},
 		// The resolved value, so that allowing private IPs by either variable name gives the same key.
-		allowPrivateIp: privateIpAllowedByEnv(),
+		allowPrivateIp,
 	};
 }
 
@@ -89,10 +89,12 @@ function digest(parts: Record<string, unknown>): string {
  * Key for the cache and in-flight sharing of a summary: the URL plus every option that can change the result.
  * `cache`, `coordinator`, `cacheTtl` and `errorCacheTtl` do not change the result and are left out.
  * `purpose` keeps it apart from every favicon check key.
+ * `allowPrivateIp` is whether the environment allows private IPs (see privateIpAllowedByEnv); a call passes the value
+ * its transport was built with.
  */
-export function buildRequestKey(url: string, opts: SummarizeOptions): string {
+export function buildRequestKey(url: string, opts: SummarizeOptions, allowPrivateIp = privateIpAllowedByEnv()): string {
 	return digest({
-		...requestParts(opts),
+		...requestParts(opts, allowPrivateIp),
 		purpose: 'summary',
 		url,
 		lang: opts.lang,
@@ -107,8 +109,8 @@ export function buildRequestKey(url: string, opts: SummarizeOptions): string {
  * change a HEAD for it. The HEAD sends no Accept-Language, always follows redirects and never requires
  * content-length, so `lang`, `followRedirects` and `contentLengthRequired` are left out. So are `plugins`: a plugin
  * never checks a favicon, and which provider summarizes the page does not change a check's result.
- * `purpose` keeps it apart from every summary key.
+ * `purpose` keeps it apart from every summary key. `allowPrivateIp` is as in buildRequestKey.
  */
-export function buildIconKey(url: string, opts: SummarizeOptions): string {
-	return digest({ ...requestParts(opts), purpose: 'icon', url });
+export function buildIconKey(url: string, opts: SummarizeOptions, allowPrivateIp = privateIpAllowedByEnv()): string {
+	return digest({ ...requestParts(opts, allowPrivateIp), purpose: 'icon', url });
 }

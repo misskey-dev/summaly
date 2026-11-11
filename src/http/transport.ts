@@ -47,8 +47,12 @@ export type Transport = {
 	close(): void;
 };
 
+/**
+ * `opts.allowPrivateIp` is whether the environment allows private IPs, as the caller already read it
+ * (so that its keys and this transport use the same value); when omitted, it is read from `env`.
+ */
 export function createTransport(
-	opts: { agent?: SummarizeOptions['agent']; allowedPrivateNetworks?: string[]; proxy?: ProxyOptions },
+	opts: { agent?: SummarizeOptions['agent']; allowedPrivateNetworks?: string[]; proxy?: ProxyOptions; allowPrivateIp?: boolean },
 	env: NodeJS.ProcessEnv = process.env,
 ): Transport {
 	// Public input: reject unusable proxy URLs (any scheme, even one a caller agent replaces) up front.
@@ -56,7 +60,7 @@ export function createTransport(
 	const agents = { http: opts.agent?.http, https: opts.agent?.https };
 	const hasAgent = agents.http != null || agents.https != null;
 	// The guard is handed off per scheme: only a scheme whose agent the caller supplied leaves blocking to the caller.
-	const guardOff = privateIpAllowedByEnv(env) || (agents.http != null && agents.https != null);
+	const guardOff = (opts.allowPrivateIp ?? privateIpAllowedByEnv(env)) || (agents.http != null && agents.https != null);
 	const guard = guardOff ? null : createAddressGuard(opts.allowedPrivateNetworks);
 	const proxy = proxyWithoutCallerSchemes(opts.proxy, agents);
 	const guardedAgents = guard ? createGuardedAgents(guard) : null;

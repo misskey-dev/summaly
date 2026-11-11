@@ -241,6 +241,39 @@ describe('favicon の確認結果のキャッシュ', () => {
 		expect(icons.faviconHeads()).toBe(1);
 	});
 
+	test('要約の途中でプライベート IP 許可の環境変数が変わっても、許可した設定で得た icon を許可していない呼び出しに返さない', async () => {
+		const icons = await site({ host: '127.0.0.2' });
+		// The variable is removed while the first call is fetching its page, after its transport was built.
+		const pages = await site({ faviconHref: icons.favicon, onPageGet: () => delete process.env.CHIRAMISS_ALLOW_PRIVATE_IP });
+		const summarize = createSummarizer({ allowedPrivateNetworks: ['127.0.0.1/32'] });
+
+		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'true';
+		const allowed = await summarize(`${pages.url}a`);
+		const denied = await summarize(`${pages.url}b`);
+
+		expect(allowed.icon).toBe(icons.favicon);
+		expect(denied.icon).toBeNull();
+	});
+
+	test('要約の途中で allowedPrivateNetworks の配列が書き換えられても、許可した設定で得た icon を許可していない呼び出しに返さない', async () => {
+		const icons = await site({ host: '127.0.0.2' });
+		const networks = ['127.0.0.1/32', '127.0.0.2/32'];
+		// The caller's array loses 127.0.0.2 while the first call is fetching its page, after its transport was built.
+		const pages = await site({
+			faviconHref: icons.favicon,
+			onPageGet: () => {
+				if (networks.length === 2) networks.pop();
+			},
+		});
+		const summarize = createSummarizer({ allowedPrivateNetworks: networks });
+
+		const allowed = await summarize(`${pages.url}a`);
+		const denied = await summarize(`${pages.url}b`);
+
+		expect(allowed.icon).toBe(icons.favicon);
+		expect(denied.icon).toBeNull();
+	});
+
 	test('要約のキーに icon のエントリ、icon のキーに要約のエントリがあっても、取り直して正しい結果を返す', async () => {
 		const s = await site();
 		const cache = new MemorySummaryCache();

@@ -1,5 +1,6 @@
 import { buildIconKey } from '@/coalesce/key.js';
 import type { CoalesceDeps } from '@/coalesce/run.js';
+import { privateIpAllowedByEnv } from '@/http/address-guard.js';
 import { type FetchRequest, type FetchResult, fetchResponse } from '@/http/request.js';
 import { type Transport, createTransport } from '@/http/transport.js';
 import { type ResolvedOptions, resolveOptions } from '@/options.js';
@@ -23,17 +24,43 @@ export type ScrapeContext = {
 
 const NO_COALESCE: CoalesceDeps = Object.freeze({ cache: null, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 });
 
-export function createScrapeContext(opts: SummarizeOptions, coalesce: CoalesceDeps = NO_COALESCE): ScrapeContext {
+/**
+ * `opts` with its arrays and objects copied (`allowedPrivateNetworks`, `proxy`, `plugins`), so a caller changing
+ * them while a call runs does not reach the call. A call builds its transport and every key from one such copy
+ * and one reading of the private IP environment variables, so the transport that sends a request and the key its
+ * result is stored under always agree on what may be reached.
+ */
+export function fixOptions(opts: SummarizeOptions): SummarizeOptions {
 	return {
-		options: resolveOptions(opts),
-		scrapingOptions: toScrapingOptions(opts),
+		...opts,
+		allowedPrivateNetworks: opts.allowedPrivateNetworks?.slice(),
+		proxy: opts.proxy && { ...opts.proxy },
+		plugins: opts.plugins?.slice(),
+	};
+}
+
+/**
+ * `allowPrivateIp` is whether the environment allows private IPs (see privateIpAllowedByEnv); a summarizer passes
+ * the value its summary key was built with. The transport and the favicon check keys use the same value and the same
+ * copy of `opts` (see fixOptions).
+ */
+export function createScrapeContext(
+	opts: SummarizeOptions,
+	coalesce: CoalesceDeps = NO_COALESCE,
+	allowPrivateIp: boolean = privateIpAllowedByEnv(),
+): ScrapeContext {
+	const fixed = fixOptions(opts);
+	return {
+		options: resolveOptions(fixed),
+		scrapingOptions: toScrapingOptions(fixed),
 		transport: createTransport({
-			agent: opts.agent,
-			allowedPrivateNetworks: opts.allowedPrivateNetworks,
-			proxy: opts.proxy,
+			agent: fixed.agent,
+			allowedPrivateNetworks: fixed.allowedPrivateNetworks,
+			proxy: fixed.proxy,
+			allowPrivateIp,
 		}),
 		coalesce,
-		iconKey: url => buildIconKey(url, opts),
+		iconKey: url => buildIconKey(url, fixed, allowPrivateIp),
 	};
 }
 
