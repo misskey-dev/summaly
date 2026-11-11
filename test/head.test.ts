@@ -15,6 +15,13 @@ describe('parseHead', () => {
 		]);
 	});
 
+	test('rel のない link も読む（oEmbed の link は type だけのことがある）', () => {
+		const h = parseHead('<head><link type="application/json+oembed" href="/oembed.json"><link rel="icon"></head>');
+		expect(h.links).toEqual([
+			{ rel: null, type: 'application/json+oembed', href: '/oembed.json' },
+		]);
+	});
+
 	test('同じ meta が複数あれば最初のもの', () => {
 		const h = parseHead('<head><meta property="og:title" content="first"><meta property="og:title" content="second"></head>');
 		expect(h.meta('property:og:title')).toBe('first');

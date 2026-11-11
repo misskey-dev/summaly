@@ -1,6 +1,7 @@
 import { Parser } from 'htmlparser2';
 
-export type LinkTag = { rel: string; type: string | null; href: string };
+/** `rel` is null when absent (oEmbed discovery links often have only `type`). */
+export type LinkTag = { rel: string | null; type: string | null; href: string };
 
 export type HeadInfo = {
 	title: string | null;
@@ -45,9 +46,9 @@ export function parseHead(html: string): HeadInfo {
 					if (!metas.has(key)) metas.set(key, content);
 				}
 			} else if (name === 'link') {
-				const { rel, href } = attrs;
-				if (rel === undefined || href === undefined) return;
-				links.push({ rel, type: attrs['type'] ?? null, href });
+				const href = attrs['href'];
+				if (href === undefined) return;
+				links.push({ rel: attrs['rel'] ?? null, type: attrs['type'] ?? null, href });
 			}
 		},
 		ontext(text) {
