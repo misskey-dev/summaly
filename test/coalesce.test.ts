@@ -3,7 +3,7 @@ import https from 'node:https';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { buildIconKey, buildRequestKey, objectId } from '@/coalesce/key.js';
-import { runCoalesced } from '@/coalesce/run.js';
+import { runCoalesced, runCoalescedIcon } from '@/coalesce/run.js';
 import {
 	type CacheEntry,
 	createSummarizer,
@@ -119,6 +119,18 @@ async function sizeOf(key: string, entry: CacheEntry): Promise<number> {
 	const cache = new MemorySummaryCache();
 	await cache.set(key, entry, 60_000);
 	return cache.estimatedBytes;
+}
+
+/** A cache that returns `entry` for every key and records what is stored. */
+function brokenCache(entry: unknown): SummaryCache & { stored: CacheEntry[] } {
+	const stored: CacheEntry[] = [];
+	return {
+		get: async () => entry as CacheEntry,
+		set: async (_key, value) => {
+			stored.push(value);
+		},
+		stored,
+	};
 }
 
 describe('coalescing and caching', () => {
@@ -523,6 +535,69 @@ describe('runCoalesced', () => {
 		}).catch(() => {});
 
 		expect(cache.stored.size).toBe(0);
+	});
+
+	const notSummaries: unknown[] = [
+		{ kind: 'icon', href: 'https://example.com/favicon.ico' },
+		{ kind: 'icon', href: null },
+		{ kind: 'ok' },
+		{ kind: 'ok', value: null },
+		{ kind: 'error' },
+		{ kind: 'unknown' },
+		{},
+		null,
+		'ok',
+	];
+
+	test.each(notSummaries)('要約のキーで %j が返っても、取り直して結果を返す', async entry => {
+		const cache = brokenCache(entry);
+		let calls = 0;
+		const value = await runCoalesced({ cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 }, () => 'k', async () => {
+			calls++;
+			return result;
+		});
+
+		expect(calls).toBe(1);
+		expect(value).toEqual(result);
+		expect(cache.stored).toEqual([{ kind: 'ok', value: result }]);
+	});
+
+	const notIcons: unknown[] = [
+		{ kind: 'ok', value: result },
+		{ kind: 'error', error: { name: 'Error', message: 'x' } },
+		{ kind: 'icon' },
+		{ kind: 'icon', href: 1 },
+		{ kind: 'unknown' },
+		{},
+		null,
+		'icon',
+	];
+
+	test.each(notIcons)('icon のキーで %j が返っても、確認し直して結果を返す', async entry => {
+		const cache = brokenCache(entry);
+		let calls = 0;
+		const href = await runCoalescedIcon({ cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 }, () => 'k', async () => {
+			calls++;
+			return 'https://example.com/favicon.ico';
+		});
+
+		expect(calls).toBe(1);
+		expect(href).toBe('https://example.com/favicon.ico');
+		expect(cache.stored).toEqual([{ kind: 'icon', href: 'https://example.com/favicon.ico' }]);
+	});
+
+	test('キャッシュも coordinator もなければ icon の key を作らない', async () => {
+		let calls = 0;
+		const deps = { cache: null, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
+		const key = () => {
+			throw new Error('key must not be built');
+		};
+
+		expect(await runCoalescedIcon(deps, key, async () => {
+			calls++;
+			return null;
+		})).toBeNull();
+		expect(calls).toBe(1);
 	});
 
 	test('InProcessCoordinator は完了したら key を手放す', async () => {

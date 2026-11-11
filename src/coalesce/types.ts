@@ -12,10 +12,17 @@ export type SerializedError = {
 
 /**
  * キャッシュに保存する1件分。JSON を往復しても同じ結果になる形に限る
+ *
+ * - `ok` / `error`: 要約の結果（成功した要約、または失敗したときのエラー）
+ * - `icon`: favicon の確認結果。HEAD が成功した icon の URL、失敗したときは null
+ *
+ * 要約と favicon の確認は同じキャッシュを使うが、キーは用途ごとに分かれていて重ならない。
+ * 用途に合わない種類のエントリ（要約のキーで `icon` が返ったなど）は、壊れたものとしてキャッシュミスと同じに扱う
  */
 export type CacheEntry =
 	| { kind: 'ok'; value: SummaryResult }
-	| { kind: 'error'; error: SerializedError };
+	| { kind: 'error'; error: SerializedError }
+	| { kind: 'icon'; href: string | null };
 
 export interface SummaryCache {
 	get(key: string): Promise<CacheEntry | undefined>;
