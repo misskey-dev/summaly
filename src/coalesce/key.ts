@@ -1,8 +1,14 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { SummalyOptions } from '@/types.js';
 
 const ids = new WeakMap<object, number>();
 let nextId = 1;
+
+/**
+ * Chosen once per process and part of every object identity in a key: objectId numbers restart at 1 in each
+ * process, so without it two processes sharing an external cache could give different agents or plugins the same key.
+ */
+const PROCESS_NONCE = randomUUID();
 
 /** A number unique to `obj` for as long as it lives, so objects that cannot be serialized (agents, plugins) can be part of a key. */
 export function objectId(obj: object): number {
@@ -14,9 +20,11 @@ export function objectId(obj: object): number {
 	return id;
 }
 
-/** Objects are identified by identity; anything else is kept as a value. */
+/** Objects are identified by identity (only meaningful within this process); anything else is kept as a value. */
 function identity(value: unknown): unknown {
-	return (typeof value === 'object' && value !== null) || typeof value === 'function' ? { id: objectId(value) } : value;
+	return (typeof value === 'object' && value !== null) || typeof value === 'function'
+		? { process: PROCESS_NONCE, id: objectId(value) }
+		: value;
 }
 
 /**
@@ -38,7 +46,7 @@ function canonical(value: unknown): string {
 		}
 		case 'bigint': return `b${value.toString()}`;
 		case 'symbol': return `y${value.toString()}`;
-		case 'function': return `f${objectId(value)}`;
+		case 'function': return `f${PROCESS_NONCE}:${objectId(value)}`;
 		default: return `${typeof value}`;
 	}
 }

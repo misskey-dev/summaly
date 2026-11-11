@@ -1,7 +1,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { buildRequestKey, objectId } from '@/coalesce/key.js';
 import { runCoalesced } from '@/coalesce/run.js';
 import {
@@ -590,6 +590,24 @@ describe('buildRequestKey', () => {
 		const enabled = buildRequestKey(url, {});
 
 		expect(enabled).not.toBe(unset);
+	});
+
+	test('agent と plugin の同一性はプロセスごとの値を含み、別のプロセスとは key が重ならない', async () => {
+		// Fresh copies of the module stand in for two processes: in each, object numbers start at 1,
+		// so the first agent (or plugin) in each gets the same number.
+		vi.resetModules();
+		const first = await import('@/coalesce/key.js');
+		vi.resetModules();
+		const second = await import('@/coalesce/key.js');
+		const agents = [new http.Agent(), new http.Agent()];
+		cleanups.push(() => agents.forEach(a => a.destroy()));
+		const plugin = (): SummalyPlugin => ({ test: () => false, summarize: async () => null });
+
+		expect(first.objectId(agents[0])).toBe(second.objectId(agents[1]));
+		expect(first.buildRequestKey(url, { agent: { http: agents[0] } })).not.toBe(second.buildRequestKey(url, { agent: { http: agents[1] } }));
+		expect(first.buildRequestKey(url, { plugins: [plugin()] })).not.toBe(second.buildRequestKey(url, { plugins: [plugin()] }));
+		// Keys without objects are the same in every process.
+		expect(first.buildRequestKey(url, { lang: 'ja' })).toBe(second.buildRequestKey(url, { lang: 'ja' }));
 	});
 
 	test('objectId は同じオブジェクトに同じ番号、違うオブジェクトに違う番号を返す', () => {
