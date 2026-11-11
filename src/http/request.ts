@@ -148,10 +148,12 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 			signal.removeEventListener('abort', onAbort);
 			const first = !failed;
 			failed = true;
-			// A pooled keep-alive socket that the server closed while it sat idle fails before any response.
-			// GET and HEAD are idempotent, so send again: the retry takes another pooled socket or opens a new one,
-			// which goes through the same agent and checks. A request on a new socket is never retried.
-			if (first && response === undefined && request.reusedSocket && (err as NodeJS.ErrnoException).code === 'ECONNRESET'
+			// A reused keep-alive socket can fail before any response: the server closed it while it sat idle
+			// (ECONNRESET), or bytes left over from the previous response reached it after this request went out
+			// (an HTTP parser error, HPE_*), e.g. a non-compliant server sending a body after a HEAD response or
+			// past Content-Length. GET and HEAD are idempotent, so send again: the retry takes another pooled socket
+			// or opens a new one, which goes through the same agent and checks. A request on a new socket is never retried.
+			if (first && response === undefined && request.reusedSocket && isStaleSocketError(err)
 				&& !signal.aborted && timeoutError === undefined) {
 				send().then(resolve, reject);
 				return;
@@ -162,6 +164,12 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 	});
 	const res = await send();
 	return { res, timeoutError: () => timeoutError };
+}
+
+/** An error of a reused socket that says nothing about the server's answer to this request (see sendRequest). */
+function isStaleSocketError(err: Error): boolean {
+	const code = (err as NodeJS.ErrnoException).code;
+	return code === 'ECONNRESET' || (code?.startsWith('HPE_') ?? false);
 }
 
 async function receiveResponse(req: FetchRequest, url: URL, res: http.IncomingMessage): Promise<FetchResult> {

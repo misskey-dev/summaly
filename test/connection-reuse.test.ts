@@ -1,6 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
-import type { AddressInfo, Socket } from 'node:net';
+import net, { type AddressInfo, type Socket } from 'node:net';
 import tls from 'node:tls';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { createSummarizer } from '@/index.js';
@@ -23,7 +23,7 @@ type Origin = {
 	close: () => Promise<void>;
 };
 
-const origins: Origin[] = [];
+const origins: { close: () => Promise<void> }[] = [];
 afterEach(async () => {
 	await Promise.all(origins.splice(0).map(o => o.close()));
 });
@@ -164,4 +164,61 @@ test('接続を再利用しても、許可していないプライベート IP �
 	expect(summary.title).toBe('page');
 	expect(origin.requestsBySocket()).toEqual([['HEAD /', 'GET /']]);
 	expect(targetHits).toBe(0);
+});
+
+/**
+ * A raw origin that answers the requests on one connection in order, but sends `stray` bytes that do not belong
+ * to any response (as a non-compliant server does) on that connection just before its next response.
+ * Holding them until the next request makes them arrive after the client has sent that request on the reused socket.
+ */
+async function startStrayOrigin(stray: (method: string, path: string) => string | undefined): Promise<{ url: string; connections: () => number }> {
+	let connections = 0;
+	const sockets = new Set<Socket>();
+	const server = net.createServer(socket => {
+		connections++;
+		sockets.add(socket);
+		socket.on('close', () => sockets.delete(socket));
+		socket.on('error', () => {});
+		let buffered = '';
+		let pending: string | undefined;
+		socket.on('data', data => {
+			buffered += data.toString('latin1');
+			for (let end = buffered.indexOf('\r\n\r\n'); end >= 0; end = buffered.indexOf('\r\n\r\n')) {
+				const [method = '', path = ''] = buffered.slice(0, end).split(' ');
+				buffered = buffered.slice(end + 4);
+				const body = path === '/favicon.ico' ? 'icon' : PAGE;
+				const type = path === '/favicon.ico' ? 'image/x-icon' : 'text/html';
+				socket.write(`${pending ?? ''}HTTP/1.1 200 OK\r\ncontent-type: ${type}\r\ncontent-length: ${Buffer.byteLength(body)}\r\n\r\n${method === 'HEAD' ? '' : body}`);
+				pending = stray(method, path);
+			}
+		});
+	});
+	await new Promise<void>(resolve => server.listen(0, '127.0.0.1', () => resolve()));
+	origins.push({
+		close: () => new Promise<void>(resolve => {
+			for (const socket of sockets) socket.destroy();
+			server.close(() => resolve());
+		}),
+	});
+	return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}/`, connections: () => connections };
+}
+
+describe('再利用したソケットに前の応答の余りが届いたら、新しい接続で送り直す', () => {
+	test('HEAD の応答のあとに本文（チャンクの終端）が届く', async () => {
+		const origin = await startStrayOrigin((method, path) => (method === 'HEAD' && path === '/' ? '0\r\n\r\n' : undefined));
+		const summary = await summarize(origin.url);
+		expect(summary.title).toBe('page');
+		expect(summary.icon).toBe(new URL('/favicon.ico', origin.url).href);
+		// The page GET failed on the reused socket and went out again on a new connection.
+		expect(origin.connections()).toBe(2);
+	});
+
+	test('GET の本文が Content-Length より長い', async () => {
+		const origin = await startStrayOrigin((method, path) => (method === 'GET' && path === '/' ? 'trailing garbage' : undefined));
+		const summary = await summarize(origin.url);
+		expect(summary.title).toBe('page');
+		// The favicon HEAD failed on the reused socket and went out again on a new connection.
+		expect(summary.icon).toBe(new URL('/favicon.ico', origin.url).href);
+		expect(origin.connections()).toBe(2);
+	});
 });
