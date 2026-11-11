@@ -28,7 +28,9 @@ export function createAddressGuard(allowedNetworks: string[] = []): AddressGuard
 function parseAllowedNetwork(cidr: string): Network {
 	let network: Network;
 	try {
-		network = ipaddr.parseCIDR(cidr);
+		// Same result as ipaddr.parseCIDR, which tries IPv6 first and builds and catches an Error for every IPv4 CIDR
+		// (this runs on every summary). An IPv6 CIDR always contains ':' and an IPv4 one never does.
+		network = cidr.includes(':') ? ipaddr.IPv6.parseCIDR(cidr) : ipaddr.IPv4.parseCIDR(cidr);
 	} catch {
 		throw new TypeError(`Invalid CIDR: ${cidr}`);
 	}

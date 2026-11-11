@@ -1,4 +1,5 @@
 import dns from 'node:dns';
+import ipaddr from 'ipaddr.js';
 import { describe, expect, test, vi } from 'vitest';
 import { StatusError } from '@/http/status-error.js';
 import {
@@ -42,6 +43,17 @@ describe('AddressGuard', () => {
 
 	test('IPv4 射影 IPv6 の範囲が /96 より広い CIDR も TypeError', () => {
 		expect(() => createAddressGuard(['::ffff:0:0/80'])).toThrow('write it in IPv4 form');
+	});
+
+	// createAddressGuard runs on every summary; ipaddr.parseCIDR would first try IPv6 and build and catch an Error.
+	test('IPv4 の CIDR は IPv6 として解釈を試みない', () => {
+		const spy = vi.spyOn(ipaddr.IPv6, 'parseCIDR');
+		try {
+			createAddressGuard(['127.0.0.0/8', '10.0.0.0/8']);
+			expect(spy).not.toHaveBeenCalled();
+		} finally {
+			spy.mockRestore();
+		}
 	});
 
 	test('正規の IPv4 / IPv6 CIDR は受け付ける', () => {
