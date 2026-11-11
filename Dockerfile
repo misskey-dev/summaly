@@ -4,7 +4,10 @@
 ARG NODE_VERSION=22.23.2
 
 # ---- base: pnpm and the manifests needed for installing dependencies ----
-FROM node:${NODE_VERSION}-slim AS base
+# The stages up to "deps" run on the build machine's platform even when building for another platform
+# (e.g. linux/arm64 on an amd64 machine), because their outputs are platform-independent JavaScript.
+# Only "runtime" uses the target platform, and it runs no commands, so no emulation is needed for building.
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-slim AS base
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Install the pnpm version in the "packageManager" field of package.json (e.g. "pnpm@12.6.0")
@@ -21,6 +24,7 @@ RUN pnpm build
 # ---- deps: runtime dependencies only ----
 # fastify is an optionalDependency, which "--prod" still installs
 # (do not add "--no-optional", or the server cannot start)
+# The runtime dependencies must stay free of native addons, because this stage runs on the build machine's platform
 FROM base AS deps
 RUN pnpm install --frozen-lockfile --prod
 
