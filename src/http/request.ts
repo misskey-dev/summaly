@@ -1,0 +1,267 @@
+// Derived from misskey-dev/summaly (MIT)
+import http from 'node:http';
+import https from 'node:https';
+import { Transform, type TransformCallback, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import zlib from 'node:zlib';
+import { assertHostAllowed, createGuardedLookup } from './address-guard.js';
+import { StatusError } from './status-error.js';
+import type { Transport } from './transport.js';
+
+export type FetchRequest = {
+	url: string;
+	method: 'GET' | 'HEAD';
+	headers: Record<string, string | undefined>;
+	typeFilter?: RegExp;
+	followRedirects: boolean;
+	/** Connect / socket idle timeout in ms (0 disables) */
+	responseTimeout: number;
+	/** Whole-operation timeout in ms, across all redirect hops (0 disables) */
+	operationTimeout: number;
+	contentLengthLimit: number;
+	contentLengthRequired: boolean;
+};
+
+export type FetchResult = {
+	/** Final URL after redirects */
+	url: string;
+	statusCode: number;
+	headers: http.IncomingHttpHeaders;
+	/** Decompressed body */
+	body: Buffer;
+};
+
+const MAX_REDIRECTS = 10;
+// Same as got: 300 and 304 are not followed.
+const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
+
+export async function fetchResponse(transport: Transport, req: FetchRequest): Promise<FetchResult> {
+	const controller = new AbortController();
+	const timer = req.operationTimeout > 0
+		? setTimeout(() => controller.abort(new Error(`Timeout awaiting 'request' for ${req.operationTimeout}ms`)), req.operationTimeout)
+		: undefined;
+	try {
+		return await fetchFollowingRedirects(transport, req, controller.signal);
+	} catch (e) {
+		if (controller.signal.aborted) throw controller.signal.reason;
+		throw e;
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+async function fetchFollowingRedirects(transport: Transport, req: FetchRequest, signal: AbortSignal): Promise<FetchResult> {
+	let url = parseHttpUrl(req.url);
+	for (let redirects = 0; ; redirects++) {
+		const { res, timeoutError } = await sendRequest(transport, req, url, signal);
+		const location = res.headers.location;
+		if (req.followRedirects && location && REDIRECT_CODES.has(res.statusCode ?? 0)) {
+			res.destroy();
+			if (redirects >= MAX_REDIRECTS) {
+				throw new Error(`Redirected ${MAX_REDIRECTS} times. Aborting.`);
+			}
+			url = parseHttpUrl(new URL(location, url).href);
+			continue;
+		}
+		try {
+			return await receiveResponse(req, url, res);
+		} catch (e) {
+			throw timeoutError() ?? e;
+		}
+	}
+}
+
+function parseHttpUrl(input: string): URL {
+	const url = new URL(input);
+	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+		throw new Error(`Unsupported protocol: ${url.protocol}`);
+	}
+	return url;
+}
+
+function buildHeaders(headers: FetchRequest['headers']): http.OutgoingHttpHeaders {
+	const result: http.OutgoingHttpHeaders = {};
+	for (const [name, value] of Object.entries(headers)) {
+		if (value !== undefined && name.toLowerCase() !== 'accept-encoding') result[name] = value;
+	}
+	result['accept-encoding'] = 'gzip, deflate, br';
+	return result;
+}
+
+/** Sends one hop and resolves once the response headers arrive. */
+async function sendRequest(transport: Transport, req: FetchRequest, url: URL, signal: AbortSignal) {
+	// Gate every hop before connecting. net.connect skips `lookup` for IP literals, so this is the only check for them.
+	if (transport.guard) {
+		await abortable(assertHostAllowed(transport.guard, url.hostname), signal);
+	}
+
+	const isHttps = url.protocol === 'https:';
+	const options: https.RequestOptions = {
+		method: req.method,
+		headers: buildHeaders(req.headers),
+		agent: isHttps ? transport.agents.https : transport.agents.http,
+		signal,
+	};
+	if (req.responseTimeout > 0) options.timeout = req.responseTimeout;
+	// Re-check at socket connect time (DNS rebinding defense).
+	if (transport.guard) options.lookup = createGuardedLookup(transport.guard);
+
+	let timeoutError: Error | undefined;
+	const res = await new Promise<http.IncomingMessage>((resolve, reject) => {
+		let response: http.IncomingMessage | undefined;
+		const request = (isHttps ? https : http).request(url, options, r => {
+			response = r;
+			resolve(r);
+		});
+		request.on('timeout', () => {
+			timeoutError = new Error(`Timeout awaiting 'socket' for ${req.responseTimeout}ms`);
+			request.destroy(timeoutError);
+			response?.destroy(timeoutError);
+		});
+		// Stays attached after the response so late socket errors never go unhandled.
+		request.on('error', reject);
+		request.end();
+	});
+	return { res, timeoutError: () => timeoutError };
+}
+
+async function receiveResponse(req: FetchRequest, url: URL, res: http.IncomingMessage): Promise<FetchResult> {
+	const statusCode = res.statusCode ?? 0;
+	// Like got: fall back to the standard reason phrase when the server sends an empty one.
+	const statusMessage = res.statusMessage !== undefined && res.statusMessage !== ''
+		? res.statusMessage
+		: http.STATUS_CODES[statusCode] ?? '';
+	try {
+		// Status check (same rule as got: with followRedirects, unfollowed 3xx other than 304 are errors)
+		const okLimit = req.followRedirects ? 299 : 399;
+		if (!((statusCode >= 200 && statusCode <= okLimit) || statusCode === 304)) {
+			throw new StatusError(`${statusCode} ${statusMessage}`, statusCode, statusMessage);
+		}
+
+		// Check html
+		const contentType = res.headers['content-type'];
+		if (req.typeFilter && !contentType?.match(req.typeFilter)) {
+			throw new Error(`Rejected by type filter ${contentType}`);
+		}
+
+		// Size check by the response header
+		const contentLength = res.headers['content-length'];
+		if (contentLength) {
+			const maxSize = req.contentLengthLimit;
+			const size = Number(contentLength);
+			if (size > maxSize) {
+				throw new Error(`maxSize exceeded (${size} > ${maxSize}) on response`);
+			}
+		} else if (req.contentLengthRequired) {
+			throw new Error('content-length required');
+		}
+	} catch (e) {
+		res.destroy();
+		throw e;
+	}
+
+	const hasNoBody = req.method === 'HEAD'
+		|| (statusCode >= 100 && statusCode < 200)
+		|| statusCode === 204 || statusCode === 205 || statusCode === 304;
+	const encoding = hasNoBody ? undefined : res.headers['content-encoding']?.trim().toLowerCase();
+	const decompressor = encoding ? createDecompressor(encoding) : null;
+	const body = await readBody(res, decompressor, req.contentLengthLimit);
+
+	let headers = res.headers;
+	if (decompressor) {
+		// Like got: headers describe the decompressed body.
+		headers = { ...res.headers };
+		delete headers['content-encoding'];
+		delete headers['content-length'];
+	}
+
+	const finalUrl = new URL(url);
+	finalUrl.username = '';
+	finalUrl.password = '';
+	return { url: finalUrl.href, statusCode, headers, body };
+}
+
+/** Size check while receiving (counts decompressed bytes) */
+async function readBody(res: http.IncomingMessage, decompressor: Transform | null, maxSize: number): Promise<Buffer> {
+	const chunks: Buffer[] = [];
+	let size = 0;
+	const sink = new Writable({
+		write(chunk: Buffer, _encoding, callback) {
+			size += chunk.length;
+			if (size > maxSize) {
+				callback(new Error(`maxSize exceeded (${size} > ${maxSize}) on response`));
+				return;
+			}
+			chunks.push(chunk);
+			callback();
+		},
+	});
+	await (decompressor ? pipeline(res, decompressor, sink) : pipeline(res, sink));
+	return Buffer.concat(chunks, size);
+}
+
+function createDecompressor(encoding: string): Transform | null {
+	switch (encoding) {
+		case 'gzip':
+		case 'x-gzip':
+		case 'deflate':
+		case 'br':
+			return new Decompressor(encoding);
+		default:
+			// Unknown encodings are passed through untouched (same as got).
+			return null;
+	}
+}
+
+/**
+ * Picks the zlib stream on the first chunk (raw deflate vs zlib-wrapped, as decompress-response does),
+ * and yields an empty body for an empty input instead of a zlib error.
+ */
+class Decompressor extends Transform {
+	readonly #encoding: string;
+	#inner: zlib.Unzip | zlib.InflateRaw | zlib.BrotliDecompress | undefined;
+
+	constructor(encoding: string) {
+		super();
+		this.#encoding = encoding;
+	}
+
+	#createInner(first: Buffer) {
+		if (this.#encoding === 'br') return zlib.createBrotliDecompress();
+		if (this.#encoding === 'deflate' && (first.readUInt8(0) & 0x08) === 0) return zlib.createInflateRaw();
+		return zlib.createUnzip();
+	}
+
+	override _transform(chunk: Buffer, _encoding: BufferEncoding, callback: TransformCallback) {
+		if (!this.#inner) {
+			const inner = this.#createInner(chunk);
+			inner.on('data', (data: Buffer) => this.push(data));
+			inner.on('error', err => this.destroy(err));
+			this.#inner = inner;
+		}
+		this.#inner.write(chunk, () => callback());
+	}
+
+	override _flush(callback: TransformCallback) {
+		if (!this.#inner) {
+			callback();
+			return;
+		}
+		this.#inner.once('end', () => callback());
+		this.#inner.end();
+	}
+
+	override _destroy(err: Error | null, callback: (error?: Error | null) => void) {
+		this.#inner?.destroy();
+		callback(err);
+	}
+}
+
+function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+	if (signal.aborted) return Promise.reject(signal.reason);
+	return new Promise<T>((resolve, reject) => {
+		const onAbort = () => reject(signal.reason);
+		signal.addEventListener('abort', onAbort, { once: true });
+		promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+	});
+}
