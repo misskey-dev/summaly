@@ -2,8 +2,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
-import { Transform, type TransformCallback, Writable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
+import { Transform, type TransformCallback } from 'node:stream';
 import zlib from 'node:zlib';
 import { assertHostAllowed } from './address-guard.js';
 import { StatusError } from './status-error.js';
@@ -226,40 +225,84 @@ function maxSizeExceeded(size: number, maxSize: number): Error {
 }
 
 /**
- * Size check while receiving. Counts decompressed bytes, and also the compressed bytes on the wire,
- * so input that decompresses to little (e.g. endless empty gzip members) cannot stream unbounded.
+ * Reads the whole body, decompressed when `decompressor` is given, with the size checked while receiving.
+ * Counts decompressed bytes, and also the compressed bytes on the wire, so input that decompresses to little
+ * (e.g. endless empty gzip members) cannot stream unbounded.
+ *
+ * Wired by hand rather than with `stream/promises` pipeline, which builds an AbortController (and a DOMException
+ * on completion) for every call. Like pipeline it rejects when the response ends early (connection reset or
+ * premature close), and on any failure destroys the response (so its socket is never reused) and the decompressor.
+ * Its error listeners stay attached, so errors after settling never go unhandled.
  */
-async function readBody(res: http.IncomingMessage, decompressor: Transform | null, maxSize: number): Promise<Buffer> {
-	const chunks: Buffer[] = [];
-	let size = 0;
-	const sink = new Writable({
-		write(chunk: Buffer, _encoding, callback) {
+function readBody(res: http.IncomingMessage, decompressor: Transform | null, maxSize: number): Promise<Buffer> {
+	return new Promise((resolve, reject) => {
+		const chunks: Buffer[] = [];
+		let size = 0;
+		let settled = false;
+		let resEnded = false;
+
+		const fail = (err: Error) => {
+			if (settled) return;
+			settled = true;
+			res.destroy();
+			decompressor?.destroy();
+			reject(err);
+		};
+		const collect = (chunk: Buffer) => {
+			if (settled) return;
 			size += chunk.length;
 			if (size > maxSize) {
-				callback(maxSizeExceeded(size, maxSize));
+				fail(maxSizeExceeded(size, maxSize));
 				return;
 			}
 			chunks.push(chunk);
-			callback();
-		},
-	});
-	if (decompressor) {
-		let wireSize = 0;
-		const wireCounter = new Transform({
-			transform(chunk: Buffer, _encoding, callback) {
-				wireSize += chunk.length;
-				if (wireSize > maxSize) {
-					callback(maxSizeExceeded(wireSize, maxSize));
-					return;
-				}
-				callback(null, chunk);
-			},
+		};
+		const done = () => {
+			if (settled) return;
+			settled = true;
+			resolve(Buffer.concat(chunks, size));
+		};
+
+		res.on('error', fail);
+		res.on('end', () => {
+			resEnded = true;
 		});
-		await pipeline(res, wireCounter, decompressor, sink);
-	} else {
-		await pipeline(res, sink);
-	}
-	return Buffer.concat(chunks, size);
+		res.on('close', () => {
+			if (!resEnded) fail(prematureClose());
+		});
+
+		if (!decompressor) {
+			res.on('data', collect);
+			res.on('end', done);
+			return;
+		}
+
+		let wireSize = 0;
+		decompressor.on('error', fail);
+		decompressor.on('data', collect);
+		decompressor.on('end', done);
+		res.on('data', (chunk: Buffer) => {
+			if (settled) return;
+			wireSize += chunk.length;
+			if (wireSize > maxSize) {
+				fail(maxSizeExceeded(wireSize, maxSize));
+				return;
+			}
+			if (!decompressor.write(chunk)) {
+				res.pause();
+				decompressor.once('drain', () => res.resume());
+			}
+		});
+		res.on('end', () => {
+			if (!settled) decompressor.end();
+		});
+	});
+}
+
+function prematureClose(): Error {
+	const err: NodeJS.ErrnoException = new Error('Premature close');
+	err.code = 'ERR_STREAM_PREMATURE_CLOSE';
+	return err;
 }
 
 function createDecompressor(encoding: string): Transform | null {
