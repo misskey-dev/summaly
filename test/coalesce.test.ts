@@ -587,7 +587,7 @@ describe('buildRequestKey', () => {
 	});
 
 	test('SUMMALY_ALLOW_PRIVATE_IP が違えば key も違う', () => {
-		delete process.env.SUMMALY_ALLOW_PRIVATE_IP;
+		for (const name of ALLOW_PRIVATE_IP_VARS) delete process.env[name];
 		const unset = buildRequestKey(url, {});
 		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
 		const enabled = buildRequestKey(url, {});
