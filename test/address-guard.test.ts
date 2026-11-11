@@ -1,5 +1,4 @@
 import dns from 'node:dns';
-import http from 'node:http';
 import { describe, expect, test, vi } from 'vitest';
 import { StatusError } from '@/http/status-error.js';
 import {
@@ -7,7 +6,7 @@ import {
 	createAddressGuard,
 	createGuardedLookup,
 	isAddressAllowed,
-	isGuardDisabled,
+	privateIpAllowedByEnv,
 } from '@/http/address-guard.js';
 
 describe('AddressGuard', () => {
@@ -130,11 +129,11 @@ describe('AddressGuard', () => {
 		expect(o).toMatchObject({ statusCode: 400, statusMessage: 'x', isPermanentError: true });
 	});
 
-	test('isGuardDisabled: agent あり→true、空オブジェクト→false、env=true→true', () => {
-		expect(isGuardDisabled({ http: new http.Agent() }, {})).toBe(true);
-		expect(isGuardDisabled({}, {})).toBe(false);
-		expect(isGuardDisabled({ http: undefined }, {})).toBe(false);
-		expect(isGuardDisabled(undefined, {})).toBe(false);
-		expect(isGuardDisabled(undefined, { SUMMALY_ALLOW_PRIVATE_IP: 'true' })).toBe(true);
+	test('privateIpAllowedByEnv: SUMMALY_ALLOW_PRIVATE_IP が true のときだけ true', () => {
+		expect(privateIpAllowedByEnv({ SUMMALY_ALLOW_PRIVATE_IP: 'true' })).toBe(true);
+		expect(privateIpAllowedByEnv({})).toBe(false);
+		expect(privateIpAllowedByEnv({ SUMMALY_ALLOW_PRIVATE_IP: 'false' })).toBe(false);
+		expect(privateIpAllowedByEnv({ SUMMALY_ALLOW_PRIVATE_IP: 'TRUE' })).toBe(false);
+		expect(privateIpAllowedByEnv({ SUMMALY_ALLOW_PRIVATE_IP: '1' })).toBe(false);
 	});
 });

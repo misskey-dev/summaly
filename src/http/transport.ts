@@ -1,7 +1,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import type { ProxyOptions, SummalyOptions } from '@/types.js';
-import { type AddressGuard, createAddressGuard, createGuardedLookup, isGuardDisabled } from './address-guard.js';
+import { type AddressGuard, createAddressGuard, createGuardedLookup, privateIpAllowedByEnv } from './address-guard.js';
 import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy.js';
 
 /** Per-call connection settings. Holds no global state. */
@@ -46,7 +46,7 @@ export function createTransport(
 	const agents = { http: opts.agent?.http, https: opts.agent?.https };
 	const hasAgent = agents.http != null || agents.https != null;
 	// The guard is handed off per scheme: only a scheme whose agent the caller supplied leaves blocking to the caller.
-	const guardOff = isGuardDisabled(undefined, env) || (agents.http != null && agents.https != null);
+	const guardOff = privateIpAllowedByEnv(env) || (agents.http != null && agents.https != null);
 	const guard = guardOff ? null : createAddressGuard(opts.allowedPrivateNetworks);
 	const proxy = proxyWithoutCallerSchemes(opts.proxy, agents);
 	return {

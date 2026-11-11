@@ -1,7 +1,6 @@
 import dns from 'node:dns';
 import type net from 'node:net';
 import ipaddr from 'ipaddr.js';
-import type { SummalyOptions } from '@/types.js';
 import { StatusError } from './status-error.js';
 
 type Network = [ipaddr.IPv4 | ipaddr.IPv6, number];
@@ -88,33 +87,36 @@ export async function assertHostAllowed(guard: AddressGuard, hostname: string): 
 /** Applies the same check at socket connect time (DNS rebinding defense). */
 export function createGuardedLookup(guard: AddressGuard): net.LookupFunction {
 	return (hostname, options, callback) => {
+		// On failure Node reads only the error, so the callback is called with it alone (as dns.lookup does).
+		const fail = callback as (err: NodeJS.ErrnoException) => void;
 		dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
 			if (err) {
-				(callback as (e: NodeJS.ErrnoException | null) => void)(err);
+				fail(err);
 				return;
 			}
 			if (addresses.length === 0) {
-				const e: NodeJS.ErrnoException = new Error(`getaddrinfo ENOTFOUND ${hostname}`);
+				const e: NodeJS.ErrnoException & { hostname?: string } = new Error(`getaddrinfo ENOTFOUND ${hostname}`);
 				e.code = 'ENOTFOUND';
-				(e as any).hostname = hostname;
-				(callback as (e: Error | null) => void)(e);
+				e.hostname = hostname;
+				fail(e);
 				return;
 			}
 			for (const { address } of addresses) {
 				if (!isAddressAllowed(guard, address)) {
-					(callback as (e: Error | null) => void)(rejected(address));
+					fail(rejected(address));
 					return;
 				}
 			}
 			if (options.all) {
-				(callback as any)(null, addresses);
+				callback(null, addresses);
 			} else {
-				(callback as any)(null, addresses[0].address, addresses[0].family);
+				callback(null, addresses[0].address, addresses[0].family);
 			}
 		});
 	};
 }
 
-export function isGuardDisabled(agent: SummalyOptions['agent'], env: NodeJS.ProcessEnv = process.env): boolean {
-	return env.SUMMALY_ALLOW_PRIVATE_IP === 'true' || Object.values(agent ?? {}).some(Boolean);
+/** Whether the environment turns the private IP block off (upstream compatible `SUMMALY_ALLOW_PRIVATE_IP=true`). */
+export function privateIpAllowedByEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+	return env.SUMMALY_ALLOW_PRIVATE_IP === 'true';
 }
