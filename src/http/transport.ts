@@ -2,7 +2,7 @@ import http from 'node:http';
 import https from 'node:https';
 import type { ProxyOptions, SummalyOptions } from '@/types.js';
 import { type AddressGuard, createAddressGuard, createGuardedLookup, isGuardDisabled } from './address-guard.js';
-import { createProxyAgents, selectProxyUrl } from './proxy.js';
+import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy.js';
 
 /** Per-call connection settings. Holds no global state. */
 export type Transport = {
@@ -30,7 +30,8 @@ export type Transport = {
 	proxy: ProxyOptions | null;
 	/**
 	 * Proxy agents owned by this transport, one per scheme in `proxy`. They resolve only the proxy host,
-	 * so a proxied hop checks its target with `assertHostAllowed` before anything is sent to the proxy.
+	 * so a proxied hop checks its target with `assertHostAllowed` before anything is sent to the proxy,
+	 * and tunnels to the address that check validated (see `TUNNEL_TARGET`).
 	 */
 	proxyAgents: { http?: http.Agent; https?: https.Agent };
 };
@@ -39,6 +40,8 @@ export function createTransport(
 	opts: { agent?: SummalyOptions['agent']; allowedPrivateNetworks?: string[]; proxy?: ProxyOptions },
 	env: NodeJS.ProcessEnv = process.env,
 ): Transport {
+	// Public input: reject unusable proxy URLs (any scheme, even one a caller agent replaces) up front.
+	if (opts.proxy) assertProxyOptions(opts.proxy);
 	const agents = { http: opts.agent?.http, https: opts.agent?.https };
 	const hasAgent = agents.http != null || agents.https != null;
 	// The guard is handed off per scheme: only a scheme whose agent the caller supplied leaves blocking to the caller.

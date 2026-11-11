@@ -35,7 +35,18 @@ describe('AddressGuard', () => {
 	test('assertHostAllowed は IP リテラルをそのまま判定する', async () => {
 		await expect(assertHostAllowed(createAddressGuard(), '10.0.0.1')).rejects.toBeInstanceOf(StatusError);
 		await expect(assertHostAllowed(createAddressGuard(), '[::1]')).rejects.toBeInstanceOf(StatusError);
-		await expect(assertHostAllowed(createAddressGuard(), '93.184.216.34')).resolves.toBeUndefined();
+		await expect(assertHostAllowed(createAddressGuard(), '93.184.216.34')).resolves.toEqual(['93.184.216.34']);
+		await expect(assertHostAllowed(createAddressGuard(['2001:db8::/32']), '[2001:db8::1]')).resolves.toEqual(['2001:db8::1']);
+	});
+
+	test('assertHostAllowed は検証したアドレスを解決順に返す', async () => {
+		const spy = vi.spyOn(dns.promises, 'lookup').mockResolvedValue([
+			{ address: '93.184.216.34', family: 4 },
+			{ address: '2606:2800:220:1:248:1893:25c8:1946', family: 6 },
+		] as any);
+		const addresses = await assertHostAllowed(createAddressGuard(), 'example.test');
+		spy.mockRestore();
+		expect(addresses).toEqual(['93.184.216.34', '2606:2800:220:1:248:1893:25c8:1946']);
 	});
 
 	test('createGuardedLookup は接続時の名前解決でも拒否する', async () => {

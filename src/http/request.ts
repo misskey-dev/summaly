@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import zlib from 'node:zlib';
 import { assertHostAllowed } from './address-guard.js';
 import { StatusError } from './status-error.js';
+import { TUNNEL_TARGET, type TunnelTarget } from './proxy.js';
 import { type Transport, selectOwnedAgent } from './transport.js';
 
 export type FetchRequest = {
@@ -94,25 +95,30 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 	// A caller-supplied agent for this scheme takes over private IP blocking; otherwise the hop stays guarded.
 	const callerAgent = isHttps ? transport.agents.https : transport.agents.http;
 	let agent: http.Agent | undefined = callerAgent;
+	let tunnelTarget: TunnelTarget | undefined;
 	if (!callerAgent) {
+		let validated: string[] | undefined;
 		if (transport.guard) {
 			// Gate every hop before connecting or asking the proxy. This is the only check of the target when
-			// it is an IP literal (net.connect skips `lookup`) or when the hop goes through the proxy
-			// (the proxy agent resolves only the proxy host; the proxy itself is trusted configuration).
-			await abortable(assertHostAllowed(transport.guard, url.hostname), signal);
+			// it is an IP literal (net.connect skips `lookup`) or when the hop goes through the proxy.
+			validated = await abortable(assertHostAllowed(transport.guard, url.hostname), signal);
 		}
 		// Direct hops use the transport-owned guarded agents, whose lookup re-checks at connect time
 		// (DNS rebinding defense). They never hold sockets opened under another policy, so that check
 		// is never skipped by socket reuse.
+		// Proxied hops tunnel to the address validated above, so the proxy never resolves the name again
+		// (DNS rebinding / split-horizon DNS). The proxy agents read it from the request options.
 		agent = selectOwnedAgent(transport, url);
+		tunnelTarget = { address: validated?.[0], signal };
 	}
 
-	const options: https.RequestOptions = {
+	const options: https.RequestOptions & { [TUNNEL_TARGET]?: TunnelTarget } = {
 		method: req.method,
 		headers: buildHeaders(req.headers),
 		agent,
 		signal,
 	};
+	if (tunnelTarget) options[TUNNEL_TARGET] = tunnelTarget;
 	if (req.responseTimeout > 0) options.timeout = req.responseTimeout;
 
 	let timeoutError: Error | undefined;
@@ -120,15 +126,26 @@ async function sendRequest(transport: Transport, req: FetchRequest, url: URL, si
 		let response: http.IncomingMessage | undefined;
 		const request = (isHttps ? https : http).request(url, options, r => {
 			response = r;
+			signal.removeEventListener('abort', onAbort);
 			resolve(r);
 		});
+		// Reject on abort right away: until the agent hands over a socket (e.g. while a proxy CONNECT is pending),
+		// destroying the request only records the error.
+		const onAbort = () => {
+			reject(signal.reason);
+			request.destroy(signal.reason as Error);
+		};
+		signal.addEventListener('abort', onAbort, { once: true });
 		request.on('timeout', () => {
 			timeoutError = new Error(`Timeout awaiting 'socket' for ${req.responseTimeout}ms`);
 			request.destroy(timeoutError);
 			response?.destroy(timeoutError);
 		});
 		// Stays attached after the response so late socket errors never go unhandled.
-		request.on('error', reject);
+		request.on('error', err => {
+			signal.removeEventListener('abort', onAbort);
+			reject(err);
+		});
 		request.end();
 	});
 	return { res, timeoutError: () => timeoutError };

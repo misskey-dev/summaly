@@ -1,28 +1,38 @@
+import dns from 'node:dns';
 import http from 'node:http';
+import https from 'node:https';
 import type { AddressInfo } from 'node:net';
 import net from 'node:net';
-import { HttpProxyAgent, HttpsProxyAgent } from 'hpagent';
-import { afterEach, describe, expect, test } from 'vitest';
-import { createProxyAgents, selectProxyUrl } from '@/http/proxy.js';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { createProxyAgents, selectProxyUrl, TunnelingHttpAgent, TunnelingHttpsAgent } from '@/http/proxy.js';
 import { fetchResponse, type FetchRequest } from '@/http/request.js';
 import { StatusError } from '@/http/status-error.js';
 import { createTransport } from '@/http/transport.js';
 import type { ProxyOptions } from '@/types.js';
 import { startTestServer } from './helpers/test-server.js';
+import { TEST_CERT, TEST_CERT_HOST, TEST_KEY } from './helpers/tls-cert.js';
 
 type TestProxy = {
 	url: string;
 	/** Number of requests (CONNECT or otherwise) the proxy received */
 	received(): number;
+	/** The authority (request target) of each CONNECT the proxy received, in order */
+	connects: string[];
+	/** The Proxy-Authorization header of each CONNECT, in order */
+	authorizations: (string | undefined)[];
+	/** Number of client and upstream sockets still open */
+	open(): number;
 	close(): Promise<void>;
 };
 
 /**
- * Minimal forward proxy on 127.0.0.1. hpagent tunnels both http and https targets with CONNECT,
- * so CONNECT is relayed; any other request is only counted and answered with 501.
+ * Minimal forward proxy on 127.0.0.1. Targets are tunneled with CONNECT, so CONNECT is relayed
+ * (or answered with 502 when `relay` is false); any other request is only counted and answered with 501.
  */
-function startTestProxy(): Promise<TestProxy> {
+function startTestProxy({ relay = true } = {}): Promise<TestProxy> {
 	let received = 0;
+	const connects: string[] = [];
+	const authorizations: (string | undefined)[] = [];
 	const sockets = new Set<net.Socket>();
 	const server = http.createServer((_req, res) => {
 		received++;
@@ -31,6 +41,14 @@ function startTestProxy(): Promise<TestProxy> {
 	});
 	server.on('connect', (req: http.IncomingMessage, client: net.Socket, head: Buffer) => {
 		received++;
+		connects.push(req.url ?? '');
+		authorizations.push(req.headers['proxy-authorization']);
+		sockets.add(client);
+		client.on('close', () => sockets.delete(client));
+		if (!relay) {
+			client.end('HTTP/1.1 502 Bad Gateway\r\n\r\n');
+			return;
+		}
 		const { hostname, port } = new URL(`http://${req.url}`);
 		const upstream = net.connect(Number(port), hostname.replace(/^\[|\]$/g, ''), () => {
 			client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
@@ -38,7 +56,8 @@ function startTestProxy(): Promise<TestProxy> {
 			upstream.pipe(client);
 			client.pipe(upstream);
 		});
-		sockets.add(client).add(upstream);
+		sockets.add(upstream);
+		upstream.on('close', () => sockets.delete(upstream));
 		const cleanup = () => {
 			client.destroy();
 			upstream.destroy();
@@ -53,6 +72,9 @@ function startTestProxy(): Promise<TestProxy> {
 			resolve({
 				url: `http://127.0.0.1:${port}`,
 				received: () => received,
+				connects,
+				authorizations,
+				open: () => sockets.size,
 				close: () => new Promise<void>((done, fail) => {
 					for (const s of sockets) s.destroy();
 					server.close(err => (err ? fail(err) : done()));
@@ -63,13 +85,60 @@ function startTestProxy(): Promise<TestProxy> {
 	});
 }
 
+type HangingProxy = {
+	url: string;
+	/** Number of TCP connections accepted */
+	accepted(): number;
+	/** Number of accepted connections that are still open */
+	open(): number;
+	close(): Promise<void>;
+};
+
+/** Accepts TCP connections and reads the CONNECT request, but never answers it. */
+function startHangingProxy(): Promise<HangingProxy> {
+	let accepted = 0;
+	const sockets = new Set<net.Socket>();
+	const server = net.createServer(socket => {
+		accepted++;
+		sockets.add(socket);
+		socket.on('error', () => {});
+		socket.on('close', () => sockets.delete(socket));
+		socket.resume();
+	});
+	return new Promise((resolve, reject) => {
+		server.once('error', reject);
+		server.listen(0, '127.0.0.1', () => {
+			const { port } = server.address() as AddressInfo;
+			resolve({
+				url: `http://127.0.0.1:${port}`,
+				accepted: () => accepted,
+				open: () => sockets.size,
+				close: () => new Promise<void>((done, fail) => {
+					for (const s of sockets) s.destroy();
+					server.close(err => (err ? fail(err) : done()));
+				}),
+			});
+		});
+	});
+}
+
+/** Polls `condition` until it holds or `ms` passes. */
+async function waitFor(condition: () => boolean, ms = 1000): Promise<boolean> {
+	const deadline = Date.now() + ms;
+	while (!condition()) {
+		if (Date.now() > deadline) return false;
+		await new Promise(r => setTimeout(r, 10));
+	}
+	return true;
+}
+
 const closers: (() => Promise<void>)[] = [];
 afterEach(async () => {
 	await Promise.all(closers.splice(0).map(close => close()));
 });
 
-async function proxy(): Promise<TestProxy> {
-	const p = await startTestProxy();
+async function proxy(options?: { relay?: boolean }): Promise<TestProxy> {
+	const p = await startTestProxy(options);
 	closers.push(p.close);
 	return p;
 }
@@ -127,14 +196,14 @@ describe('selectProxyUrl', () => {
 });
 
 describe('createProxyAgents', () => {
-	test('scheme ごとに hpagent の agent を作る', () => {
+	test('scheme ごとにトンネル用の agent を作る', () => {
 		const agents = createProxyAgents({ http: 'http://p:3128', https: 'http://p:8080' });
-		expect(agents.http).toBeInstanceOf(HttpProxyAgent);
-		expect(agents.https).toBeInstanceOf(HttpsProxyAgent);
+		expect(agents.http).toBeInstanceOf(TunnelingHttpAgent);
+		expect(agents.https).toBeInstanceOf(TunnelingHttpsAgent);
 	});
 
 	test('指定のない scheme には作らない', () => {
-		expect(createProxyAgents({ https: 'http://p:8080' })).toEqual({ https: expect.any(HttpsProxyAgent) });
+		expect(createProxyAgents({ https: 'http://p:8080' })).toEqual({ https: expect.any(TunnelingHttpsAgent) });
 		expect(createProxyAgents({ http: '' })).toEqual({});
 	});
 });
@@ -144,8 +213,8 @@ describe('createTransport with proxy', () => {
 		const t = createTransport({ proxy: { http: 'http://p:3128', https: 'http://p:8080' } }, {});
 		expect(t.agents).toEqual({});
 		expect(t.guard).not.toBeNull();
-		expect(t.proxyAgents.http).toBeInstanceOf(HttpProxyAgent);
-		expect(t.proxyAgents.https).toBeInstanceOf(HttpsProxyAgent);
+		expect(t.proxyAgents.http).toBeInstanceOf(TunnelingHttpAgent);
+		expect(t.proxyAgents.https).toBeInstanceOf(TunnelingHttpsAgent);
 	});
 
 	test('agent を渡した scheme ではプロキシ設定を使わない', () => {
@@ -153,8 +222,38 @@ describe('createTransport with proxy', () => {
 		const t = createTransport({ agent: { http: agent }, proxy: { http: 'http://p:3128', https: 'http://p:8080' } }, {});
 		expect(t.agents.http).toBe(agent);
 		expect(t.proxyAgents.http).toBeUndefined();
-		expect(t.proxyAgents.https).toBeInstanceOf(HttpsProxyAgent);
+		expect(t.proxyAgents.https).toBeInstanceOf(TunnelingHttpsAgent);
 		expect(t.proxy).toEqual({ https: 'http://p:8080' });
+	});
+
+	test.each([
+		['proxy.local:3128'],
+		['socks5://p:1080'],
+		['http://'],
+		['file:///tmp/proxy'],
+		['not a url'],
+	])('http/https 以外やホスト名のないプロキシ URL は TypeError (%s)', value => {
+		for (const scheme of ['http', 'https'] as const) {
+			expect(() => createTransport({ proxy: { [scheme]: value } }, {})).toThrow(TypeError);
+			expect(() => createTransport({ proxy: { [scheme]: value } }, {})).toThrow(value);
+		}
+	});
+
+	test('プロキシ URL の検証は agent を渡した scheme にも効く', () => {
+		expect(() => createTransport({ agent: { http: new http.Agent() }, proxy: { http: 'socks5://p:1080' } }, {})).toThrow(TypeError);
+	});
+
+	test('不正なプロキシ URL のエラーにはパスワードを載せない', () => {
+		expect(() => createTransport({ proxy: { http: 'socks5://u:secret@p:1080' } }, {})).toThrow(/^(?!.*secret).*socks5:\/\/u:\*\*\*@p:1080/);
+	});
+
+	test.each([
+		[{ http: 'http://p:3128' }],
+		[{ https: 'https://p:8443' }],
+		[{ http: 'http://user:pw@p:3128', https: 'http://[2001:db8::1]:8080' }],
+		[{ http: '', https: '' }],
+	])('http/https のプロキシ URL は受け付ける (%o)', proxy => {
+		expect(() => createTransport({ proxy }, {})).not.toThrow();
 	});
 });
 
@@ -245,5 +344,133 @@ describe('fetchResponse through a proxy', () => {
 		expect(result.body.toString()).toBe('via caller agent');
 		expect(calls).toBeGreaterThan(0);
 		expect(p.received()).toBe(0);
+	});
+});
+
+describe('fetchResponse through a proxy: timeouts', () => {
+	async function hanging(): Promise<HangingProxy> {
+		const p = await startHangingProxy();
+		closers.push(p.close);
+		return p;
+	}
+
+	test.each(['http', 'https'])('CONNECT に応答しないプロキシでも operationTimeout で打ち切り、ソケットを閉じる (%s)', async scheme => {
+		const p = await hanging();
+		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8'], proxy: { [scheme]: p.url } }, {});
+		const started = Date.now();
+		const e = await fetchResponse(transport, { ...request(`${scheme}://127.0.0.1:9/`), responseTimeout: 0, operationTimeout: 300 }).catch(e => e);
+		expect(Date.now() - started).toBeLessThan(1000);
+		expect(e).toBeInstanceOf(Error);
+		expect(e.message).toContain("Timeout awaiting 'request' for 300ms");
+		expect(p.accepted()).toBe(1);
+		expect(await waitFor(() => p.open() === 0)).toBe(true);
+	});
+
+	test.each(['http', 'https'])('CONNECT に応答しないプロキシは responseTimeout で打ち切り、ソケットを閉じる (%s)', async scheme => {
+		const p = await hanging();
+		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8'], proxy: { [scheme]: p.url } }, {});
+		const started = Date.now();
+		const e = await fetchResponse(transport, { ...request(`${scheme}://127.0.0.1:9/`), responseTimeout: 300, operationTimeout: 60000 }).catch(e => e);
+		expect(Date.now() - started).toBeLessThan(1000);
+		expect(e).toBeInstanceOf(Error);
+		expect(e.message).toContain('300ms');
+		expect(p.accepted()).toBe(1);
+		expect(await waitFor(() => p.open() === 0)).toBe(true);
+	});
+});
+
+describe('fetchResponse through a proxy: CONNECT authority', () => {
+	/** Resolves the given names in `assertHostAllowed` (dns.promises.lookup); other names resolve normally. */
+	function fakeDns(records: Record<string, { address: string; family: number }[]>) {
+		const original = dns.promises.lookup.bind(dns.promises);
+		const spy = vi.spyOn(dns.promises, 'lookup').mockImplementation(((hostname: string, options: any) =>
+			hostname in records ? Promise.resolve(records[hostname]) : original(hostname, options)) as any);
+		closers.push(async () => spy.mockRestore());
+		return spy;
+	}
+
+	test('ホスト名の宛先は、検証した IP アドレスで CONNECT し、Host ヘッダは元のホスト名のまま', async () => {
+		const lookup = fakeDns({ 'proxied.test': [{ address: '127.0.0.1', family: 4 }] });
+		const p = await proxy();
+		let host: string | undefined;
+		const server = await serve((req, res) => {
+			host = req.headers.host;
+			res.end('via ip');
+		});
+		const { port } = new URL(server.url);
+		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8'], proxy: { http: p.url } }, {});
+		const result = await fetchResponse(transport, request(`http://proxied.test:${port}/`));
+		expect(result.body.toString()).toBe('via ip');
+		expect(p.connects).toEqual([`127.0.0.1:${port}`]);
+		expect(host).toBe(`proxied.test:${port}`);
+		// Resolved once, by the guard check
+		expect(lookup.mock.calls.filter(([h]) => h === 'proxied.test')).toHaveLength(1);
+	});
+
+	test('IPv6 リテラルの宛先は角括弧付きで CONNECT する', async () => {
+		const p = await proxy({ relay: false });
+		const transport = createTransport({ allowedPrivateNetworks: ['2001:db8::/32'], proxy: { http: p.url, https: p.url } }, {});
+		await expect(fetchResponse(transport, request('http://[2001:db8::1]:8080/'))).rejects.toThrow('502');
+		await expect(fetchResponse(transport, request('https://[2001:db8::1]/'))).rejects.toThrow('502');
+		expect(p.connects).toEqual(['[2001:db8::1]:8080', '[2001:db8::1]:443']);
+	});
+
+	test('IPv6 アドレスに解決されたホスト名も角括弧付きで CONNECT する', async () => {
+		fakeDns({ 'v6.test': [{ address: '2001:db8::2', family: 6 }] });
+		const p = await proxy({ relay: false });
+		const transport = createTransport({ allowedPrivateNetworks: ['2001:db8::/32'], proxy: { https: p.url } }, {});
+		await expect(fetchResponse(transport, request('https://v6.test/'))).rejects.toThrow('502');
+		expect(p.connects).toEqual(['[2001:db8::2]:443']);
+	});
+
+	test('プロキシ URL の認証情報を Proxy-Authorization で送る', async () => {
+		const p = await proxy({ relay: false });
+		const proxyUrl = p.url.replace('http://', 'http://user:p%40ss@');
+		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8'], proxy: { http: proxyUrl } }, {});
+		await expect(fetchResponse(transport, request('http://127.0.0.1:9/'))).rejects.toThrow('502');
+		expect(p.authorizations).toEqual([`Basic ${Buffer.from('user:p@ss').toString('base64')}`]);
+	});
+
+	test('guard が無効なら宛先を自分で解決せず、ホスト名のままプロキシに渡す', async () => {
+		const lookup = fakeDns({});
+		const p = await proxy({ relay: false });
+		const transport = createTransport({ proxy: { http: p.url } }, { SUMMALY_ALLOW_PRIVATE_IP: 'true' });
+		await expect(fetchResponse(transport, request('http://only-the-proxy-knows.test/'))).rejects.toThrow('502');
+		expect(p.connects).toEqual(['only-the-proxy-knows.test:80']);
+		expect(lookup).not.toHaveBeenCalled();
+	});
+
+	test('https の宛先は IP へトンネルしつつ、SNI・証明書検証・Host にはホスト名を使う', async () => {
+		fakeDns({ [TEST_CERT_HOST]: [{ address: '127.0.0.1', family: 4 }] });
+		const p = await proxy();
+		let host: string | undefined;
+		let servername: string | false | null | undefined;
+		const server = https.createServer({ cert: TEST_CERT, key: TEST_KEY }, (req, res) => {
+			host = req.headers.host;
+			servername = (req.socket as import('node:tls').TLSSocket).servername;
+			res.end('via tls');
+		});
+		await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+		closers.push(() => new Promise<void>(done => {
+			server.close(() => done());
+			server.closeAllConnections();
+		}));
+		const { port } = server.address() as AddressInfo;
+		const url = `https://${TEST_CERT_HOST}:${port}/`;
+
+		// The certificate names only the host name, so verification fails unless it uses the host name
+		const transport = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8'], proxy: { https: p.url } }, {});
+		(transport.proxyAgents.https as https.Agent).options.ca = TEST_CERT;
+		const result = await fetchResponse(transport, request(url));
+		expect(result.body.toString()).toBe('via tls');
+		expect(p.connects).toEqual([`127.0.0.1:${port}`]);
+		expect(host).toBe(`${TEST_CERT_HOST}:${port}`);
+		expect(servername).toBe(TEST_CERT_HOST);
+
+		// Certificate verification stays on: without the test CA the self-signed certificate is rejected
+		const untrusted = createTransport({ allowedPrivateNetworks: ['127.0.0.0/8'], proxy: { https: p.url } }, {});
+		await expect(fetchResponse(untrusted, request(url))).rejects.toThrow(/self[- ]signed/);
+		// Both tunnels are torn down (keepAlive off; the failed TLS handshake closes its tunnel)
+		expect(await waitFor(() => p.open() === 0)).toBe(true);
 	});
 });

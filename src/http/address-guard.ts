@@ -41,18 +41,25 @@ function rejected(ip: string): StatusError {
 	return new StatusError(`Private IP rejected ${ip}`, 400, 'Private IP Rejected');
 }
 
-export async function assertHostAllowed(guard: AddressGuard, hostname: string): Promise<void> {
+/**
+ * Checks every address `hostname` resolves to and returns them (in resolution order) when all are allowed.
+ * An IP literal is checked as is (brackets stripped) and returned as the only address.
+ * Callers that connect through a proxy must connect to one of the returned addresses, not re-resolve the name.
+ */
+export async function assertHostAllowed(guard: AddressGuard, hostname: string): Promise<string[]> {
 	const host = hostname.replace(/^\[|\]$/g, '');
 	if (host === '') throw noAddress(hostname);
 	if (ipaddr.isValid(host)) {
 		if (!isAddressAllowed(guard, host)) throw rejected(host);
-		return;
+		// Canonical form, so the address handed to the proxy is exactly the one checked here.
+		return [ipaddr.parse(host).toString()];
 	}
 	const results = await dns.promises.lookup(host, { all: true });
 	if (results.length === 0) throw noAddress(host);
 	for (const { address } of results) {
 		if (!isAddressAllowed(guard, address)) throw rejected(address);
 	}
+	return results.map(r => r.address);
 }
 
 /** Applies the same check at socket connect time (DNS rebinding defense). */
