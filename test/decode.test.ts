@@ -105,6 +105,65 @@ describe('detectEncoding', () => {
 	test('何もわからなければ utf-8', () => {
 		expect(detectEncoding(Buffer.alloc(0))).toBe('utf-8');
 	});
+
+	test('先頭 16KB が ASCII だけなら、chardet の答えに頼らず全体で判定し直す', () => {
+		// chardet calls an ASCII-only sample like this one ISO-8859-1, which would garble the Shift_JIS title after it.
+		const html = Buffer.concat([ascii(`<html><head><script>${'var x = 1;\n'.repeat(1800)}</script>`), SJIS_HTML_WITHOUT_META]);
+
+		expect(decodeHtml(html)).toContain(SJIS_TITLE);
+		// Only the whole body was given to chardet, not the ASCII-only sample.
+		expect(detectSpy).toHaveBeenCalledTimes(1);
+		expect(detectSpy.mock.calls[0][0].length).toBe(html.length);
+	});
+
+	test('ASCII だけのページは chardet を呼ばずに utf-8 として読む', () => {
+		expect(detectEncoding(ascii('<html><head><title>plain</title></head></html>'))).toBe('utf-8');
+		expect(detectSpy).not.toHaveBeenCalled();
+	});
+
+	test('宣言のない ISO-2022-JP（7 ビット）も判定できる', () => {
+		const html = ascii('<html><head><title>\x1b$BF|K\\8l$N%?%$%H%k!V%F%9%H!W\x1b(B</title></head></html>');
+
+		expect(detectEncoding(html)).toBe('iso-2022-jp');
+		expect(decodeHtml(html)).toContain('日本語のタイトル「テスト」');
+	});
+});
+
+describe('誤った宣言', () => {
+	test('content-type が UTF-8 でも本文が UTF-8 として正しくなければ、meta や chardet で判定する', () => {
+		expect(decodeHtml(SJIS_HTML, 'text/html; charset=UTF-8')).toContain(SJIS_TITLE);
+		expect(decodeHtml(SJIS_HTML_WITHOUT_META, 'text/html; charset=UTF-8')).toContain(SJIS_TITLE);
+	});
+
+	test('meta が UTF-8 でも本文が UTF-8 として正しくなければ、chardet で判定する', () => {
+		const html = Buffer.from(SJIS_HTML.toString('latin1').replace('<meta charset="Shift_JIS">', '<meta charset="utf-8">'), 'latin1');
+
+		expect(decodeHtml(html)).toContain(SJIS_TITLE);
+	});
+
+	test('正しい UTF-8 の宣言はそのまま使い、chardet を呼ばない', () => {
+		const html = Buffer.from('<html><head><title>日本語</title></head></html>');
+
+		expect(decodeHtml(html, 'text/html; charset=utf-8')).toContain('日本語');
+		expect(decodeHtml(Buffer.from('<meta charset="utf-8"><title>日本語</title>'))).toContain('日本語');
+		expect(detectSpy).not.toHaveBeenCalled();
+	});
+
+	test('content-type の ISO-8859-1（サーバーの既定値）より、ページの meta を優先する', () => {
+		expect(detectEncoding(SJIS_HTML, 'text/html; charset=ISO-8859-1')).toBe('shift_jis');
+		expect(decodeHtml(SJIS_HTML, 'text/html; charset=ISO-8859-1')).toContain(SJIS_TITLE);
+	});
+
+	test('content-type の ISO-8859-1 は、meta がなければ chardet の後に使う', () => {
+		expect(decodeHtml(SJIS_HTML_WITHOUT_META, 'text/html; charset=ISO-8859-1')).toContain(SJIS_TITLE);
+		expect(detectEncoding(ascii('<title>plain</title>'), 'text/html; charset=ISO-8859-1')).toBe('utf-8');
+		expect(detectEncoding(Buffer.alloc(0), 'text/html; charset=ISO-8859-1')).toBe('windows-1252');
+		expect(decodeHtml(ascii('<html><head><title>Café crème</title></head><body>naïve façade</body></html>'), 'text/html; charset=ISO-8859-1')).toContain('Café crème');
+	});
+
+	test('UTF-8 と ISO-8859-1 以外の content-type の宣言は、そのまま使う', () => {
+		expect(detectEncoding(SJIS_HTML, 'text/html; charset=euc-jp')).toBe('euc-jp');
+	});
 });
 
 describe('decodeHtml', () => {

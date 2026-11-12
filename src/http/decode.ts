@@ -95,47 +95,115 @@ function fromMeta(body: Buffer): string | null {
 	return null;
 }
 
-function isValidUtf8(body: Buffer): boolean {
-	try {
-		strictUtf8TextDecoder.decode(body);
+/** The encoding of a body, and its text when finding the encoding already decoded it. */
+type Resolved = { encoding: string; text?: string };
 
-		return true;
+/** The body decoded as UTF-8, or null when it is not valid UTF-8. */
+function strictUtf8(body: Buffer): string | null {
+	try {
+		return strictUtf8TextDecoder.decode(body);
 	} catch {
-		return false;
+		return null;
 	}
 }
 
-function fromDetection(body: Buffer): string | null {
+/** ESC, which the 7-bit ISO-2022 encodings (such as ISO-2022-JP) use to switch character sets; HTML has none. */
+const ESC = 0x1b;
+
+/** Whether the bytes hold anything but plain ASCII text: a byte of 0x80 or above, or an ISO-2022 escape. */
+function hasNonAscii(bytes: Uint8Array): boolean {
+	for (const byte of bytes) {
+		if (byte >= 0x80 || byte === ESC) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function fromDetection(body: Buffer): Resolved | null {
 	if (body.length === 0) {
 		return null;
 	}
-	const sampled = detect(body.subarray(0, CHARDET_SAMPLE_BYTES));
+	const sample = body.subarray(0, CHARDET_SAMPLE_BYTES);
 
-	if (sampled?.toLowerCase() !== 'ascii') {
-		return sampled ? canonicalEncoding(sampled) : null;
+	// Checked here rather than through chardet's answer: chardet may call an ASCII-only sample ISO-8859-1.
+	if (hasNonAscii(sample)) {
+		const sampled = detect(sample);
+		const encoding = sampled ? canonicalEncoding(sampled) : null;
+
+		return encoding ? { encoding } : null;
 	}
 	// An ASCII-only sample says nothing about the rest. Most such pages are UTF-8, which is cheap to confirm;
 	// otherwise fall back to detecting on the whole body (slow, but only for undeclared non-UTF-8 pages).
-	if (isValidUtf8(body)) {
-		return 'utf-8';
+	const text = strictUtf8(body);
+
+	if (text !== null) {
+		return { encoding: 'utf-8', text };
 	}
 	const whole = detect(body);
+	const encoding = whole ? canonicalEncoding(whole) : null;
 
-	return whole ? canonicalEncoding(whole) : null;
+	return encoding ? { encoding } : null;
 }
 
 /**
- * Detects the encoding of an HTML body, in the order browsers use:
+ * Finds the encoding of an HTML body, mostly in the order browsers use:
  * BOM → content-type charset → `<meta charset>` near the top → chardet on a sample → utf-8.
- * Returns a WHATWG canonical encoding name.
+ *
+ * Unlike browsers, two declarations servers often get wrong are not taken at their word, so that such pages
+ * still read correctly:
+ * - UTF-8 (in the content-type or a meta) is used only when the body is valid UTF-8; otherwise the next clue decides.
+ * - windows-1252 (ISO-8859-1) in the content-type, often a server's default, comes after the page's own clues
+ *   (its meta, then detection).
+ *
  * chardet sees only a sample: running it on a whole page would dominate the cost of a summary.
  */
+function resolve(body: Buffer, contentType: string | undefined): Resolved {
+	const bom = fromBom(body);
+
+	if (bom) {
+		return { encoding: bom };
+	}
+
+	// Decoded at most once: a valid result is the text of the page, so it is not decoded again.
+	let utf8: string | null | undefined;
+	const asUtf8 = (): Resolved | null => {
+		utf8 ??= strictUtf8(body);
+
+		return utf8 === null ? null : { encoding: 'utf-8', text: utf8 };
+	};
+
+	const header = fromContentType(contentType);
+
+	if (header === 'utf-8') {
+		const resolved = asUtf8();
+
+		if (resolved) {
+			return resolved;
+		}
+	} else if (header !== null && header !== 'windows-1252') {
+		return { encoding: header };
+	}
+
+	const meta = fromMeta(body);
+
+	if (meta === 'utf-8') {
+		const resolved = asUtf8();
+
+		if (resolved) {
+			return resolved;
+		}
+	} else if (meta !== null) {
+		return { encoding: meta };
+	}
+
+	return fromDetection(body) ?? { encoding: header === 'windows-1252' ? header : 'utf-8' };
+}
+
+/** The WHATWG canonical name of the encoding of an HTML body (see resolve). */
 export function detectEncoding(body: Buffer, contentType?: string): string {
-	return fromBom(body)
-		?? fromContentType(contentType)
-		?? fromMeta(body)
-		?? fromDetection(body)
-		?? 'utf-8';
+	return resolve(body, contentType).encoding;
 }
 
 export function toUtf8(body: Buffer, encoding: string): string {
@@ -150,5 +218,7 @@ export function toUtf8(body: Buffer, encoding: string): string {
 }
 
 export function decodeHtml(body: Buffer, contentType?: string): string {
-	return toUtf8(body, detectEncoding(body, contentType));
+	const { encoding, text } = resolve(body, contentType);
+
+	return text ?? toUtf8(body, encoding);
 }
