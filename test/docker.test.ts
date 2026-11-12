@@ -173,7 +173,8 @@ describe('Docker イメージ', () => {
 
 		test('環境変数で指定したオプションが反映される', async () => {
 			const before = (await receivedUserAgents()).length;
-			const res = await fetch(`${container!.baseUrl}/?url=${encodeURIComponent(targetUrl)}`);
+			// A URL no other test summarizes: the server caches summaries, so a repeated URL would not reach the fixture server.
+			const res = await fetch(`${container!.baseUrl}/?url=${encodeURIComponent(`${targetUrl}?user-agent`)}`);
 			expect(res.status).toBe(200);
 			// The page itself is fetched with SUMMALY_USER_AGENT (the favicon check may follow with another User-Agent)
 			expect((await receivedUserAgents()).slice(before)).toContain('summaly-docker-test/1.0');
