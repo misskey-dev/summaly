@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import { fastifySummaly, type SummalyFastifyOptions } from '@/fastify.js';
 import { parseQueryOptions, resolveRequestOptions } from '@/fastify/query.js';
 import { DEFAULT_MAX_RESPONSE_SIZE, DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT } from '@/options.js';
-import type { SummalyPlugin } from '@/plugin.js';
+import { defineSummalyPlugin, type SummalyPlugin } from '@/plugin.js';
 import { JsonCache } from './helpers/json-cache.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
@@ -70,12 +70,41 @@ describe('fastifySummaly', () => {
 		expect(res.json()).toEqual({ error: 'url is required' });
 	});
 
-	test('returns 500 with the status code when fetching fails', async () => {
+	test('取得が HTTP エラーなら 500 で、name、message とステータスを返す', async () => {
 		const { app, origin } = await setup();
 		const res = await app.inject({ method: 'GET', url: '/', query: { url: `${origin}/missing-plugin` } });
 
 		expect(res.statusCode).toBe(500);
-		expect(res.json().error.statusCode).toBe(404);
+		expect(res.json()).toEqual({
+			error: { name: 'StatusError', message: '404 Not Found', statusCode: 404, statusMessage: 'Not Found', isPermanentError: true },
+		});
+	});
+
+	test('接続できなければ、Node.js のエラーコードを返す', async () => {
+		const closed = await startTestServer((_req, res) => res.end());
+		const url = closed.url;
+
+		await closed.close();
+		const { app } = await setup();
+		const res = await app.inject({ method: 'GET', url: '/', query: { url } });
+
+		expect(res.statusCode).toBe(500);
+		expect(res.json().error).toMatchObject({ code: 'ECONNREFUSED' });
+		expect(res.json().error.message).toContain('ECONNREFUSED');
+	});
+
+	test('プラグインのエラーは name と message を返し、長いメッセージは切り詰め、スタックは返さない', async () => {
+		const throwing = (thrown: unknown) => defineSummalyPlugin({ name: 'throws', test: () => true, summarize: async () => {
+			throw thrown;
+		} });
+		const { app: typeError } = await setup({ plugins: [throwing(new TypeError('boom'))] });
+		const { app: long } = await setup({ plugins: [throwing(new Error('x'.repeat(5000)))] });
+		const { app: notError } = await setup({ plugins: [throwing('oops')] });
+		const query = { url: 'https://example.com/' };
+
+		expect((await typeError.inject({ method: 'GET', url: '/', query })).json()).toEqual({ error: { name: 'TypeError', message: 'boom' } });
+		expect((await long.inject({ method: 'GET', url: '/', query })).json().error.message).toBe('x'.repeat(1024));
+		expect((await notError.inject({ method: 'GET', url: '/', query })).json()).toEqual({ error: { name: 'Error', message: 'oops' } });
 	});
 
 	test('returns the summary', async () => {

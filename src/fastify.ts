@@ -3,9 +3,12 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
+import { toErrorBody } from '@/fastify/error.js';
 import { resolveRequestOptions } from '@/fastify/query.js';
 import { createSummaly } from '@/index.js';
 import type { SummalyOptions } from '@/types.js';
+
+export type { SummalyErrorBody } from '@/fastify/error.js';
 
 /**
  * Options of fastifySummaly: summaly options applied to every request.
@@ -20,7 +23,8 @@ export type SummalyFastifyOptions = SummalyOptions;
 
 /**
  * Serves `GET /?url=<url>&lang=<lang>&...` with the summary as JSON.
- * A missing `url` gives 400 and a failed summary 500, both as `{ error }`.
+ * A missing `url` gives 400 `{ error: 'url is required' }`. A failed summary gives 500 `{ error }` with why it failed
+ * (SummalyErrorBody: name, message, and the HTTP status or the system error code when there is one).
  *
  * Each registration has its own summaly instance (see createSummaly), closed when Fastify closes.
  *
@@ -50,7 +54,7 @@ export const fastifySummaly: FastifyPluginAsync<SummalyFastifyOptions> = async (
 			return await summaly(url, resolveRequestOptions(query, options));
 		} catch (e) {
 			return reply.status(500).send({
-				error: e,
+				error: toErrorBody(e),
 			});
 		}
 	});
