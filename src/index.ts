@@ -1,6 +1,4 @@
-import { InProcessCoordinator } from '@/coalesce/in-process-coordinator.js';
 import { buildRequestKey } from '@/coalesce/key.js';
-import { MemorySummaryCache } from '@/coalesce/memory-cache.js';
 import { type CoalesceDeps, runCoalesced } from '@/coalesce/run.js';
 import { type ScrapeContext, createScrapeContext, fetchWithContext, fixOptions } from '@/context.js';
 import { scrapeGeneral } from '@/extract/general.js';
@@ -14,9 +12,6 @@ import { VERSION } from '@/version.js';
 
 export const version: string = VERSION;
 
-export { InProcessCoordinator } from '@/coalesce/in-process-coordinator.js';
-export { MemorySummaryCache } from '@/coalesce/memory-cache.js';
-export type { MemorySummaryCacheOptions } from '@/coalesce/memory-cache.js';
 export { StatusError } from '@/http/status-error.js';
 export { default } from '@/fastify-plugin.js';
 export type { FastifyLike } from '@/fastify-plugin.js';
@@ -28,43 +23,49 @@ export type {
 	SummalyOptions,
 	SummalyResult,
 } from '@/types.js';
-export type {
-	CacheEntry,
-	InflightCoordinator,
-	SerializedError,
-	SummaryCache,
-} from '@/coalesce/types.js';
-
 /**
- * Defaults merged under the options of every call.
+ * A summaly function with its own connection pool (see createSummaly).
  */
-export const summalyDefaultOptions: SummalyOptions = {
-	lang: null,
-	followRedirects: true,
-	plugins: [],
+export type SummalyInstance = {
+	(url: string, options?: SummalyOptions): Promise<SummalyResult>;
+	/**
+	 * Refuses new calls, waits for the calls in progress to settle, then destroys the instance's connections.
+	 * The `cache` and `coordinator` it was given are left alone. Calling it again returns the same promise.
+	 */
+	close(): Promise<void>;
+	/** Same as `close()`, for `await using`. */
+	[Symbol.asyncDispose](): Promise<void>;
 };
 
-const DEFAULT_CACHE_TTL = 5 * 60 * 1000;
-const DEFAULT_ERROR_CACHE_TTL = 30 * 1000;
+/** Merged under the options of every call. Not exported: changing it would change every later call. */
+const DEFAULT_OPTIONS: Readonly<SummalyOptions> = Object.freeze({
+	lang: null,
+	followRedirects: true,
+});
 
 /**
- * Creates a summaly function with its own result cache, in-flight sharing and connection pool.
- * Options given per call are merged over `base`. `cache: false` / `coordinator: false` (in either) turns that part off.
- * Its calls with the same `allowedPrivateNetworks` reuse each other's idle connections for a short time
- * (see GuardedAgentPool); separate summarizers never share connections.
+ * Creates a summaly function with its own connection pool. Options given per call are merged over `base`.
+ * Calls of one instance with the same `allowedPrivateNetworks` reuse each other's idle connections for a short time
+ * (see GuardedAgentPool); separate instances never share connections. `close()` destroys them.
+ *
+ * Results are cached and in-flight calls shared only through a `cache` / `coordinator` given in `base` or per call
+ * (`false` per call turns off the one in `base`).
  * @throws {TypeError} when `base.plugins` holds something not made by defineSummalyPlugin, or two plugins with one name
  */
-export function createSummaly(base: SummalyOptions = {}): (url: string, options?: SummalyOptions) => Promise<SummalyResult> {
+export function createSummaly(base: SummalyOptions = {}): SummalyInstance {
 	assertPlugins(base.plugins, builtinPluginNames);
-	const memoryCache = new MemorySummaryCache();
-	const inProcessCoordinator = new InProcessCoordinator();
 	const agentPool = new GuardedAgentPool();
+	const inFlight = new Set<Promise<unknown>>();
+	let closing: Promise<void> | undefined;
 
-	return (url, options = {}) => {
+	const summarize = (url: string, options: SummalyOptions = {}): Promise<SummalyResult> => {
+		if (closing !== undefined) {
+			return Promise.reject(new Error('This summaly instance is closed'));
+		}
 		// Fixed when the call starts: the summary key, the transport and the favicon check keys are all built from
 		// these, whatever the caller or the environment changes while the call runs.
 		const opts = fixOptions({
-			...summalyDefaultOptions,
+			...DEFAULT_OPTIONS,
 			...base,
 			...options,
 		});
@@ -75,27 +76,50 @@ export function createSummaly(base: SummalyOptions = {}): (url: string, options?
 			return Promise.reject(error);
 		}
 		const allowPrivateIp = privateIpAllowedByEnv();
-		const cache = options.cache ?? base.cache ?? memoryCache;
-		const coordinator = options.coordinator ?? base.coordinator ?? inProcessCoordinator;
+		const cache = options.cache ?? base.cache;
+		const coordinator = options.coordinator ?? base.coordinator;
 		const deps: CoalesceDeps = {
-			cache: cache === false ? null : cache,
-			coordinator: coordinator === false ? null : coordinator,
-			cacheTtl: options.cacheTtl ?? base.cacheTtl ?? DEFAULT_CACHE_TTL,
-			errorCacheTtl: options.errorCacheTtl ?? base.errorCacheTtl ?? DEFAULT_ERROR_CACHE_TTL,
+			cache: cache === undefined || cache === false ? null : cache,
+			coordinator: coordinator === undefined || coordinator === false ? null : coordinator,
 		};
 
-		return runCoalesced(
+		const promise = runCoalesced(
 			deps,
 			() => buildRequestKey(url, opts, allowPrivateIp),
 			() => summarizeUncached(url, opts, deps, allowPrivateIp, agentPool),
 		);
+		const forget = () => {
+			inFlight.delete(promise);
+		};
+
+		inFlight.add(promise);
+		promise.then(forget, forget);
+
+		return promise;
 	};
+
+	const close = (): Promise<void> => {
+		closing ??= (async () => {
+			await Promise.allSettled(inFlight);
+			agentPool.destroy();
+		})();
+
+		return closing;
+	};
+
+	return Object.assign(summarize, { close, [Symbol.asyncDispose]: close });
 }
 
+let defaultInstance: SummalyInstance | undefined;
+
 /**
- * Summarize an web page
+ * Summarize an web page. Uses an instance of createSummaly made on the first call.
  */
-export const summaly: (url: string, options?: SummalyOptions) => Promise<SummalyResult> = createSummaly();
+export const summaly = (url: string, options?: SummalyOptions): Promise<SummalyResult> => {
+	defaultInstance ??= createSummaly();
+
+	return defaultInstance(url, options);
+};
 
 /**
  * The whole summary without caching or sharing it: final URL, plugin match, scraping.
@@ -115,7 +139,7 @@ async function summarizeUncached(
 	// The requests of this call share the transport's connections. Guarded connections that completed their responses
 	// stay idle in the summarizer's pool for later calls; proxy connections end with the call (see Transport#close).
 	try {
-		const actualUrl = opts.followRedirects ? await resolveFinalUrl(ctx, url) : url;
+		const actualUrl = ctx.options.followRedirects ? await resolveFinalUrl(ctx, url) : url;
 		const target = new URL(actualUrl);
 
 		// The caller's plugins first, so that they can take over URLs a built-in plugin would summarize.

@@ -2,13 +2,10 @@ import type { CacheEntry, InflightCoordinator, SerializedError, SummaryCache } f
 import { StatusError } from '@/http/status-error.js';
 import type { SummalyResult } from '@/types.js';
 
+/** The cache and in-flight sharing a summary uses; null when the caller gave none. */
 export type CoalesceDeps = {
 	cache: SummaryCache | null;
 	coordinator: InflightCoordinator | null;
-	/** How long a success is kept (ms). 0 or less does not store it. */
-	cacheTtl: number;
-	/** How long a failure is kept (ms). 0 or less does not store it. */
-	errorCacheTtl: number;
 };
 
 /** Longest error message kept (characters). A message can quote remote content, and every cached entry stays in memory. */
@@ -93,14 +90,12 @@ async function runTask(task: () => Promise<SummalyResult>): Promise<SummaryEntry
 	}
 }
 
-/** One use of the cache: how its entries are made, recognized, timed and handed back. */
+/** One use of the cache: how its entries are made, recognized and handed back. */
 type Use<E extends CacheEntry, T> = {
 	/** Does the work and returns its outcome as an entry. */
 	run: () => Promise<E>;
 	/** Whether a stored entry is this use's. Any other entry (another use's, or a broken one) counts as a miss. */
 	accepts: (entry: unknown) => entry is E;
-	/** Whether the entry is kept for `cacheTtl` (true) or `errorCacheTtl` (false). */
-	succeeded: (entry: E) => boolean;
 	/** The caller's result from the entry. */
 	settle: (entry: E) => T;
 };
@@ -110,14 +105,10 @@ type Use<E extends CacheEntry, T> = {
  * Order: cache lookup → `use.run` through the coordinator → the entry stored in the cache → a result settled for each caller.
  * Every caller, including the one whose call ran the work, gets its result settled from the same entry.
  * A failing `cache.get` or coordinator rejects; a failing `cache.set` does not (the entry is just not stored).
- * `key` is called only when there is a cache or a coordinator to use it (building it hashes every option).
+ * Needs a cache or a coordinator; without either, callers run the work directly (see runCoalesced).
  */
 async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => string, use: Use<E, T>): Promise<T> {
 	const { cache, coordinator } = deps;
-
-	if (cache === null && coordinator === null) {
-		return use.settle(await use.run());
-	}
 	const requestKey = key();
 
 	const lookup = async (): Promise<E | undefined> => {
@@ -144,13 +135,12 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 		}
 
 		const entry = await use.run();
-		const ttl = use.succeeded(entry) ? deps.cacheTtl : deps.errorCacheTtl;
 
-		if (cache !== null && ttl > 0) {
+		if (cache !== null) {
 			// Storing is best effort: a failed set must not throw away work already done, nor make the callers
 			// sharing it (or the favicon check's fallback) do it again.
 			try {
-				await cache.set(requestKey, entry, ttl);
+				await cache.set(requestKey, entry);
 			} catch {
 				// Not stored; the callers still get the entry.
 			}
@@ -165,33 +155,40 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 /**
  * Runs a summary `task` at most once per key at a time and caches the outcome, failures included.
  * The stored entry is a structuredClone copy, and each caller gets a separate copy (or the error rebuilt from it).
+ * Without a cache and a coordinator, `task` just runs: its result and its error reach the caller as they are.
  */
 export function runCoalesced(
 	deps: CoalesceDeps,
 	key: () => string,
 	task: () => Promise<SummalyResult>,
 ): Promise<SummalyResult> {
+	if (deps.cache === null && deps.coordinator === null) {
+		return task();
+	}
+
 	return coalesce(deps, key, {
 		run: () => runTask(task),
 		accepts: isSummaryEntry,
-		succeeded: entry => entry.kind === 'ok',
 		settle,
 	});
 }
 
 /**
  * Runs a favicon `check` at most once per key at a time and caches its outcome: the href to return as the icon,
- * kept for `cacheTtl`, or null (the check failed), kept for `errorCacheTtl`. Only that outcome is stored.
+ * or null (the check failed). Only that outcome is stored. Without a cache and a coordinator, `check` just runs.
  */
 export function runCoalescedIcon(
 	deps: CoalesceDeps,
 	key: () => string,
 	check: () => Promise<string | null>,
 ): Promise<string | null> {
+	if (deps.cache === null && deps.coordinator === null) {
+		return check();
+	}
+
 	return coalesce(deps, key, {
 		run: async () => ({ kind: 'icon', href: await check() }),
 		accepts: isIconEntry,
-		succeeded: entry => entry.href !== null,
 		settle: entry => entry.href,
 	});
 }

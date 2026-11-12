@@ -14,11 +14,12 @@ const common = {
 } satisfies UserConfig;
 
 export default defineConfig([
-	// Library (published API): `.` and `./plugin`
+	// Library (published API): `.`, `./cache` and `./plugin`
 	{
 		...common,
 		entry: {
 			index: './src/index.ts',
+			cache: './src/cache.ts',
 			plugin: './src/plugin.ts',
 		},
 		dts: true,

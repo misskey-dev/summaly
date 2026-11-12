@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import http, { Agent as httpAgent } from 'node:http';
 import { Agent as httpsAgent } from 'node:https';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { createSummaly, summalyDefaultOptions } from '@/index.js';
+import { createSummaly } from '@/index.js';
 import { StatusError } from '@/http/status-error.js';
 import { defineSummalyPlugin, type SummalyPlugin, type SummalyPluginOptions, type SummalyPluginResult } from '@/plugin.js';
 import { DEFAULT_BOT_UA } from '@/version.js';
@@ -179,12 +179,10 @@ describe('local tests', () => {
 	describe('options', () => {
 		test('指定したオプションが以降の呼び出しに引き継がれないこと', async () => {
 			const content = fixture('htmls/basic.html');
-			const defaults = { ...summalyDefaultOptions };
 
 			const host = await serve(onlyRoot((_req, res) => sendWithLength(res, content)));
 
 			await expect(summaly(host, { contentLengthLimit: content.byteLength - 1, userAgent: 'test-ua', allowedPrivateNetworks })).rejects.toThrow();
-			expect(summalyDefaultOptions).toEqual(defaults);
 			expect(await summaly(host, { allowedPrivateNetworks })).toBeDefined();
 		});
 	});

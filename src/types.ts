@@ -162,23 +162,15 @@ export type SummalyOptions = {
 	proxy?: ProxyOptions;
 
 	/**
-	 * Result cache. Pass false to disable
+	 * Cache for summaries and favicon checks (see `@misskey-dev/summaly/cache`). None by default.
+	 * false turns off the one given to createSummaly for this call.
 	 */
 	cache?: SummaryCache | false;
 
 	/**
-	 * TTL of successful results in the cache (ms). Also used for favicon checks whose HEAD succeeded
-	 */
-	cacheTtl?: number;
-
-	/**
-	 * TTL of failures in the cache (ms). Also used for favicon checks whose HEAD failed (icon is null)
-	 */
-	errorCacheTtl?: number;
-
-	/**
-	 * Coordinator that shares in-flight requests for the same key. Pass false to disable.
-	 * Its `run` is called again, with another key, from inside a running task (see InflightCoordinator)
+	 * Shares in-flight summaries and favicon checks with the same key (see `@misskey-dev/summaly/cache`).
+	 * None by default. false turns off the one given to createSummaly for this call.
+	 * Its `run` is called again, with another key, from inside a running task (see InflightCoordinator).
 	 */
 	coordinator?: InflightCoordinator | false;
 };

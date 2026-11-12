@@ -4,6 +4,7 @@
 
 import ipaddr from 'ipaddr.js';
 import type { ProxyOptions, SummalyOptions } from '@/index.js';
+import type { MemorySummaryCacheOptions } from './memory-cache.js';
 
 export type ServerConfig = {
 	/**
@@ -20,6 +21,11 @@ export type ServerConfig = {
 	 * Options passed to summaly
 	 */
 	summalyOptions: SummalyOptions;
+
+	/**
+	 * TTLs of the server's cache (see MemorySummaryCache); unset ones use its defaults
+	 */
+	cache: Pick<MemorySummaryCacheOptions, 'ttl' | 'errorTtl'>;
 };
 
 export const DEFAULT_SERVER_HOST = 'localhost';
@@ -309,17 +315,18 @@ export function loadServerConfig(env: NodeJS.ProcessEnv): ServerConfig {
 		summalyOptions.proxy = proxy;
 	}
 
+	const cache: ServerConfig['cache'] = {};
 	const cacheTtl = readSetting(env, 'CACHE_TTL');
 
 	if (cacheTtl != null) {
-		summalyOptions.cacheTtl = parseNonNegativeInteger(cacheTtl.name, cacheTtl.value);
+		cache.ttl = parseNonNegativeInteger(cacheTtl.name, cacheTtl.value);
 	}
 
 	const errorCacheTtl = readSetting(env, 'ERROR_CACHE_TTL');
 
 	if (errorCacheTtl != null) {
-		summalyOptions.errorCacheTtl = parseNonNegativeInteger(errorCacheTtl.name, errorCacheTtl.value);
+		cache.errorTtl = parseNonNegativeInteger(errorCacheTtl.name, errorCacheTtl.value);
 	}
 
-	return { host, port, summalyOptions };
+	return { host, port, summalyOptions, cache };
 }

@@ -17,6 +17,10 @@
       "types": "./built/index.d.ts",
       "default": "./built/index.js"
     },
+    "./cache": {
+      "types": "./built/cache.d.ts",
+      "default": "./built/cache.js"
+    },
     "./plugin": {
       "types": "./built/plugin.d.ts",
       "default": "./built/plugin.js"

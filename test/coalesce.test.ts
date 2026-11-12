@@ -4,18 +4,10 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { buildIconKey, buildRequestKey, objectId } from '@/coalesce/key.js';
 import { runCoalesced, runCoalescedIcon } from '@/coalesce/run.js';
-import {
-	type CacheEntry,
-	createSummaly,
-	InProcessCoordinator,
-	MemorySummaryCache,
-	StatusError,
-	summalyDefaultOptions,
-	type SummalyOptions,
-	type SummalyResult,
-	type SummaryCache,
-} from '@/index.js';
+import { type CacheEntry, InProcessCoordinator, type SummaryCache } from '@/cache.js';
+import { createSummaly, StatusError, type SummalyOptions, type SummalyResult } from '@/index.js';
 import { defineSummalyPlugin, type SummalyPlugin } from '@/plugin.js';
+import { MemorySummaryCache } from '@/server/memory-cache.js';
 import { JsonCache } from './helpers/json-cache.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
@@ -74,6 +66,11 @@ async function countingServer(opts: { delayMs?: number; status?: number } = {}):
 	return { url: server.url, gets: () => gets };
 }
 
+/** A cache and a coordinator to give a summaly instance, which uses neither unless given them. */
+function coalescing(): Pick<SummalyOptions, 'cache' | 'coordinator'> {
+	return { cache: new MemorySummaryCache(), coordinator: new InProcessCoordinator() };
+}
+
 function newAgent(): http.Agent {
 	const agent = new http.Agent();
 
@@ -94,10 +91,10 @@ function recordingCache(): SummaryCache & { gets: () => number; storedKinds: Cac
 
 			return inner.get(key);
 		},
-		set: (key, entry, ttlMs) => {
+		set: (key, entry) => {
 			storedKinds.push(entry.kind);
 
-			return inner.set(key, entry, ttlMs);
+			return inner.set(key, entry);
 		},
 		gets: () => gets,
 		storedKinds,
@@ -131,15 +128,6 @@ function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): Sum
 	return { ...plugin, calls: () => calls };
 }
 
-/** Estimated bytes of one entry, as MemorySummaryCache accounts it. */
-async function sizeOf(key: string, entry: CacheEntry): Promise<number> {
-	const cache = new MemorySummaryCache();
-
-	await cache.set(key, entry, 60_000);
-
-	return cache.estimatedBytes;
-}
-
 /** A cache that returns `entry` for every key and records what is stored. */
 function brokenCache(entry: unknown): SummaryCache & { stored: CacheEntry[] } {
 	const stored: CacheEntry[] = [];
@@ -156,7 +144,7 @@ function brokenCache(entry: unknown): SummaryCache & { stored: CacheEntry[] } {
 describe('coalescing and caching', () => {
 	test('同時に来た同じ要求は1回だけ取得する', async () => {
 		const server = await countingServer({ delayMs: 100 });
-		const summaly = createSummaly({ allowedPrivateNetworks });
+		const summaly = createSummaly({ ...coalescing(), allowedPrivateNetworks });
 
 		const results = await Promise.all(Array.from({ length: 10 }, () => summaly(server.url)));
 
@@ -171,7 +159,7 @@ describe('coalescing and caching', () => {
 
 	test('lang が違えば別々に取得する', async () => {
 		const server = await countingServer({ delayMs: 100 });
-		const summaly = createSummaly({ allowedPrivateNetworks });
+		const summaly = createSummaly({ ...coalescing(), allowedPrivateNetworks });
 
 		await Promise.all([
 			summaly(server.url, { lang: 'ja-JP' }),
@@ -183,7 +171,7 @@ describe('coalescing and caching', () => {
 
 	test('agent が違えば別々に取得する', async () => {
 		const server = await countingServer({ delayMs: 100 });
-		const summaly = createSummaly();
+		const summaly = createSummaly(coalescing());
 		const agentA = newAgent();
 		const agentB = newAgent();
 
@@ -196,9 +184,9 @@ describe('coalescing and caching', () => {
 		expect(server.gets()).toBe(2);
 	});
 
-	test('cacheTtl 内の再要求は取得しない、期限後は取得する', async () => {
+	test('キャッシュの ttl の間の再要求は取得しない、期限後は取得する', async () => {
 		const server = await countingServer();
-		const summaly = createSummaly({ allowedPrivateNetworks, cacheTtl: 50 });
+		const summaly = createSummaly({ cache: new MemorySummaryCache({ ttl: 50 }), coordinator: new InProcessCoordinator(), allowedPrivateNetworks });
 
 		await summaly(server.url);
 		await summaly(server.url);
@@ -209,9 +197,9 @@ describe('coalescing and caching', () => {
 		expect(server.gets()).toBe(2);
 	});
 
-	test('失敗も errorCacheTtl の間はキャッシュされ、同じ statusCode の StatusError が投げられる', async () => {
+	test('失敗もキャッシュの errorTtl の間はキャッシュされ、同じ statusCode の StatusError が投げられる', async () => {
 		const server = await countingServer({ status: 404, delayMs: 50 });
-		const summaly = createSummaly({ allowedPrivateNetworks, errorCacheTtl: 200 });
+		const summaly = createSummaly({ cache: new MemorySummaryCache({ errorTtl: 200 }), coordinator: new InProcessCoordinator(), allowedPrivateNetworks });
 
 		// Concurrent callers sharing one failed fetch all get an equivalent StatusError.
 		const concurrent = await Promise.all([
@@ -240,7 +228,7 @@ describe('coalescing and caching', () => {
 
 	test('返された結果を書き換えても、同時の呼び出し側と次のキャッシュヒットに影響しない', async () => {
 		const server = await countingServer({ delayMs: 50 });
-		const summaly = createSummaly({ allowedPrivateNetworks });
+		const summaly = createSummaly({ ...coalescing(), allowedPrivateNetworks });
 
 		const [a, b] = await Promise.all([summaly(server.url), summaly(server.url)]);
 		const original = structuredClone(b);
@@ -264,6 +252,24 @@ describe('coalescing and caching', () => {
 		expect(server.gets()).toBe(1);
 	});
 
+	test('キャッシュも coordinator も渡さなければ、毎回取得し、結果とエラーをそのまま返す', async () => {
+		const server = await countingServer({ delayMs: 50 });
+		const summaly = createSummaly({ allowedPrivateNetworks });
+
+		await Promise.all([summaly(server.url), summaly(server.url)]);
+		await summaly(server.url);
+		expect(server.gets()).toBe(3);
+
+		// Without a cache nothing is stored, so the error is the one thrown, with its own class and stack.
+		class PluginError extends Error {}
+		const error = new PluginError('failed');
+		const plugin = defineSummalyPlugin({ name: 'throws', test: () => true, summarize: async () => {
+			throw error;
+		} });
+
+		await expect(summaly('https://throws.example/', { plugins: [plugin], followRedirects: false })).rejects.toBe(error);
+	});
+
 	test('cache: false と coordinator: false で毎回取得する', async () => {
 		const server = await countingServer({ delayMs: 50 });
 
@@ -274,7 +280,7 @@ describe('coalescing and caching', () => {
 		expect(server.gets()).toBe(4);
 
 		// The same options per call disable them on an instance that has them enabled.
-		const enabled = createSummaly({ allowedPrivateNetworks });
+		const enabled = createSummaly({ ...coalescing(), allowedPrivateNetworks });
 		const off = { cache: false, coordinator: false } as const;
 
 		await Promise.all([enabled(server.url, off), enabled(server.url, off)]);
@@ -285,92 +291,20 @@ describe('coalescing and caching', () => {
 	test('cache: false でも同時の要求は一本化され、coordinator: false でもキャッシュは効く', async () => {
 		const server = await countingServer({ delayMs: 50 });
 
-		const coordinatorOnly = createSummaly({ allowedPrivateNetworks, cache: false });
+		const coordinatorOnly = createSummaly({ ...coalescing(), allowedPrivateNetworks, cache: false });
 
 		await Promise.all([coordinatorOnly(server.url), coordinatorOnly(server.url)]);
 		expect(server.gets()).toBe(1);
 		await coordinatorOnly(server.url);
 		expect(server.gets()).toBe(2);
 
-		const cacheOnly = createSummaly({ allowedPrivateNetworks, coordinator: false });
+		const cacheOnly = createSummaly({ ...coalescing(), allowedPrivateNetworks, coordinator: false });
 
 		await cacheOnly(server.url);
 		await cacheOnly(server.url);
 		expect(server.gets()).toBe(3);
 	});
 
-	test('インスタンスごとにキャッシュを持つ', async () => {
-		const server = await countingServer();
-
-		await createSummaly({ allowedPrivateNetworks })(server.url);
-		await createSummaly({ allowedPrivateNetworks })(server.url);
-
-		expect(server.gets()).toBe(2);
-	});
-
-	test('MemorySummaryCache は maxEntries を超えると古いものから捨てる', async () => {
-		const cache = new MemorySummaryCache({ maxEntries: 2 });
-		const entry = (title: string): CacheEntry => ({ kind: 'error', error: { name: 'Error', message: title } });
-
-		await cache.set('a', entry('a'), 60_000);
-		await cache.set('b', entry('b'), 60_000);
-		await cache.set('c', entry('c'), 60_000);
-
-		expect(await cache.get('a')).toBeUndefined();
-		expect(await cache.get('b')).toEqual(entry('b'));
-		expect(await cache.get('c')).toEqual(entry('c'));
-
-		// Setting an existing key again makes it the newest.
-		await cache.set('b', entry('b2'), 60_000);
-		await cache.set('d', entry('d'), 60_000);
-		expect(await cache.get('c')).toBeUndefined();
-		expect(await cache.get('b')).toEqual(entry('b2'));
-		expect(await cache.get('d')).toEqual(entry('d'));
-	});
-
-	// A summary of a page usually stores two entries (the summary and its favicon check), so the default keeps
-	// as many summaries as the 1000 it kept before favicon checks were cached.
-	test('MemorySummaryCache は既定で 2000 件まで持つ', async () => {
-		const cache = new MemorySummaryCache();
-
-		for (let i = 0; i <= 2000; i++) {
-			await cache.set(`k${i}`, { kind: 'icon', href: null }, 60_000);
-		}
-
-		expect(cache.size).toBe(2000);
-		expect(await cache.get('k0')).toBeUndefined();
-		expect(await cache.get('k1')).toEqual({ kind: 'icon', href: null });
-	});
-
-	test('MemorySummaryCache は maxBytes を超えると古いものから捨てる', async () => {
-		const entry = (message: string): CacheEntry => ({ kind: 'error', error: { name: 'Error', message } });
-		const one = await sizeOf('a', entry('x'.repeat(100)));
-		const cache = new MemorySummaryCache({ maxBytes: one * 2 });
-
-		await cache.set('a', entry('x'.repeat(100)), 60_000);
-		await cache.set('b', entry('y'.repeat(100)), 60_000);
-		expect(cache.estimatedBytes).toBe(one * 2);
-		await cache.set('c', entry('z'.repeat(100)), 60_000);
-
-		expect(cache.estimatedBytes).toBe(one * 2);
-		expect(await cache.get('a')).toBeUndefined();
-		expect(await cache.get('b')).toEqual(entry('y'.repeat(100)));
-		expect(await cache.get('c')).toEqual(entry('z'.repeat(100)));
-	});
-
-	test('MemorySummaryCache は maxEntryBytes を超えるものを保存しない', async () => {
-		const small: CacheEntry = { kind: 'error', error: { name: 'Error', message: 'small' } };
-		const large: CacheEntry = { kind: 'error', error: { name: 'Error', message: 'x'.repeat(1000) } };
-		const cache = new MemorySummaryCache({ maxEntryBytes: 1000 });
-
-		await cache.set('k', small, 60_000);
-		// Re-setting the key with an entry too large to store also drops the old one.
-		await cache.set('k', large, 60_000);
-
-		expect(await cache.get('k')).toBeUndefined();
-		expect(cache.size).toBe(0);
-		expect(cache.estimatedBytes).toBe(0);
-	});
 
 	test('maxEntryBytes を超える結果は保存されず、次の呼び出しで取り直す', async () => {
 		const plugin = fixedPlugin('large.example', { sitename: 'x'.repeat(10_000) });
@@ -430,7 +364,7 @@ describe('coalescing and caching', () => {
 		expect(cache.size).toBeGreaterThan(0);
 		expect(cache.size).toBeLessThan(20);
 		// The newest stays; the oldest went first.
-		const keyOf = (i: number) => buildRequestKey(`${server.url}page/${i}`, { ...summalyDefaultOptions, allowedPrivateNetworks });
+		const keyOf = (i: number) => buildRequestKey(`${server.url}page/${i}`, { lang: null, followRedirects: true, allowedPrivateNetworks });
 
 		expect(await cache.get(keyOf(19))).toBeDefined();
 		expect(await cache.get(keyOf(0))).toBeUndefined();
@@ -445,16 +379,6 @@ describe('coalescing and caching', () => {
 
 		expect(cache.size).toBe(0);
 		expect(cache.estimatedBytes).toBe(0);
-	});
-
-	test('MemorySummaryCache は期限切れのものを返さない', async () => {
-		const cache = new MemorySummaryCache();
-		const entry: CacheEntry = { kind: 'error', error: { name: 'Error', message: 'x' } };
-
-		await cache.set('k', entry, 30);
-		expect(await cache.get('k')).toEqual(entry);
-		await sleep(50);
-		expect(await cache.get('k')).toBeUndefined();
 	});
 
 	test('CacheEntry は JSON.stringify → JSON.parse で往復しても同じ結果を返す', async () => {
@@ -530,7 +454,7 @@ describe('runCoalesced', () => {
 	};
 
 	test('ステータスのないエラーは name を保った Error として復元される', async () => {
-		const deps = { cache: new MemorySummaryCache(), coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
+		const deps = { cache: new MemorySummaryCache(), coordinator: null };
 		const failure = Object.assign(new Error('boom'), { name: 'TypeError' });
 		let calls = 0;
 		const task = async () => {
@@ -551,7 +475,7 @@ describe('runCoalesced', () => {
 
 	test('保存するエラーのメッセージは 1024 文字に切り詰める', async () => {
 		const cache = new JsonCache();
-		const deps = { cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
+		const deps = { cache, coordinator: null };
 
 		const thrown = await runCoalesced(deps, () => 'k', async () => {
 			throw new StatusError('x'.repeat(5000), 500, 'Internal Server Error');
@@ -567,18 +491,18 @@ describe('runCoalesced', () => {
 	});
 
 	// The key (canonical serialization + SHA-256) is only read by the cache and the coordinator.
-	test('キャッシュも coordinator もなければ key を作らない', async () => {
+	test('キャッシュも coordinator もなければ key を作らず、結果とエラーをそのまま返す', async () => {
 		const key = vi.fn(() => 'k');
-		const deps = { cache: null, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
-		const value = await runCoalesced(deps, key, async () => result);
+		const deps = { cache: null, coordinator: null };
+		const error = new StatusError('gone', 410, 'Gone');
+		const uncloneable = { ...result, extra: () => {} };
 
-		expect(value).toEqual(result);
-		expect(value).not.toBe(result);
+		expect(await runCoalesced(deps, key, async () => result)).toBe(result);
 		await expect(runCoalesced(deps, key, async () => {
-			throw new StatusError('gone', 410, 'Gone');
-		})).rejects.toMatchObject({ message: 'gone', statusCode: 410 });
-		// A value structuredClone cannot copy still becomes an error.
-		await expect(runCoalesced(deps, key, async () => ({ ...result, extra: () => {} }))).rejects.toThrow();
+			throw error;
+		})).rejects.toBe(error);
+		// Nothing is stored, so a value structuredClone cannot copy is returned as it is.
+		expect(await runCoalesced(deps, key, async () => uncloneable)).toBe(uncloneable);
 		expect(key).not.toHaveBeenCalled();
 	});
 
@@ -589,7 +513,7 @@ describe('runCoalesced', () => {
 				throw new Error('cache is down');
 			},
 		};
-		const deps = { cache, coordinator: new InProcessCoordinator(), cacheTtl: 1000, errorCacheTtl: 1000 };
+		const deps = { cache, coordinator: new InProcessCoordinator() };
 		let calls = 0;
 		const task = async () => {
 			calls++;
@@ -613,17 +537,6 @@ describe('runCoalesced', () => {
 		expect(icons).toEqual(['https://example.com/favicon.ico', 'https://example.com/favicon.ico']);
 	});
 
-	test('TTL が 0 なら保存しない', async () => {
-		const cache = new JsonCache();
-
-		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, () => 'ok', async () => result);
-		await runCoalesced({ cache, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 }, () => 'ng', async () => {
-			throw new Error('x');
-		}).catch(() => {});
-
-		expect(cache.stored.size).toBe(0);
-	});
-
 	const notSummaries: unknown[] = [
 		{ kind: 'icon', href: 'https://example.com/favicon.ico' },
 		{ kind: 'icon', href: null },
@@ -639,7 +552,7 @@ describe('runCoalesced', () => {
 	test.each(notSummaries)('要約のキーで %j が返っても、取り直して結果を返す', async entry => {
 		const cache = brokenCache(entry);
 		let calls = 0;
-		const value = await runCoalesced({ cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 }, () => 'k', async () => {
+		const value = await runCoalesced({ cache, coordinator: null }, () => 'k', async () => {
 			calls++;
 
 			return result;
@@ -664,7 +577,7 @@ describe('runCoalesced', () => {
 	test.each(notIcons)('icon のキーで %j が返っても、確認し直して結果を返す', async entry => {
 		const cache = brokenCache(entry);
 		let calls = 0;
-		const href = await runCoalescedIcon({ cache, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 }, () => 'k', async () => {
+		const href = await runCoalescedIcon({ cache, coordinator: null }, () => 'k', async () => {
 			calls++;
 
 			return 'https://example.com/favicon.ico';
@@ -677,7 +590,7 @@ describe('runCoalesced', () => {
 
 	test('キャッシュも coordinator もなければ icon の key を作らない', async () => {
 		let calls = 0;
-		const deps = { cache: null, coordinator: null, cacheTtl: 1000, errorCacheTtl: 1000 };
+		const deps = { cache: null, coordinator: null };
 		const key = () => {
 			throw new Error('key must not be built');
 		};
@@ -752,10 +665,10 @@ describe('buildRequestKey', () => {
 		expect(buildRequestKey(url, { plugins: [defineSummalyPlugin({ name: 'a', test: () => true, summarize: async () => null })] })).toBe(keys[18]);
 	});
 
-	test('cache / coordinator / TTL は key に含めない', () => {
+	test('cache / coordinator は key に含めない', () => {
 		const base = buildRequestKey(url, {});
 
-		expect(buildRequestKey(url, { cache: false, coordinator: false, cacheTtl: 1, errorCacheTtl: 2 })).toBe(base);
+		expect(buildRequestKey(url, { cache: false, coordinator: false })).toBe(base);
 		expect(buildRequestKey(url, { cache: new MemorySummaryCache(), coordinator: new InProcessCoordinator() })).toBe(base);
 	});
 
@@ -811,7 +724,7 @@ describe('buildIconKey', () => {
 	});
 
 	test('同じ URL と設定でも、要約のキーとは重ならない', () => {
-		const variants: SummalyOptions[] = [{}, { ...summalyDefaultOptions }, { allowedPrivateNetworks }, { userAgent: 'ua' }];
+		const variants: SummalyOptions[] = [{}, { lang: null, followRedirects: true }, { allowedPrivateNetworks }, { userAgent: 'ua' }];
 
 		for (const opts of variants) {
 			expect(buildIconKey(url, opts)).not.toBe(buildRequestKey(url, opts));
@@ -852,7 +765,7 @@ describe('buildIconKey', () => {
 		expect(buildIconKey(url, {})).not.toBe(unset);
 	});
 
-	test('HEAD に使わない設定（lang、plugins、followRedirects、contentLengthRequired）と cache / coordinator / TTL は含めない', () => {
+	test('HEAD に使わない設定（lang、plugins、followRedirects、contentLengthRequired）と cache / coordinator は含めない', () => {
 		const plugin = defineSummalyPlugin({ name: 'p', test: () => false, summarize: async () => null });
 		const base = buildIconKey(url, {});
 
@@ -863,8 +776,6 @@ describe('buildIconKey', () => {
 			contentLengthRequired: true,
 			cache: false,
 			coordinator: false,
-			cacheTtl: 1,
-			errorCacheTtl: 2,
 		})).toBe(base);
 	});
 });

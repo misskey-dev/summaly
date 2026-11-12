@@ -1,4 +1,4 @@
-import type { CacheEntry, SummaryCache } from '@/index.js';
+import type { CacheEntry, SummaryCache } from '@/cache.js';
 
 /** A SummaryCache that keeps only JSON strings, like a Redis-backed implementation would. */
 export class JsonCache implements SummaryCache {
@@ -8,7 +8,7 @@ export class JsonCache implements SummaryCache {
 
 		return raw === undefined ? undefined : JSON.parse(raw) as CacheEntry;
 	}
-	async set(key: string, entry: CacheEntry, _ttlMs: number): Promise<void> {
+	async set(key: string, entry: CacheEntry): Promise<void> {
 		this.stored.set(key, JSON.stringify(entry));
 	}
 }

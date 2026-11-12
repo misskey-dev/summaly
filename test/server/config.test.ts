@@ -11,6 +11,7 @@ describe('loadServerConfig', () => {
 			host: 'localhost',
 			port: 3000,
 			summalyOptions: {},
+			cache: {},
 		});
 		expect(DEFAULT_SERVER_HOST).toBe('localhost');
 		expect(DEFAULT_SERVER_PORT).toBe(3000);
@@ -25,6 +26,7 @@ describe('loadServerConfig', () => {
 			host: 'localhost',
 			port: 3000,
 			summalyOptions: {},
+			cache: {},
 		});
 	});
 
@@ -51,6 +53,7 @@ describe('loadServerConfig', () => {
 				contentLengthLimit: 1048576,
 				contentLengthRequired: true,
 			},
+			cache: {},
 		});
 	});
 
@@ -181,14 +184,14 @@ describe('loadServerConfig', () => {
 			no_proxy: '',
 		});
 
-		expect(config).toEqual({ host: 'localhost', port: 3000, summalyOptions: {} });
+		expect(config).toEqual({ host: 'localhost', port: 3000, summalyOptions: {}, cache: {} });
 		expect(Object.keys(config.summalyOptions)).toEqual([]);
 	});
 
 	test('undefined は未設定として扱われる', () => {
 		const config = loadServerConfig({ SUMMALY_LANG: undefined, SUMMALY_PORT: undefined, HTTPS_PROXY: undefined });
 
-		expect(config).toEqual({ host: 'localhost', port: 3000, summalyOptions: {} });
+		expect(config).toEqual({ host: 'localhost', port: 3000, summalyOptions: {}, cache: {} });
 		expect(Object.keys(config.summalyOptions)).toEqual([]);
 	});
 
@@ -322,15 +325,12 @@ describe('loadServerConfig', () => {
 		});
 	});
 
-	test('SUMMALY_CACHE_TTL / SUMMALY_ERROR_CACHE_TTL を読む', () => {
-		expect(loadServerConfig({ SUMMALY_CACHE_TTL: '60000', SUMMALY_ERROR_CACHE_TTL: '5000' }).summalyOptions).toEqual({
-			cacheTtl: 60000,
-			errorCacheTtl: 5000,
-		});
-		expect(loadServerConfig({ SUMMALY_CACHE_TTL: '0', SUMMALY_ERROR_CACHE_TTL: '0' }).summalyOptions).toEqual({
-			cacheTtl: 0,
-			errorCacheTtl: 0,
-		});
+	test('SUMMALY_CACHE_TTL / SUMMALY_ERROR_CACHE_TTL はサーバーのキャッシュの TTL になり、summalyOptions には入らない', () => {
+		const config = loadServerConfig({ SUMMALY_CACHE_TTL: '60000', SUMMALY_ERROR_CACHE_TTL: '5000' });
+
+		expect(config.cache).toEqual({ ttl: 60000, errorTtl: 5000 });
+		expect(config.summalyOptions).toEqual({});
+		expect(loadServerConfig({ SUMMALY_CACHE_TTL: '0', SUMMALY_ERROR_CACHE_TTL: '0' }).cache).toEqual({ ttl: 0, errorTtl: 0 });
 	});
 });
 
@@ -356,11 +356,11 @@ describe('SUMMALY_*', () => {
 		{ suffix: 'CONTENT_LENGTH_LIMIT', value: '1048576', expected: { summalyOptions: { contentLengthLimit: 1048576 } }, invalid: '1e3' },
 		{ suffix: 'CONTENT_LENGTH_REQUIRED', value: 'true', expected: { summalyOptions: { contentLengthRequired: true } }, invalid: 'on' },
 		{ suffix: 'ALLOWED_PRIVATE_NETWORKS', value: '10.0.0.0/8', expected: { summalyOptions: { allowedPrivateNetworks: ['10.0.0.0/8'] } }, invalid: 'nope' },
-		{ suffix: 'CACHE_TTL', value: '60000', expected: { summalyOptions: { cacheTtl: 60000 } }, invalid: 'NaN' },
-		{ suffix: 'ERROR_CACHE_TTL', value: '5000', expected: { summalyOptions: { errorCacheTtl: 5000 } }, invalid: '+1' },
+		{ suffix: 'CACHE_TTL', value: '60000', expected: { cache: { ttl: 60000 } }, invalid: 'NaN' },
+		{ suffix: 'ERROR_CACHE_TTL', value: '5000', expected: { cache: { errorTtl: 5000 } }, invalid: '+1' },
 	];
 
-	const defaults: ServerConfig = { host: 'localhost', port: 3000, summalyOptions: {} };
+	const defaults: ServerConfig = { host: 'localhost', port: 3000, summalyOptions: {}, cache: {} };
 
 	test.each(cases)('SUMMALY_$suffix が読まれる', ({ suffix, value, expected }) => {
 		expect(loadServerConfig({ [`SUMMALY_${suffix}`]: value })).toEqual({ ...defaults, ...expected });
@@ -377,6 +377,7 @@ describe('SUMMALY_*', () => {
 			...config,
 			...c.expected,
 			summalyOptions: { ...config.summalyOptions, ...c.expected.summalyOptions },
+			cache: { ...config.cache, ...c.expected.cache },
 		}), defaults);
 
 		expect(loadServerConfig(env)).toEqual(expected);

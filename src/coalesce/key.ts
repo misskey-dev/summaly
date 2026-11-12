@@ -105,7 +105,7 @@ function digest(parts: Record<string, unknown>): string {
 
 /**
  * Key for the cache and in-flight sharing of a summary: the URL plus every option that can change the result.
- * `cache`, `coordinator`, `cacheTtl` and `errorCacheTtl` do not change the result and are left out.
+ * `cache` and `coordinator` do not change the result and are left out.
  * Plugins are identified by their names (unique within a summary), so the key is the same in every process.
  * `purpose` keeps it apart from every favicon check key.
  * `allowPrivateIp` is whether the environment allows private IPs (see privateIpAllowedByEnv); a call passes the value

@@ -20,7 +20,7 @@ export type ScrapeContext = {
 	iconKey: (url: string) => string;
 };
 
-const NO_COALESCE: CoalesceDeps = Object.freeze({ cache: null, coordinator: null, cacheTtl: 0, errorCacheTtl: 0 });
+const NO_COALESCE: CoalesceDeps = Object.freeze({ cache: null, coordinator: null });
 
 /**
  * `opts` with its arrays and objects copied (`allowedPrivateNetworks`, `proxy`, `agent`, `plugins`), so a caller changing

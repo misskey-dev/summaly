@@ -71,7 +71,7 @@ export function createGuardedAgents(guard: AddressGuard, options: GuardedAgentOp
 /**
  * Guarded agents shared by the summaries of one summarizer, one set per guard setting, so summaries of a site made
  * one after another reuse a connection instead of opening (and for https, handshaking) a new one each time.
- * Owned by a summarizer instance (like its MemorySummaryCache), never by the module: separate summarizers never
+ * Owned by a summaly instance (see createSummaly), never by the module: separate instances never
  * share connections.
  *
  * Summaries share a set only when their guards allow the same networks (see guardKey), so a socket opened under one
@@ -121,5 +121,17 @@ export class GuardedAgentPool {
 		}
 
 		return entry;
+	}
+
+	/**
+	 * Destroys every agent of the pool with its sockets, idle or not, and empties the pool.
+	 * Call it only when no request uses the pool any more; a later acquire builds new agents.
+	 */
+	destroy(): void {
+		for (const { agents } of this.#entries.values()) {
+			agents.http.destroy();
+			agents.https.destroy();
+		}
+		this.#entries.clear();
 	}
 }

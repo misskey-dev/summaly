@@ -7,9 +7,10 @@ import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
 import { expect, test, describe, beforeEach, afterEach } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
-import { MemorySummaryCache, type CacheEntry, type InflightCoordinator, type SummaryCache } from '@/index.js';
+import type { CacheEntry, InflightCoordinator, SummaryCache } from '@/cache.js';
 import { buildApp } from '@/server/app.js';
 import { loadServerConfig } from '@/server/config.js';
+import { MemorySummaryCache } from '@/server/memory-cache.js';
 import {
 	LIB_DEFAULT_CONTENT_LENGTH_LIMIT,
 	LIB_DEFAULT_OPERATION_TIMEOUT,
@@ -348,9 +349,9 @@ describe('環境変数で設定したサーバーの動作', () => {
 		const memory = new MemorySummaryCache();
 		const cache: SummaryCache = {
 			get: key => memory.get(key),
-			set: async (key, entry, ttl) => {
+			set: async (key, entry) => {
 				sets.push(entry);
-				await memory.set(key, entry, ttl);
+				await memory.set(key, entry);
 			},
 		};
 		let runs = 0;
