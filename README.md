@@ -134,6 +134,7 @@ Proxy URLs must be `http:` or `https:` URLs with a host (`http://user:pass@proxy
 
 `summaly()` returns a Promise of a `SummalyResult`.
 Almost all values are nullable; `player` is never null.
+`icon` and `thumbnail` are http(s) URLs or image `data:` URLs, and `player.url` and `activityPub` are http(s) URLs: other schemes (such as `javascript:`) a page or a plugin gives are replaced with null.
 
 | Property             | Type                                             | Description                                                |
 |:---------------------|:-------------------------------------------------|:-----------------------------------------------------------|

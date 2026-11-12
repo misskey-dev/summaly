@@ -2,6 +2,7 @@ import { buildRequestKey } from '@/cache/key.js';
 import { type CoalesceDeps, runCoalesced } from '@/cache/run.js';
 import { type ScrapeContext, createScrapeContext, fetchWithContext, fixOptions } from '@/context.js';
 import { scrapeGeneral } from '@/extract/general.js';
+import { sanitizeUrls } from '@/extract/urls.js';
 import { privateIpAllowedByEnv } from '@/http/address-guard.js';
 import { GuardedAgentPool } from '@/http/agent-pool.js';
 import { completeSummary, createPluginContext } from '@/plugin/context.js';
@@ -135,9 +136,7 @@ async function summarizeUncached(
 		// A plugin returning null hands the URL over to the generic rules.
 		const summary: Summary = result != null ? completeSummary(result) : await scrapeGeneral(ctx, target);
 
-		return Object.assign(summary, {
-			url: actualUrl,
-		});
+		return { ...sanitizeUrls(summary), url: actualUrl };
 	} finally {
 		ctx.transport.close();
 	}
