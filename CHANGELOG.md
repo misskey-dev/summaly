@@ -1,14 +1,14 @@
-(unreleased)
+5.6.0 / 2026/11/12
 ------------------
 
 * スタンドアロンサーバーとして起動する際に、環境変数で `SummalyOptions` やリッスンするアドレス・ポートを指定できるように
   * `pnpm serve` (`node built/server.js`) で起動します。指定できる環境変数については README.md を参照してください
   * デフォルトでは `localhost:3000` でリッスンします
-* サーバーの起動に fastify-cli を使用しないように
-* Dockerfile を追加
-  * `docker build` でスタンドアロンサーバーのイメージをビルドできます。起動方法は README.md を参照してください
-* リリースごとにコンテナイメージを `ghcr.io/misskey-dev/summaly` に公開するように
-  * `linux/amd64` と `linux/arm64` に対応しています
+* スタンドアロンサーバーの起動に fastify-cli を使用しないように
+* Dockerfile を追加・Dockerでの起動に対応
+  * 起動方法・ビルド方法は README.md を参照してください
+* oEmbedのレスポンスが不正なときにエラーが発生する問題を修正
+* 依存関係の更新
 
 5.5.2 / 2026/09/18
 ------------------
