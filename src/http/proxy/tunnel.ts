@@ -28,7 +28,7 @@ export type TunnelingAgentOptions = {
 	requireAddress?: boolean;
 };
 
-export const TUNNEL_TARGET = Symbol('chiramiss.tunnelTarget');
+export const TUNNEL_TARGET = Symbol('summaly.tunnelTarget');
 
 type TunnelRequestOptions = http.ClientRequestArgs & { [TUNNEL_TARGET]?: TunnelTarget };
 type ConnectionCallback = (err: Error | null, stream: Duplex) => void;

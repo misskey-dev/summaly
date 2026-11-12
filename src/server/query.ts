@@ -1,8 +1,8 @@
 /**
- * Reads summarize options from the query string of `GET /`
+ * Reads summaly options from the query string of `GET /`
  */
 
-import type { SummarizeOptions } from '@/index.js';
+import type { SummalyOptions } from '@/index.js';
 import { MAX_TIMEOUT, toNonNegativeInteger } from './config.js';
 
 // Mirrors DEFAULT_RESPONSE_TIMEOUT / DEFAULT_OPERATION_TIMEOUT / DEFAULT_MAX_RESPONSE_SIZE in
@@ -15,17 +15,17 @@ export const LIB_DEFAULT_CONTENT_LENGTH_LIMIT = 10 * 1024 * 1024;
  * Builds the per-request options from the query and the options set by environment variables.
  *
  * - lang, userAgent, followRedirects: the environment variable wins over the query; followRedirects defaults to false
- *   like upstream's server.
+ *   like the Fastify plugin.
  * - responseTimeout, operationTimeout, contentLengthLimit: the query may only tighten. The ceiling is the environment
  *   variable when set, otherwise the lib default; a query value is used only when it is above 0 and not above the
  *   ceiling (0 would mean no timeout). Otherwise the ceiling applies. A timeout ceiling of 0 (no timeout) has no
  *   upper bound, so any timeout above 0 from the query tightens it and is used.
  * - contentLengthRequired: the query may only turn the check on.
  */
-export function resolveRequestOptions(query: Record<string, unknown>, envOptions: SummarizeOptions): SummarizeOptions {
+export function resolveRequestOptions(query: Record<string, unknown>, envOptions: SummalyOptions): SummalyOptions {
 	const { responseTimeout, operationTimeout, contentLengthLimit, contentLengthRequired, ...fromQuery } = parseQueryOptions(query);
 
-	const options: SummarizeOptions = {
+	const options: SummalyOptions = {
 		followRedirects: false,
 		...fromQuery,
 		...envOptions,
@@ -53,11 +53,10 @@ function tightenTimeout(requested: number | undefined, ceiling: number): number 
 /**
  * Picks the options the host app sends along with `url` (see UrlPreviewService.fetchSummaryFromProxy).
  *
- * A missing, malformed or repeated (array) value is left out, as if it had not been given:
- * upstream's server ignored all of these but `lang`, so dropping a value keeps its behavior.
+ * A missing, malformed or repeated (array) value is left out, as if it had not been given.
  */
-export function parseQueryOptions(query: Record<string, unknown>): Partial<SummarizeOptions> {
-	const options: Partial<SummarizeOptions> = {};
+export function parseQueryOptions(query: Record<string, unknown>): Partial<SummalyOptions> {
+	const options: Partial<SummalyOptions> = {};
 
 	const lang = readString(query, 'lang');
 

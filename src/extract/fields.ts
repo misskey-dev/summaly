@@ -1,21 +1,20 @@
-// Derived from misskey-dev/summaly (MIT)
 import { decode } from 'html-entities';
 import type { HeadInfo } from '@/html/head.js';
 import type { Player, Summary } from '@/types.js';
 import { clip } from './text.js';
 
-// Each pick* function mirrors one field of upstream parseGeneral() (src/general.ts), keeping its fallback order.
-// parseHead() returns raw values, so values are first decoded the way cheerio's `.attr()` / `.text()` did.
-// Title, description and site name then get upstream's extra decode() on top, as upstream did.
+// Each pick* function picks one field of the summary, trying its sources in order.
+// parseHead() returns raw values, so values are first decoded the way cheerio's `.attr()` / `.text()` do.
+// Title, description and site name are then decoded once more.
 //
-// Twitter cards officially use the name attribute, but upstream also accepts property for compatibility.
+// Twitter cards officially use the name attribute, but property is accepted too for compatibility.
 // See https://developer.twitter.com/en/docs/twitter-for-websites/cards/overview/summary and https://ogp.me/
 
 type MetaKey = Parameters<HeadInfo['meta']>[0];
 
 /**
  * First non-empty `content` among `keys`, decoded like an attribute value. Same as chaining cheerio `.attr('content') ||`.
- * Never returns '', so callers chain fallbacks with `??` and keep upstream's `||` behavior.
+ * Never returns '', so callers can chain fallbacks with `??` and still skip empty values.
  */
 export function metaContent(head: HeadInfo, ...keys: MetaKey[]): string | undefined {
 	for (const key of keys) {
@@ -53,7 +52,7 @@ function resolveUrl(href: string, base: URL): string | null {
 	}
 }
 
-/** Never null: like upstream's `$('title').text()`, a page without any title yields ''. */
+/** Never null: a page without any title yields ''. */
 export function pickTitle(head: HeadInfo): string {
 	const title =
 		metaContent(head, 'property:og:title', 'name:twitter:title', 'property:twitter:title') ??

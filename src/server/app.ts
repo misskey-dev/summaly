@@ -1,10 +1,9 @@
-// Derived from misskey-dev/summaly (MIT)
 /**
- * HTTP endpoints of the standalone chiramiss server
+ * HTTP endpoints of the standalone summaly server
  */
 
 import Fastify, { type FastifyInstance } from 'fastify';
-import { createSummarizer, type InflightCoordinator, type SummaryCache } from '@/index.js';
+import { createSummaly, type InflightCoordinator, type SummaryCache } from '@/index.js';
 import type { ServerConfig } from './config.js';
 import { resolveRequestOptions } from './query.js';
 
@@ -29,13 +28,13 @@ export type AppOptions = {
 };
 
 /**
- * Builds the server: `GET /` (upstream-compatible summary endpoint) and `GET /healthz`.
+ * Builds the server: `GET /` (summary endpoint) and `GET /healthz`.
  */
 export function buildApp(config: ServerConfig, deps: AppDeps = {}, options: AppOptions = {}): FastifyInstance {
 	const app = Fastify({ logger: options.logger ?? false });
 
 	// One instance per app, so concurrent and repeated requests share its in-flight runs and cache.
-	const summarize = createSummarizer({ ...config.summarizeOptions, ...deps });
+	const summaly = createSummaly({ ...config.summalyOptions, ...deps });
 
 	app.get('/', async (req, reply) => {
 		const query = req.query as Record<string, unknown>;
@@ -48,7 +47,7 @@ export function buildApp(config: ServerConfig, deps: AppDeps = {}, options: AppO
 		}
 
 		try {
-			return await summarize(url, resolveRequestOptions(query, config.summarizeOptions));
+			return await summaly(url, resolveRequestOptions(query, config.summalyOptions));
 		} catch (e) {
 			return reply.status(500).send({
 				error: e,

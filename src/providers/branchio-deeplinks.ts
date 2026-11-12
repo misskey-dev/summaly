@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import { scrapeGeneral } from '@/extract/general.js';
 import type { Provider } from './provider.js';
 

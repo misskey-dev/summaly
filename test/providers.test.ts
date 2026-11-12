@@ -9,7 +9,7 @@ import { builtinProviders } from '@/providers/index.js';
 import { fromPlugin } from '@/providers/provider.js';
 import { wikipedia } from '@/providers/wikipedia.js';
 import { StatusError } from '@/http/status-error.js';
-import type { GeneralScrapingOptions, SummaryPlugin } from '@/types.js';
+import type { GeneralScrapingOptions, SummalyPlugin } from '@/types.js';
 import { loopbackAgents } from './helpers/loopback-agent.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
@@ -161,7 +161,7 @@ describe('bluesky', () => {
 });
 
 describe('wikipedia', () => {
-	test('API を ctx の transport で取得し、本家と同じ形で返す', async () => {
+	test('API を ctx の transport で取得して要約する', async () => {
 		const extract = 'あ'.repeat(310);
 		const body = JSON.stringify({ query: { pages: { 123: { title: 'KISSの原則', extract } } } });
 		const { ctx, received } = await loopback((_req, res) => send(res, body, 'application/json; charset=utf-8'));
@@ -216,9 +216,9 @@ describe('branchio-deeplinks', () => {
 });
 
 describe('fromPlugin', () => {
-	test('test() をそのまま使い、summarize() に本家と同じ GeneralScrapingOptions を渡す', async () => {
+	test('test() をそのまま使い、summarize() に呼び出し側の値そのままの GeneralScrapingOptions を渡す', async () => {
 		let received: { url: URL; opts?: GeneralScrapingOptions } | undefined;
-		const plugin: SummaryPlugin = {
+		const plugin: SummalyPlugin = {
 			test: url => url.hostname === 'custom.example',
 			summarize: async (url, opts) => {
 				received = { url, opts };

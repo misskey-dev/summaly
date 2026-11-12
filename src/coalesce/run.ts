@@ -1,6 +1,6 @@
 import type { CacheEntry, InflightCoordinator, SerializedError, SummaryCache } from '@/coalesce/types.js';
 import { StatusError } from '@/http/status-error.js';
-import type { SummaryResult } from '@/types.js';
+import type { SummalyResult } from '@/types.js';
 
 export type CoalesceDeps = {
 	cache: SummaryCache | null;
@@ -73,7 +73,7 @@ function isIconEntry(entry: unknown): entry is IconEntry {
 }
 
 /** Gives the caller its own copy: the host app rewrites results it receives (icon, thumbnail). */
-function settle(entry: SummaryEntry): SummaryResult {
+function settle(entry: SummaryEntry): SummalyResult {
 	if (entry.kind === 'error') {
 		throw restoreError(entry.error);
 	}
@@ -85,7 +85,7 @@ function settle(entry: SummaryEntry): SummaryResult {
  * Runs `task` and turns its outcome into a CacheEntry. Cloned before storing: a value structuredClone cannot copy
  * (e.g. a function from a plugin) becomes an error entry here instead of an 'ok' entry that would throw on every cache hit.
  */
-async function runTask(task: () => Promise<SummaryResult>): Promise<SummaryEntry> {
+async function runTask(task: () => Promise<SummalyResult>): Promise<SummaryEntry> {
 	try {
 		return { kind: 'ok', value: structuredClone(await task()) };
 	} catch (error) {
@@ -169,8 +169,8 @@ async function coalesce<E extends CacheEntry, T>(deps: CoalesceDeps, key: () => 
 export function runCoalesced(
 	deps: CoalesceDeps,
 	key: () => string,
-	task: () => Promise<SummaryResult>,
-): Promise<SummaryResult> {
+	task: () => Promise<SummalyResult>,
+): Promise<SummalyResult> {
 	return coalesce(deps, key, {
 		run: () => runTask(task),
 		accepts: isSummaryEntry,

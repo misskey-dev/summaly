@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import type http from 'node:http';
 import type { HeadInfo } from '@/html/head.js';
 import { metaContent } from './fields.js';

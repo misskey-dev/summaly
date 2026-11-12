@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import Fastify from 'fastify';
 import { afterEach, describe, expect, test } from 'vitest';
 import summaryPlugin from '@/index.js';
@@ -15,7 +14,7 @@ afterEach(async () => {
 });
 
 async function setup(pluginOptions: Record<string, unknown> = {}) {
-	// The plugin uses the default cached summarize instance, so every test uses its own URL path.
+	// The plugin uses the default cached summaly instance, so every test uses its own URL path.
 	const server = await startTestServer((req, res) => {
 		if (req.url?.startsWith('/missing')) {
 			res.statusCode = 404;

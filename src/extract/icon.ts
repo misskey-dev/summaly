@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import { runCoalescedIcon } from '@/coalesce/run.js';
 import { type ScrapeContext, fetchSubresource } from '@/context.js';
 

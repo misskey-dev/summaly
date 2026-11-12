@@ -4,15 +4,15 @@ import https from 'node:https';
 import net, { type AddressInfo, type Socket } from 'node:net';
 import tls from 'node:tls';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
-import { createSummarizer } from '@/index.js';
-import type { SummaryPlugin } from '@/types.js';
+import { createSummaly } from '@/index.js';
+import type { SummalyPlugin } from '@/types.js';
 import { runSourceScript } from './helpers/run-source.js';
 import { LOOPBACK_CERT, LOOPBACK_KEY } from './helpers/tls-cert.js';
 
 const PAGE = '<!doctype html><html><head><title>page</title><link rel="icon" href="/favicon.ico"></head><body>body</body></html>';
 
 /** followRedirects is left at its default (true): HEAD for the final URL, GET for the page, HEAD for the favicon. */
-const summarize = createSummarizer({ cache: false, coordinator: false, allowedPrivateNetworks: ['127.0.0.0/8'] });
+const summaly = createSummaly({ cache: false, coordinator: false, allowedPrivateNetworks: ['127.0.0.0/8'] });
 
 type Origin = {
 	url: string;
@@ -147,7 +147,7 @@ async function startConnectProxy(): Promise<{ url: string; tunnels: () => number
 describe.each(['http', 'https'] as const)('1回の要約の中で接続を再利用する (%s)', scheme => {
 	test('HEAD・GET・favicon の HEAD を同じ接続で送る', async () => {
 		const origin = await startOrigin(scheme);
-		const summary = await summarize(origin.url);
+		const summary = await summaly(origin.url);
 
 		expect(summary.title).toBe('page');
 		expect(summary.icon).toBe(new URL('/favicon.ico', origin.url).href);
@@ -160,21 +160,21 @@ describe.each(['http', 'https'] as const)('1回の要約の中で接続を再利
 	test('要約が終わっても、待機中の接続は1本だけ残す', async () => {
 		const origin = await startOrigin(scheme);
 
-		await summarize(origin.url);
+		await summaly(origin.url);
 		expect(await origin.open()).toBe(1);
 	});
 
 	test('要約が失敗しても、完了した応答の接続は次の要約で使える', async () => {
 		const origin = await startOrigin(scheme);
 		// The HEAD for the final URL succeeds and leaves an idle socket; then the summary fails.
-		const failing: SummaryPlugin = {
+		const failing: SummalyPlugin = {
 			test: () => true,
 			summarize: () => Promise.reject(new Error('plugin failed')),
 		};
 
-		await expect(summarize(origin.url, { plugins: [failing] })).rejects.toThrow('plugin failed');
+		await expect(summaly(origin.url, { plugins: [failing] })).rejects.toThrow('plugin failed');
 		expect(origin.connections()).toBe(1);
-		const summary = await summarize(new URL('/next', origin.url).href);
+		const summary = await summaly(new URL('/next', origin.url).href);
 
 		expect(summary.title).toBe('page');
 		expect(origin.connections()).toBe(1);
@@ -189,7 +189,7 @@ describe.each(['http', 'https'] as const)('1回の要約の中で接続を再利
 			// The GET never gets an answer.
 		});
 
-		await expect(summarize(origin.url, { operationTimeout: 200 })).rejects.toThrow("Timeout awaiting 'request' for 200ms");
+		await expect(summaly(origin.url, { operationTimeout: 200 })).rejects.toThrow("Timeout awaiting 'request' for 200ms");
 		await expectAllClosed(origin);
 	});
 });
@@ -198,8 +198,8 @@ describe.each(['http', 'https'] as const)('要約をまたいで接続を再利�
 	test('同じ summarizer で同じサイトの別ページを順に要約すると、接続は1本', async () => {
 		const origin = await startOrigin(scheme);
 
-		expect((await summarize(new URL('/a', origin.url).href)).title).toBe('page');
-		expect((await summarize(new URL('/b', origin.url).href)).title).toBe('page');
+		expect((await summaly(new URL('/a', origin.url).href)).title).toBe('page');
+		expect((await summaly(new URL('/b', origin.url).href)).title).toBe('page');
 		expect(origin.connections()).toBe(1);
 		expect(origin.requestsBySocket()).toEqual([[
 			'HEAD /a', 'GET /a', 'HEAD /favicon.ico',
@@ -211,24 +211,24 @@ describe.each(['http', 'https'] as const)('要約をまたいで接続を再利�
 		const origin = await startOrigin(scheme);
 
 		await Promise.all([
-			summarize(new URL('/?c', origin.url).href),
-			summarize(new URL('/?d', origin.url).href),
+			summaly(new URL('/?c', origin.url).href),
+			summaly(new URL('/?d', origin.url).href),
 		]);
 		const concurrent = origin.connections();
 
 		expect(concurrent).toBeGreaterThanOrEqual(1);
-		await summarize(new URL('/?e', origin.url).href);
+		await summaly(new URL('/?e', origin.url).href);
 		expect(origin.connections()).toBe(concurrent);
 	});
 
 	test('別の summarizer とは接続を共有しない', async () => {
 		const origin = await startOrigin(scheme);
-		const other = createSummarizer({ cache: false, coordinator: false, allowedPrivateNetworks: ['127.0.0.0/8'] });
+		const other = createSummaly({ cache: false, coordinator: false, allowedPrivateNetworks: ['127.0.0.0/8'] });
 
-		await summarize(new URL('/a', origin.url).href);
+		await summaly(new URL('/a', origin.url).href);
 		await other(new URL('/b', origin.url).href);
 		expect(origin.connections()).toBe(2);
-		await summarize(new URL('/c', origin.url).href);
+		await summaly(new URL('/c', origin.url).href);
 		await other(new URL('/d', origin.url).href);
 		expect(origin.connections()).toBe(2);
 		for (const requests of origin.requestsBySocket()) {
@@ -241,21 +241,21 @@ describe.each(['http', 'https'] as const)('要約をまたいで接続を再利�
 	test('allowedPrivateNetworks が違う要約とは接続を共有せず、同じ設定なら書き方が違っても共有する', async () => {
 		const origin = await startOrigin(scheme);
 
-		await summarize(new URL('/a', origin.url).href);
-		await summarize(new URL('/b', origin.url).href, { allowedPrivateNetworks: ['127.0.0.1/32'] });
+		await summaly(new URL('/a', origin.url).href);
+		await summaly(new URL('/b', origin.url).href, { allowedPrivateNetworks: ['127.0.0.1/32'] });
 		expect(origin.connections()).toBe(2);
-		await summarize(new URL('/c', origin.url).href, { allowedPrivateNetworks: ['127.0.0.0/8', '127.0.0.0/8'] });
-		await summarize(new URL('/d', origin.url).href, { allowedPrivateNetworks: ['127.0.0.1/32'] });
+		await summaly(new URL('/c', origin.url).href, { allowedPrivateNetworks: ['127.0.0.0/8', '127.0.0.0/8'] });
+		await summaly(new URL('/d', origin.url).href, { allowedPrivateNetworks: ['127.0.0.1/32'] });
 		expect(origin.connections()).toBe(2);
 	});
 
 	test('相手が待機中の接続を閉じていたら、次の要約は新しい接続を使う', async () => {
 		const origin = await startOrigin(scheme);
 
-		await summarize(new URL('/a', origin.url).href);
+		await summaly(new URL('/a', origin.url).href);
 		origin.closeIdle();
 		await vi.waitFor(async () => expect(await origin.open()).toBe(0), { timeout: 1000, interval: 10 });
-		expect((await summarize(new URL('/b', origin.url).href)).title).toBe('page');
+		expect((await summaly(new URL('/b', origin.url).href)).title).toBe('page');
 		expect(origin.connections()).toBe(2);
 	});
 
@@ -275,9 +275,9 @@ describe.each(['http', 'https'] as const)('要約をまたいで接続を再利�
 			serveDefault(req, res);
 		});
 
-		await summarize(new URL('/a', origin.url).href);
+		await summaly(new URL('/a', origin.url).href);
 		dropEarlier = true;
-		const summary = await summarize(new URL('/b', origin.url).href);
+		const summary = await summaly(new URL('/b', origin.url).href);
 
 		expect(summary.title).toBe('page');
 		expect(summary.icon).toBe(new URL('/favicon.ico', origin.url).href);
@@ -298,14 +298,14 @@ describe('要約をまたいだ接続の再利用の対象外', () => {
 		const origin = await startOrigin('http');
 		const addRequest = vi.spyOn(http.globalAgent as AgentInternals, 'addRequest');
 
-		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'true';
+		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
 		try {
-			const other = createSummarizer({ cache: false, coordinator: false });
+			const other = createSummaly({ cache: false, coordinator: false });
 
 			expect((await other(origin.url)).title).toBe('page');
 			expect(addRequest).toHaveBeenCalledTimes(3);
 		} finally {
-			delete process.env.CHIRAMISS_ALLOW_PRIVATE_IP;
+			delete process.env.SUMMALY_ALLOW_PRIVATE_IP;
 			addRequest.mockRestore();
 		}
 	});
@@ -317,8 +317,8 @@ describe('要約をまたいだ接続の再利用の対象外', () => {
 		const destroy = vi.spyOn(agent, 'destroy');
 
 		try {
-			await summarize(new URL('/a', origin.url).href, { agent: { http: agent } });
-			await summarize(new URL('/b', origin.url).href, { agent: { http: agent } });
+			await summaly(new URL('/a', origin.url).href, { agent: { http: agent } });
+			await summaly(new URL('/b', origin.url).href, { agent: { http: agent } });
 			expect(addRequest).toHaveBeenCalledTimes(6);
 			expect(destroy).not.toHaveBeenCalled();
 			// Only the caller's agent connected; its own keep-alive decides reuse.
@@ -333,13 +333,13 @@ describe('要約をまたいだ接続の再利用の対象外', () => {
 		const proxy = await startConnectProxy();
 		const viaProxy = { proxy: { http: proxy.url } };
 
-		expect((await summarize(new URL('/a', origin.url).href, viaProxy)).title).toBe('page');
+		expect((await summaly(new URL('/a', origin.url).href, viaProxy)).title).toBe('page');
 		await vi.waitFor(() => expect(proxy.open()).toBe(0), { timeout: 1000, interval: 10 });
 		await expectAllClosed(origin);
 		const tunnels = proxy.tunnels();
 
 		expect(tunnels).toBeGreaterThan(0);
-		expect((await summarize(new URL('/b', origin.url).href, viaProxy)).title).toBe('page');
+		expect((await summaly(new URL('/b', origin.url).href, viaProxy)).title).toBe('page');
 		await vi.waitFor(() => expect(proxy.open()).toBe(0), { timeout: 1000, interval: 10 });
 		await expectAllClosed(origin);
 		// Each summary opened its own tunnels; none was carried over.
@@ -351,7 +351,7 @@ describe('要約をまたいだ接続の再利用の対象外', () => {
 test('待機中の接続は、待機の timeout（4秒）の後に閉じる', async () => {
 	const origin = await startOrigin('http');
 
-	await summarize(origin.url);
+	await summaly(origin.url);
 	const started = Date.now();
 
 	expect(await origin.open()).toBe(1);
@@ -365,11 +365,11 @@ test('待機中の接続は、待機の timeout（4秒）の後に閉じる', as
 test('待機中の接続が残っていても、プロセスはすぐ終了する', async () => {
 	const origin = await startOrigin('http');
 	const child = await runSourceScript(`
-		const { summarize } = await import(SOURCE_INDEX);
+		const { summaly } = await import(SOURCE_INDEX);
 		const url = process.argv[1];
 		const opts = { allowedPrivateNetworks: ['127.0.0.0/8'] };
-		const a = await summarize(new URL('/a', url).href, opts);
-		const b = await summarize(new URL('/b', url).href, opts);
+		const a = await summaly(new URL('/a', url).href, opts);
+		const b = await summaly(new URL('/b', url).href, opts);
 		console.log(JSON.stringify([a.title, b.title]));
 	`, [origin.url]);
 
@@ -397,7 +397,7 @@ test('接続を再利用しても、許可していないプライベート IP �
 		}
 		throw e;
 	});
-	const summary = await summarize(origin.url, { allowedPrivateNetworks: ['127.0.0.2/32'] });
+	const summary = await summaly(origin.url, { allowedPrivateNetworks: ['127.0.0.2/32'] });
 
 	expect(summary.title).toBe('page');
 	expect(origin.requestsBySocket()).toEqual([['HEAD /', 'GET /']]);
@@ -411,16 +411,16 @@ test('127.0.0.2 を許可した要約が接続を残していても、許可し�
 		}
 		throw e;
 	});
-	const allowed = await summarize(new URL('/a', origin.url).href, { allowedPrivateNetworks: ['127.0.0.2/32'] });
+	const allowed = await summaly(new URL('/a', origin.url).href, { allowedPrivateNetworks: ['127.0.0.2/32'] });
 
 	expect(allowed.title).toBe('page');
 	// The connection opened under the setting that allows 127.0.0.2 is idle in the pool.
 	expect(await origin.open()).toBe(1);
 	const requests = origin.requestsBySocket().flat().length;
 
-	await expect(summarize(new URL('/b', origin.url).href, { allowedPrivateNetworks: ['127.0.0.1/32'] }))
+	await expect(summaly(new URL('/b', origin.url).href, { allowedPrivateNetworks: ['127.0.0.1/32'] }))
 		.rejects.toThrow('Private IP rejected 127.0.0.2');
-	await expect(summarize(new URL('/c', origin.url).href, { allowedPrivateNetworks: [] }))
+	await expect(summaly(new URL('/c', origin.url).href, { allowedPrivateNetworks: [] }))
 		.rejects.toThrow('Private IP rejected 127.0.0.2');
 	expect(origin.requestsBySocket().flat()).toHaveLength(requests);
 	expect(origin.connections()).toBe(1);
@@ -454,7 +454,7 @@ test('127.0.0.2 を許可した要約の接続は、名前が公開アドレス�
 	}) as never);
 
 	try {
-		const other = createSummarizer({ cache: false, coordinator: false });
+		const other = createSummaly({ cache: false, coordinator: false });
 		const url = new URL(origin.url);
 
 		url.hostname = host;
@@ -525,7 +525,7 @@ async function startStrayOrigin(stray: (method: string, path: string) => string 
 describe('再利用したソケットに前の応答の余りが届いたら、新しい接続で送り直す', () => {
 	test('HEAD の応答のあとに本文（チャンクの終端）が届く', async () => {
 		const origin = await startStrayOrigin((method, path) => (method === 'HEAD' && path === '/' ? '0\r\n\r\n' : undefined));
-		const summary = await summarize(origin.url);
+		const summary = await summaly(origin.url);
 
 		expect(summary.title).toBe('page');
 		expect(summary.icon).toBe(new URL('/favicon.ico', origin.url).href);
@@ -535,7 +535,7 @@ describe('再利用したソケットに前の応答の余りが届いたら、�
 
 	test('GET の本文が Content-Length より長い', async () => {
 		const origin = await startStrayOrigin((method, path) => (method === 'GET' && path === '/' ? 'trailing garbage' : undefined));
-		const summary = await summarize(origin.url);
+		const summary = await summaly(origin.url);
 
 		expect(summary.title).toBe('page');
 		// The favicon HEAD failed on the reused socket and went out again on a new connection.
@@ -565,7 +565,7 @@ describe.each(['http', 'https'] as const)('リダイレクトの応答を受け�
 			res.writeHead(302, { location: '/', 'content-length': '0' });
 			res.end();
 		}));
-		const summary = await summarize(new URL('/old', origin.url).href);
+		const summary = await summaly(new URL('/old', origin.url).href);
 
 		expect(summary.title).toBe('page');
 		expect(origin.requestsBySocket()).toEqual([['HEAD /old', 'HEAD /', 'GET /', 'HEAD /favicon.ico']]);
@@ -576,7 +576,7 @@ describe.each(['http', 'https'] as const)('リダイレクトの応答を受け�
 			res.writeHead(302, { location: '/', 'content-type': 'text/html', 'content-length': '5' });
 			res.end('Moved');
 		}, 'GET'));
-		const summary = await summarize(new URL('/old', origin.url).href);
+		const summary = await summaly(new URL('/old', origin.url).href);
 
 		expect(summary.title).toBe('page');
 		expect(origin.requestsBySocket()).toEqual([['HEAD /old', 'GET /old', 'GET /', 'HEAD /favicon.ico']]);
@@ -588,7 +588,7 @@ describe.each(['http', 'https'] as const)('リダイレクトの応答を受け�
 			res.write('Mo');
 			res.end('ved');
 		}, 'GET'));
-		const summary = await summarize(new URL('/old', origin.url).href);
+		const summary = await summaly(new URL('/old', origin.url).href);
 
 		expect(summary.title).toBe('page');
 		expect(origin.connections()).toBe(1);
@@ -601,7 +601,7 @@ describe.each(['http', 'https'] as const)('リダイレクトの応答を受け�
 			res.writeHead(302, { location: '/', 'content-type': 'text/html', 'content-length': String(body.length) });
 			res.end(body);
 		}, 'GET'));
-		const summary = await summarize(new URL('/old', origin.url).href);
+		const summary = await summaly(new URL('/old', origin.url).href);
 
 		expect(summary.title).toBe('page');
 		expect(origin.connections()).toBe(2);
@@ -614,7 +614,7 @@ describe.each(['http', 'https'] as const)('リダイレクトの応答を受け�
 			// The rest never comes.
 		}, 'GET'));
 		const started = performance.now();
-		const summary = await summarize(new URL('/old', origin.url).href, { responseTimeout: 10_000, operationTimeout: 10_000 });
+		const summary = await summaly(new URL('/old', origin.url).href, { responseTimeout: 10_000, operationTimeout: 10_000 });
 
 		expect(summary.title).toBe('page');
 		expect(performance.now() - started).toBeLessThan(2000);

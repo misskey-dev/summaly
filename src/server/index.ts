@@ -1,6 +1,5 @@
-// Derived from misskey-dev/summaly (MIT)
 /**
- * Standalone chiramiss server (summaly-compatible)
+ * Standalone summaly server
  * Configured via environment variables (see README.md)
  */
 
@@ -15,7 +14,7 @@ async function main(): Promise<void> {
 		config = loadServerConfig(process.env);
 	} catch (err) {
 		if (err instanceof ServerConfigError) {
-			console.error(`[chiramiss] ${err.message}`);
+			console.error(`[summaly] ${err.message}`);
 		} else {
 			console.error(err);
 		}

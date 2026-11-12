@@ -1,6 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
-import type { ProxyOptions, SummarizeOptions } from '@/types.js';
+import type { ProxyOptions, SummalyOptions } from '@/types.js';
 import { type AddressGuard, createAddressGuard, privateIpAllowedByEnv } from './address-guard.js';
 import { type GuardedAgentPool, type GuardedAgentSet, createGuardedAgents } from './agent-pool.js';
 import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy/index.js';
@@ -61,7 +61,7 @@ export type Transport = {
  */
 export function createTransport(
 	opts: {
-		agent?: SummarizeOptions['agent'];
+		agent?: SummalyOptions['agent'];
 		allowedPrivateNetworks?: string[];
 		proxy?: ProxyOptions;
 		allowPrivateIp?: boolean;

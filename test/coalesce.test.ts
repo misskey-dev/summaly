@@ -6,14 +6,14 @@ import { buildIconKey, buildRequestKey, objectId } from '@/coalesce/key.js';
 import { runCoalesced, runCoalescedIcon } from '@/coalesce/run.js';
 import {
 	type CacheEntry,
-	createSummarizer,
+	createSummaly,
 	InProcessCoordinator,
 	MemorySummaryCache,
 	StatusError,
-	defaultSummarizeOptions,
-	type SummaryPlugin,
-	type SummarizeOptions,
-	type SummaryResult,
+	summalyDefaultOptions,
+	type SummalyPlugin,
+	type SummalyOptions,
+	type SummalyResult,
 	type SummaryCache,
 } from '@/index.js';
 import { JsonCache } from './helpers/json-cache.js';
@@ -23,7 +23,7 @@ const allowedPrivateNetworks = ['127.0.0.0/8', '::1/128'];
 
 const servers: TestServer[] = [];
 const cleanups: (() => void)[] = [];
-const ALLOW_PRIVATE_IP_VARS = ['CHIRAMISS_ALLOW_PRIVATE_IP', 'SUMMALY_ALLOW_PRIVATE_IP'] as const;
+const ALLOW_PRIVATE_IP_VARS = ['SUMMALY_ALLOW_PRIVATE_IP'] as const;
 const originalAllowPrivateIp = ALLOW_PRIVATE_IP_VARS.map(name => [name, process.env[name]] as const);
 
 afterEach(async () => {
@@ -105,7 +105,7 @@ function recordingCache(): SummaryCache & { gets: () => number; storedKinds: Cac
 }
 
 /** A plugin that answers for `hostname` with a fixed summary plus `extra` fields, and counts its calls. */
-function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): SummaryPlugin & { calls: () => number } {
+function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): SummalyPlugin & { calls: () => number } {
 	let calls = 0;
 
 	return {
@@ -155,9 +155,9 @@ function brokenCache(entry: unknown): SummaryCache & { stored: CacheEntry[] } {
 describe('coalescing and caching', () => {
 	test('同時に来た同じ要求は1回だけ取得する', async () => {
 		const server = await countingServer({ delayMs: 100 });
-		const summarize = createSummarizer({ allowedPrivateNetworks });
+		const summaly = createSummaly({ allowedPrivateNetworks });
 
-		const results = await Promise.all(Array.from({ length: 10 }, () => summarize(server.url)));
+		const results = await Promise.all(Array.from({ length: 10 }, () => summaly(server.url)));
 
 		expect(server.gets()).toBe(1);
 		expect(results[0].title).toBe('Coalesced');
@@ -170,11 +170,11 @@ describe('coalescing and caching', () => {
 
 	test('lang が違えば別々に取得する', async () => {
 		const server = await countingServer({ delayMs: 100 });
-		const summarize = createSummarizer({ allowedPrivateNetworks });
+		const summaly = createSummaly({ allowedPrivateNetworks });
 
 		await Promise.all([
-			summarize(server.url, { lang: 'ja-JP' }),
-			summarize(server.url, { lang: 'en-US' }),
+			summaly(server.url, { lang: 'ja-JP' }),
+			summaly(server.url, { lang: 'en-US' }),
 		]);
 
 		expect(server.gets()).toBe(2);
@@ -182,14 +182,14 @@ describe('coalescing and caching', () => {
 
 	test('agent が違えば別々に取得する', async () => {
 		const server = await countingServer({ delayMs: 100 });
-		const summarize = createSummarizer();
+		const summaly = createSummaly();
 		const agentA = newAgent();
 		const agentB = newAgent();
 
 		await Promise.all([
-			summarize(server.url, { agent: { http: agentA } }),
-			summarize(server.url, { agent: { http: agentB } }),
-			summarize(server.url, { agent: { http: agentA } }),
+			summaly(server.url, { agent: { http: agentA } }),
+			summaly(server.url, { agent: { http: agentB } }),
+			summaly(server.url, { agent: { http: agentA } }),
 		]);
 
 		expect(server.gets()).toBe(2);
@@ -197,25 +197,25 @@ describe('coalescing and caching', () => {
 
 	test('cacheTtl 内の再要求は取得しない、期限後は取得する', async () => {
 		const server = await countingServer();
-		const summarize = createSummarizer({ allowedPrivateNetworks, cacheTtl: 50 });
+		const summaly = createSummaly({ allowedPrivateNetworks, cacheTtl: 50 });
 
-		await summarize(server.url);
-		await summarize(server.url);
+		await summaly(server.url);
+		await summaly(server.url);
 		expect(server.gets()).toBe(1);
 
 		await sleep(80);
-		await summarize(server.url);
+		await summaly(server.url);
 		expect(server.gets()).toBe(2);
 	});
 
 	test('失敗も errorCacheTtl の間はキャッシュされ、同じ statusCode の StatusError が投げられる', async () => {
 		const server = await countingServer({ status: 404, delayMs: 50 });
-		const summarize = createSummarizer({ allowedPrivateNetworks, errorCacheTtl: 200 });
+		const summaly = createSummaly({ allowedPrivateNetworks, errorCacheTtl: 200 });
 
 		// Concurrent callers sharing one failed fetch all get an equivalent StatusError.
 		const concurrent = await Promise.all([
-			summarize(server.url).catch((e: unknown) => e),
-			summarize(server.url).catch((e: unknown) => e),
+			summaly(server.url).catch((e: unknown) => e),
+			summaly(server.url).catch((e: unknown) => e),
 		]);
 
 		expect(server.gets()).toBe(1);
@@ -226,22 +226,22 @@ describe('coalescing and caching', () => {
 		expect(concurrent[1]).toBeInstanceOf(StatusError);
 		expect(concurrent[1]).toMatchObject({ name: first.name, message: first.message, statusCode: 404 });
 
-		const cached = await summarize(server.url).catch((e: unknown) => e);
+		const cached = await summaly(server.url).catch((e: unknown) => e);
 
 		expect(server.gets()).toBe(1);
 		expect(cached).toBeInstanceOf(StatusError);
 		expect(cached).toMatchObject({ name: 'StatusError', message: first.message, statusCode: 404, isPermanentError: true });
 
 		await sleep(250);
-		await expect(summarize(server.url)).rejects.toBeInstanceOf(StatusError);
+		await expect(summaly(server.url)).rejects.toBeInstanceOf(StatusError);
 		expect(server.gets()).toBe(2);
 	});
 
 	test('返された結果を書き換えても、同時の呼び出し側と次のキャッシュヒットに影響しない', async () => {
 		const server = await countingServer({ delayMs: 50 });
-		const summarize = createSummarizer({ allowedPrivateNetworks });
+		const summaly = createSummaly({ allowedPrivateNetworks });
 
-		const [a, b] = await Promise.all([summarize(server.url), summarize(server.url)]);
+		const [a, b] = await Promise.all([summaly(server.url), summaly(server.url)]);
 		const original = structuredClone(b);
 
 		expect(original.thumbnail).not.toBeNull();
@@ -252,28 +252,28 @@ describe('coalescing and caching', () => {
 		a.player.allow.push('autoplay');
 		expect(b).toEqual(original);
 
-		const hit = await summarize(server.url);
+		const hit = await summaly(server.url);
 
 		expect(server.gets()).toBe(1);
 		expect(hit).toEqual(original);
 
 		hit.thumbnail = null;
 		hit.player.allow.push('fullscreen');
-		expect(await summarize(server.url)).toEqual(original);
+		expect(await summaly(server.url)).toEqual(original);
 		expect(server.gets()).toBe(1);
 	});
 
 	test('cache: false と coordinator: false で毎回取得する', async () => {
 		const server = await countingServer({ delayMs: 50 });
 
-		const disabled = createSummarizer({ allowedPrivateNetworks, cache: false, coordinator: false });
+		const disabled = createSummaly({ allowedPrivateNetworks, cache: false, coordinator: false });
 
 		await Promise.all([disabled(server.url), disabled(server.url), disabled(server.url)]);
 		await disabled(server.url);
 		expect(server.gets()).toBe(4);
 
 		// The same options per call disable them on an instance that has them enabled.
-		const enabled = createSummarizer({ allowedPrivateNetworks });
+		const enabled = createSummaly({ allowedPrivateNetworks });
 		const off = { cache: false, coordinator: false } as const;
 
 		await Promise.all([enabled(server.url, off), enabled(server.url, off)]);
@@ -284,14 +284,14 @@ describe('coalescing and caching', () => {
 	test('cache: false でも同時の要求は一本化され、coordinator: false でもキャッシュは効く', async () => {
 		const server = await countingServer({ delayMs: 50 });
 
-		const coordinatorOnly = createSummarizer({ allowedPrivateNetworks, cache: false });
+		const coordinatorOnly = createSummaly({ allowedPrivateNetworks, cache: false });
 
 		await Promise.all([coordinatorOnly(server.url), coordinatorOnly(server.url)]);
 		expect(server.gets()).toBe(1);
 		await coordinatorOnly(server.url);
 		expect(server.gets()).toBe(2);
 
-		const cacheOnly = createSummarizer({ allowedPrivateNetworks, coordinator: false });
+		const cacheOnly = createSummaly({ allowedPrivateNetworks, coordinator: false });
 
 		await cacheOnly(server.url);
 		await cacheOnly(server.url);
@@ -301,8 +301,8 @@ describe('coalescing and caching', () => {
 	test('インスタンスごとにキャッシュを持つ', async () => {
 		const server = await countingServer();
 
-		await createSummarizer({ allowedPrivateNetworks })(server.url);
-		await createSummarizer({ allowedPrivateNetworks })(server.url);
+		await createSummaly({ allowedPrivateNetworks })(server.url);
+		await createSummaly({ allowedPrivateNetworks })(server.url);
 
 		expect(server.gets()).toBe(2);
 	});
@@ -374,10 +374,10 @@ describe('coalescing and caching', () => {
 	test('maxEntryBytes を超える結果は保存されず、次の呼び出しで取り直す', async () => {
 		const plugin = fixedPlugin('large.example', { sitename: 'x'.repeat(10_000) });
 		const cache = new MemorySummaryCache({ maxEntryBytes: 10_000 });
-		const summarize = createSummarizer({ plugins: [plugin], followRedirects: false, cache });
+		const summaly = createSummaly({ plugins: [plugin], followRedirects: false, cache });
 
-		const first = await summarize('https://large.example/');
-		const second = await summarize('https://large.example/');
+		const first = await summaly('https://large.example/');
+		const second = await summaly('https://large.example/');
 
 		expect(second).toEqual(first);
 		expect(plugin.calls()).toBe(2);
@@ -397,15 +397,15 @@ describe('coalescing and caching', () => {
 	}
 
 	test('og:site_name が約 1 MB のページを 50 件取っても maxBytes を超えない', async () => {
-		// A site name this long makes the title cleanup fail (as upstream does) with an error whose message
+		// A site name this long makes the title cleanup fail with an error whose message
 		// quotes the whole site name; the stored copy of that message is clipped.
 		const server = await pageServer(Buffer.from(`<html><head><title>t</title><meta property="og:site_name" content="${'s'.repeat(1024 * 1024)}"></head></html>`));
 		const maxBytes = 64 * 1024 * 1024;
 		const cache = new MemorySummaryCache({ maxBytes });
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache });
 
 		for (let i = 0; i < 50; i++) {
-			await summarize(`${server.url}page/${i}`).catch(() => {});
+			await summaly(`${server.url}page/${i}`).catch(() => {});
 			expect(cache.estimatedBytes).toBeLessThanOrEqual(maxBytes);
 		}
 		// 50 summaries, plus the one favicon check (/favicon.ico) every page shares.
@@ -418,10 +418,10 @@ describe('coalescing and caching', () => {
 		const maxBytes = 2 * 1024 * 1024;
 		// maxEntryBytes is raised so these entries (about 512 KiB each) are stored and the byte budget is what limits them.
 		const cache = new MemorySummaryCache({ maxBytes, maxEntryBytes: 1024 * 1024 });
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache });
 
 		for (let i = 0; i < 20; i++) {
-			const result = await summarize(`${server.url}page/${i}`);
+			const result = await summaly(`${server.url}page/${i}`);
 
 			expect(result.thumbnail?.length).toBeGreaterThan(256 * 1024);
 			expect(cache.estimatedBytes).toBeLessThanOrEqual(maxBytes);
@@ -429,7 +429,7 @@ describe('coalescing and caching', () => {
 		expect(cache.size).toBeGreaterThan(0);
 		expect(cache.size).toBeLessThan(20);
 		// The newest stays; the oldest went first.
-		const keyOf = (i: number) => buildRequestKey(`${server.url}page/${i}`, { ...defaultSummarizeOptions, allowedPrivateNetworks });
+		const keyOf = (i: number) => buildRequestKey(`${server.url}page/${i}`, { ...summalyDefaultOptions, allowedPrivateNetworks });
 
 		expect(await cache.get(keyOf(19))).toBeDefined();
 		expect(await cache.get(keyOf(0))).toBeUndefined();
@@ -438,9 +438,9 @@ describe('coalescing and caching', () => {
 	test('既定の MemorySummaryCache は約 1 MB の結果を保存しない', async () => {
 		const plugin = fixedPlugin('huge.example', { sitename: 's'.repeat(1024 * 1024) });
 		const cache = new MemorySummaryCache();
-		const summarize = createSummarizer({ plugins: [plugin], followRedirects: false, cache });
+		const summaly = createSummaly({ plugins: [plugin], followRedirects: false, cache });
 
-		await summarize('https://huge.example/');
+		await summaly('https://huge.example/');
 
 		expect(cache.size).toBe(0);
 		expect(cache.estimatedBytes).toBe(0);
@@ -460,16 +460,16 @@ describe('coalescing and caching', () => {
 		const ok = await countingServer();
 		const notFound = await countingServer({ status: 404 });
 		const cache = new JsonCache();
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache });
 
-		const fresh = await summarize(ok.url);
-		const fromCache = await summarize(ok.url);
+		const fresh = await summaly(ok.url);
+		const fromCache = await summaly(ok.url);
 
 		expect(ok.gets()).toBe(1);
 		expect(fromCache).toEqual(fresh);
 
-		const freshError = await summarize(notFound.url).catch((e: unknown) => e) as StatusError;
-		const cachedError = await summarize(notFound.url).catch((e: unknown) => e) as StatusError;
+		const freshError = await summaly(notFound.url).catch((e: unknown) => e) as StatusError;
+		const cachedError = await summaly(notFound.url).catch((e: unknown) => e) as StatusError;
 
 		expect(notFound.gets()).toBe(1);
 		expect(cachedError).toBeInstanceOf(StatusError);
@@ -489,11 +489,11 @@ describe('coalescing and caching', () => {
 		// A function cannot go through structuredClone; storing it as 'ok' would make every cache hit throw.
 		const plugin = fixedPlugin('uncloneable.example', { extra: () => 'not cloneable' });
 		const cache = recordingCache();
-		const summarize = createSummarizer({ plugins: [plugin], followRedirects: false, cache });
+		const summaly = createSummaly({ plugins: [plugin], followRedirects: false, cache });
 		const url = 'https://uncloneable.example/';
 
-		const first = await summarize(url).catch((e: unknown) => e) as Error;
-		const second = await summarize(url).catch((e: unknown) => e) as Error;
+		const first = await summaly(url).catch((e: unknown) => e) as Error;
+		const second = await summaly(url).catch((e: unknown) => e) as Error;
 
 		expect(first).toBeInstanceOf(Error);
 		expect(second).toBeInstanceOf(Error);
@@ -505,9 +505,9 @@ describe('coalescing and caching', () => {
 	test('coordinator: false ならキャッシュを1回だけ読む', async () => {
 		const plugin = fixedPlugin('plugin.example');
 		const cache = recordingCache();
-		const summarize = createSummarizer({ plugins: [plugin], followRedirects: false, cache, coordinator: false });
+		const summaly = createSummaly({ plugins: [plugin], followRedirects: false, cache, coordinator: false });
 
-		await summarize('https://plugin.example/');
+		await summaly('https://plugin.example/');
 		expect(plugin.calls()).toBe(1);
 		expect(cache.gets()).toBe(1);
 		expect(cache.storedKinds).toEqual(['ok']);
@@ -515,7 +515,7 @@ describe('coalescing and caching', () => {
 });
 
 describe('runCoalesced', () => {
-	const result: SummaryResult = {
+	const result: SummalyResult = {
 		title: 't',
 		icon: null,
 		description: null,
@@ -715,8 +715,8 @@ describe('buildRequestKey', () => {
 
 	test('結果を変えうるオプションが違えば key も違う', () => {
 		const agent = new http.Agent();
-		const plugin: SummaryPlugin = { test: () => false, summarize: async () => null };
-		const variants: SummarizeOptions[] = [
+		const plugin: SummalyPlugin = { test: () => false, summarize: async () => null };
+		const variants: SummalyOptions[] = [
 			{},
 			{ lang: 'ja' },
 			{ lang: null },
@@ -766,28 +766,6 @@ describe('buildRequestKey', () => {
 		expect(enabled).not.toBe(unset);
 	});
 
-	test('プライベート IP の許可はどちらの変数名で指定しても同じ key になり、CHIRAMISS_ALLOW_PRIVATE_IP が優先される', () => {
-		for (const name of ALLOW_PRIVATE_IP_VARS) {
-			delete process.env[name];
-		}
-		const unset = buildRequestKey(url, {});
-
-		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
-		const bySummaly = buildRequestKey(url, {});
-
-		delete process.env.SUMMALY_ALLOW_PRIVATE_IP;
-		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'true';
-		const byChiramiss = buildRequestKey(url, {});
-
-		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'false';
-		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
-		const overridden = buildRequestKey(url, {});
-
-		expect(bySummaly).not.toBe(unset);
-		expect(byChiramiss).toBe(bySummaly);
-		expect(overridden).toBe(unset);
-	});
-
 	test('agent と plugin の同一性はプロセスごとの値を含み、別のプロセスとは key が重ならない', async () => {
 		// Fresh copies of the module stand in for two processes: in each, object numbers start at 1,
 		// so the first agent (or plugin) in each gets the same number.
@@ -799,7 +777,7 @@ describe('buildRequestKey', () => {
 		const agents = [new http.Agent(), new http.Agent()];
 
 		cleanups.push(() => agents.forEach(a => a.destroy()));
-		const plugin = (): SummaryPlugin => ({ test: () => false, summarize: async () => null });
+		const plugin = (): SummalyPlugin => ({ test: () => false, summarize: async () => null });
 
 		expect(first.objectId(agents[0])).toBe(second.objectId(agents[1]));
 		expect(first.buildRequestKey(url, { agent: { http: agents[0] } })).not.toBe(second.buildRequestKey(url, { agent: { http: agents[1] } }));
@@ -828,7 +806,7 @@ describe('buildIconKey', () => {
 	});
 
 	test('同じ URL と設定でも、要約のキーとは重ならない', () => {
-		const variants: SummarizeOptions[] = [{}, { ...defaultSummarizeOptions }, { allowedPrivateNetworks }, { userAgent: 'ua' }];
+		const variants: SummalyOptions[] = [{}, { ...summalyDefaultOptions }, { allowedPrivateNetworks }, { userAgent: 'ua' }];
 
 		for (const opts of variants) {
 			expect(buildIconKey(url, opts)).not.toBe(buildRequestKey(url, opts));
@@ -839,7 +817,7 @@ describe('buildIconKey', () => {
 		const agent = new http.Agent();
 
 		cleanups.push(() => agent.destroy());
-		const variants: SummarizeOptions[] = [
+		const variants: SummalyOptions[] = [
 			{},
 			{ userAgent: 'ua' },
 			{ responseTimeout: 1 },
@@ -870,7 +848,7 @@ describe('buildIconKey', () => {
 	});
 
 	test('HEAD に使わない設定（lang、plugins、followRedirects、contentLengthRequired）と cache / coordinator / TTL は含めない', () => {
-		const plugin: SummaryPlugin = { test: () => false, summarize: async () => null };
+		const plugin: SummalyPlugin = { test: () => false, summarize: async () => null };
 		const base = buildIconKey(url, {});
 
 		expect(buildIconKey(url, {

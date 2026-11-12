@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 
 function isBlank(s: string | null | undefined): boolean {
 	return s == null || s.trim() === '';

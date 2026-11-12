@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 /**
  * Tests for the standalone server's HTTP endpoints
  */
@@ -140,7 +139,6 @@ describe('環境変数で設定したサーバーの動作', () => {
 		expect(res.statusCode).toBe(500);
 	});
 
-	// chiramiss additions below
 
 	test('GET /healthz は 200 {status:"ok"}', async () => {
 		app = await createApp({});

@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import { Parser } from 'htmlparser2';
 import { type ScrapeContext, fetchSubresource } from '@/context.js';
 import type { HeadInfo } from '@/html/head.js';
@@ -12,7 +11,7 @@ const MAX_HEIGHT = 1024;
 // the current nesting depth, so unbounded nesting would take quadratic time.
 const MAX_HTML_DEPTH = 2;
 
-// TODO (from upstream): only the basic syntax of `allow` is supported.
+// TODO: only the basic syntax of `allow` is supported.
 const SAFE_PERMISSIONS = [
 	'autoplay',
 	'clipboard-write',
@@ -154,8 +153,8 @@ function toPlayer(body: OEmbed): Player | null {
 }
 
 /**
- * Attributes of the iframe when html has exactly one and it is at the top level (upstream: only the body
- * and html elements as the parents); null otherwise, or when html nests deeper than MAX_HTML_DEPTH.
+ * Attributes of the iframe when html has exactly one and it is at the top level (only the body and html
+ * elements as the parents); null otherwise, or when html nests deeper than MAX_HTML_DEPTH.
  */
 function findTopLevelIframe(html: string): Record<string, string> | null {
 	// Kept in an object: the parser callbacks change these during parser.write(), which plain `let`

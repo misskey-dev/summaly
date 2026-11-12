@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import type * as http from 'node:http';
 import type * as https from 'node:https';
 import type { InflightCoordinator, SummaryCache } from '@/coalesce/types.js';
@@ -55,17 +54,12 @@ export type Summary = {
 	fediverseCreator: string | null;
 };
 
-export type SummaryResult = Summary & {
+export type SummalyResult = Summary & {
 	/**
 	 * The actual url of that web page
 	 */
 	url: string;
 };
-
-/**
- * Alias of `SummaryResult`, kept for summaly compatibility.
- */
-export type SummalyResult = SummaryResult;
 
 export type Player = {
 	/**
@@ -99,15 +93,10 @@ export type GeneralScrapingOptions = {
 	contentLengthRequired?: boolean;
 };
 
-export interface SummaryPlugin {
+export interface SummalyPlugin {
 	test(url: URL): boolean;
 	summarize(url: URL, opts?: GeneralScrapingOptions): Promise<Summary | null>;
 }
-
-/**
- * Alias of `SummaryPlugin`, kept for summaly compatibility.
- */
-export type SummalyPlugin = SummaryPlugin;
 
 export type ProxyOptions = {
 	/**
@@ -126,7 +115,7 @@ export type ProxyOptions = {
 	noProxy?: string;
 };
 
-export type SummarizeOptions = {
+export type SummalyOptions = {
 	/**
 	 * Accept-Language for the request
 	 */
@@ -140,7 +129,7 @@ export type SummarizeOptions = {
 	/**
 	 * Custom Plugins
 	 */
-	plugins?: SummaryPlugin[];
+	plugins?: SummalyPlugin[];
 
 	/**
 	 * Custom HTTP agent
@@ -208,7 +197,3 @@ export type SummarizeOptions = {
 	coordinator?: InflightCoordinator | false;
 };
 
-/**
- * Alias of `SummarizeOptions`, kept for summaly compatibility.
- */
-export type SummalyOptions = SummarizeOptions;

@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import { amazon } from './amazon.js';
 import { bluesky } from './bluesky.js';
 import { branchioDeeplinks } from './branchio-deeplinks.js';

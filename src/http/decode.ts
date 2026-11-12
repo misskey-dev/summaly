@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import { detect } from 'chardet';
 
 /** How far into the body `<meta charset>` is looked for. The HTML spec prescans 1024 bytes; this is more lenient. */
@@ -129,7 +128,7 @@ function fromDetection(body: Buffer): string | null {
  * Detects the encoding of an HTML body, in the order browsers use:
  * BOM → content-type charset → `<meta charset>` near the top → chardet on a sample → utf-8.
  * Returns a WHATWG canonical encoding name.
- * Upstream ran chardet on the whole body first, which dominated the cost of a summary.
+ * chardet sees only a sample: running it on a whole page would dominate the cost of a summary.
  */
 export function detectEncoding(body: Buffer, contentType?: string): string {
 	return fromBom(body)

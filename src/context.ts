@@ -6,12 +6,12 @@ import { type FetchRequest, type FetchResult, fetchResponse } from '@/http/reque
 import { type Transport, createTransport } from '@/http/transport.js';
 import { type ResolvedOptions, resolveOptions } from '@/options.js';
 import { toScrapingOptions } from '@/providers/provider.js';
-import type { GeneralScrapingOptions, SummarizeOptions } from '@/types.js';
+import type { GeneralScrapingOptions, SummalyOptions } from '@/types.js';
 
 /** Everything one summary needs to make requests. Built per call; holds no global state. */
 export type ScrapeContext = {
 	options: ResolvedOptions;
-	/** The caller's raw values (no defaults filled in, lang not validated), as upstream hands them to plugins. */
+	/** The caller's raw values (no defaults filled in, lang not validated), as handed to plugins. */
 	scrapingOptions: GeneralScrapingOptions;
 	transport: Transport;
 	/**
@@ -31,7 +31,7 @@ const NO_COALESCE: CoalesceDeps = Object.freeze({ cache: null, coordinator: null
  * and one reading of the private IP environment variables, so the transport that sends a request and the key its
  * result is stored under always agree on what may be reached.
  */
-export function fixOptions(opts: SummarizeOptions): SummarizeOptions {
+export function fixOptions(opts: SummalyOptions): SummalyOptions {
 	return {
 		...opts,
 		allowedPrivateNetworks: opts.allowedPrivateNetworks?.slice(),
@@ -49,7 +49,7 @@ export function fixOptions(opts: SummarizeOptions): SummarizeOptions {
  * the transport builds its own agents and its close destroys them.
  */
 export function createScrapeContext(
-	opts: SummarizeOptions,
+	opts: SummalyOptions,
 	coalesce: CoalesceDeps = NO_COALESCE,
 	allowPrivateIp: boolean = privateIpAllowedByEnv(),
 	agentPool?: GuardedAgentPool,
@@ -93,8 +93,8 @@ export function fetchWithContext(ctx: ScrapeContext, req: ContextRequest): Promi
 
 /**
  * Fetches a resource referenced by a page (oEmbed endpoint, favicon).
- * Like upstream's `get()` / `head()`: accepts any type, follows redirects, does not require content-length.
- * Unlike upstream, the context's transport, User-Agent, timeouts and size limit apply.
+ * Accepts any type, follows redirects and does not require content-length.
+ * The context's transport, User-Agent, timeouts and size limit apply.
  */
 export function fetchSubresource(ctx: ScrapeContext, url: string, method: 'GET' | 'HEAD'): Promise<FetchResult> {
 	return fetchWithContext(ctx, {

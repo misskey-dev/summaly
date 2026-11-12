@@ -1,4 +1,4 @@
-import type { SummaryResult } from '@/types.js';
+import type { SummalyResult } from '@/types.js';
 
 /**
  * JSON にできるエラーの表現（キャッシュに保存するため）
@@ -20,7 +20,7 @@ export type SerializedError = {
  * 用途に合わない種類のエントリ（要約のキーで `icon` が返ったなど）は、壊れたものとしてキャッシュミスと同じに扱う
  */
 export type CacheEntry =
-	| { kind: 'ok'; value: SummaryResult }
+	| { kind: 'ok'; value: SummalyResult }
 	| { kind: 'error'; error: SerializedError }
 	| { kind: 'icon'; href: string | null };
 

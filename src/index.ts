@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import { InProcessCoordinator } from '@/coalesce/in-process-coordinator.js';
 import { buildRequestKey } from '@/coalesce/key.js';
 import { MemorySummaryCache } from '@/coalesce/memory-cache.js';
@@ -9,7 +8,7 @@ import { privateIpAllowedByEnv } from '@/http/address-guard.js';
 import { GuardedAgentPool } from '@/http/agent-pool.js';
 import { builtinProviders } from '@/providers/index.js';
 import { fromPlugin } from '@/providers/provider.js';
-import type { SummarizeOptions, SummaryResult } from '@/types.js';
+import type { SummalyOptions, SummalyResult } from '@/types.js';
 import { VERSION } from '@/version.js';
 
 export const version: string = VERSION;
@@ -26,9 +25,6 @@ export type {
 	Player,
 	ProxyOptions,
 	Summary,
-	SummarizeOptions,
-	SummaryPlugin,
-	SummaryResult,
 	SummalyOptions,
 	SummalyPlugin,
 	SummalyResult,
@@ -43,27 +39,22 @@ export type {
 /**
  * Defaults merged under the options of every call.
  */
-export const defaultSummarizeOptions: SummarizeOptions = {
+export const summalyDefaultOptions: SummalyOptions = {
 	lang: null,
 	followRedirects: true,
 	plugins: [],
 };
 
-/**
- * Alias of `defaultSummarizeOptions`, kept for summaly compatibility.
- */
-export const summalyDefaultOptions: SummarizeOptions = defaultSummarizeOptions;
-
 const DEFAULT_CACHE_TTL = 5 * 60 * 1000;
 const DEFAULT_ERROR_CACHE_TTL = 30 * 1000;
 
 /**
- * Creates a summarize function with its own result cache, in-flight sharing and connection pool.
+ * Creates a summaly function with its own result cache, in-flight sharing and connection pool.
  * Options given per call are merged over `base`. `cache: false` / `coordinator: false` (in either) turns that part off.
  * Its calls with the same `allowedPrivateNetworks` reuse each other's idle connections for a short time
  * (see GuardedAgentPool); separate summarizers never share connections.
  */
-export function createSummarizer(base: SummarizeOptions = {}): (url: string, options?: SummarizeOptions) => Promise<SummaryResult> {
+export function createSummaly(base: SummalyOptions = {}): (url: string, options?: SummalyOptions) => Promise<SummalyResult> {
 	const memoryCache = new MemorySummaryCache();
 	const inProcessCoordinator = new InProcessCoordinator();
 	const agentPool = new GuardedAgentPool();
@@ -72,7 +63,7 @@ export function createSummarizer(base: SummarizeOptions = {}): (url: string, opt
 		// Fixed when the call starts: the summary key, the transport and the favicon check keys are all built from
 		// these, whatever the caller or the environment changes while the call runs.
 		const opts = fixOptions({
-			...defaultSummarizeOptions,
+			...summalyDefaultOptions,
 			...base,
 			...options,
 		});
@@ -95,19 +86,9 @@ export function createSummarizer(base: SummarizeOptions = {}): (url: string, opt
 }
 
 /**
- * Alias of `createSummarizer`, kept for summaly compatibility.
- */
-export const createSummaly: (base?: SummarizeOptions) => (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = createSummarizer;
-
-/**
  * Summarize an web page
  */
-export const summarize: (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = createSummarizer();
-
-/**
- * Alias of `summarize`, kept for summaly compatibility.
- */
-export const summaly: (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = summarize;
+export const summaly: (url: string, options?: SummalyOptions) => Promise<SummalyResult> = createSummaly();
 
 /**
  * The whole summary without caching or sharing it: final URL, provider match, scraping.
@@ -117,11 +98,11 @@ export const summaly: (url: string, options?: SummarizeOptions) => Promise<Summa
  */
 async function summarizeUncached(
 	url: string,
-	opts: SummarizeOptions,
+	opts: SummalyOptions,
 	deps: CoalesceDeps,
 	allowPrivateIp: boolean,
 	agentPool: GuardedAgentPool,
-): Promise<SummaryResult> {
+): Promise<SummalyResult> {
 	const ctx = createScrapeContext(opts, deps, allowPrivateIp, agentPool);
 
 	// The requests of this call share the transport's connections. Guarded connections that completed their responses
@@ -136,7 +117,7 @@ async function summarizeUncached(
 		const summary = match ? await match.summarize(ctx, target) : await scrapeGeneral(ctx, target);
 
 		if (summary == null) {
-			throw new Error('failed summarize');
+			throw new Error('failed summaly');
 		}
 
 		return Object.assign(summary, {
@@ -148,7 +129,7 @@ async function summarizeUncached(
 }
 
 /**
- * Follows redirects with HEAD to find the page's final URL. Falls back to `url` on any failure, as upstream does.
+ * Follows redirects with HEAD to find the page's final URL. Falls back to `url` on any failure.
  * Goes through the context's transport, so every hop is checked against the private IP guard.
  */
 async function resolveFinalUrl(ctx: ScrapeContext, url: string): Promise<string> {
@@ -161,7 +142,7 @@ async function resolveFinalUrl(ctx: ScrapeContext, url: string): Promise<string>
 				'accept-language': ctx.options.lang ?? undefined,
 			},
 			followRedirects: true,
-			// Like upstream's plain got.head(): no size or content-length checks (a HEAD has no body).
+			// No size or content-length checks: a HEAD has no body.
 			contentLengthLimit: Number.POSITIVE_INFINITY,
 			contentLengthRequired: false,
 		});

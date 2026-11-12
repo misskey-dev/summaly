@@ -1,6 +1,5 @@
-// Derived from misskey-dev/summaly (MIT)
 import type { ScrapeContext } from '@/context.js';
-import type { GeneralScrapingOptions, Summary, SummarizeOptions, SummaryPlugin } from '@/types.js';
+import type { GeneralScrapingOptions, Summary, SummalyOptions, SummalyPlugin } from '@/types.js';
 
 /** Site-specific summarizer. Gets the per-call context so its requests go through the same transport and settings. */
 export type Provider = {
@@ -10,10 +9,10 @@ export type Provider = {
 };
 
 /**
- * Wraps a caller-supplied `SummaryPlugin`. The plugin gets the same `GeneralScrapingOptions` upstream passes:
+ * Wraps a caller-supplied `SummalyPlugin`. The plugin gets `GeneralScrapingOptions`:
  * the caller's raw values, not the context's effective settings.
  */
-export function fromPlugin(plugin: SummaryPlugin): Provider {
+export function fromPlugin(plugin: SummalyPlugin): Provider {
 	return {
 		name: 'plugin',
 		test: url => plugin.test(url),
@@ -22,10 +21,10 @@ export function fromPlugin(plugin: SummaryPlugin): Provider {
 }
 
 /**
- * Picks the `GeneralScrapingOptions` keys from the merged options as upstream index.ts does.
+ * Picks the `GeneralScrapingOptions` keys from the merged options.
  * Unset keys stay undefined and `lang` is passed as given.
  */
-export function toScrapingOptions(opts: SummarizeOptions): GeneralScrapingOptions {
+export function toScrapingOptions(opts: SummalyOptions): GeneralScrapingOptions {
 	return {
 		lang: opts.lang,
 		userAgent: opts.userAgent,

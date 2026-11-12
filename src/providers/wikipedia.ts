@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import { fetchSubresource } from '@/context.js';
 import { clip } from '@/extract/text.js';
 import type { Provider } from './provider.js';

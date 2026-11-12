@@ -223,7 +223,7 @@ describe('pool を使う transport', () => {
 
 	test('guard が無効なら pool を使わない', () => {
 		const pool = new GuardedAgentPool();
-		const transport = createTransport({ agentPool: pool }, { CHIRAMISS_ALLOW_PRIVATE_IP: 'true' });
+		const transport = createTransport({ agentPool: pool }, { SUMMALY_ALLOW_PRIVATE_IP: 'true' });
 
 		expect(transport.guard).toBeNull();
 		expect(transport.guardedAgents).toBeNull();

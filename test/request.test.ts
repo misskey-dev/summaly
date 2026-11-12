@@ -113,11 +113,6 @@ describe('createTransport', () => {
 		expect(createTransport({}, { SUMMALY_ALLOW_PRIVATE_IP: 'true' }).guard).toBeNull();
 		expect(createTransport({ agent: { http: new http.Agent() } }, { SUMMALY_ALLOW_PRIVATE_IP: 'true' }).guard).toBeNull();
 	});
-
-	test('CHIRAMISS_ALLOW_PRIVATE_IP=true なら guard なし、CHIRAMISS_ALLOW_PRIVATE_IP=false は SUMMALY_ALLOW_PRIVATE_IP=true より優先', () => {
-		expect(createTransport({}, { CHIRAMISS_ALLOW_PRIVATE_IP: 'true' }).guard).toBeNull();
-		expect(createTransport({}, { CHIRAMISS_ALLOW_PRIVATE_IP: 'false', SUMMALY_ALLOW_PRIVATE_IP: 'true' }).guard).not.toBeNull();
-	});
 });
 
 describe('fetchResponse', () => {
@@ -654,7 +649,7 @@ describe('transport 内の接続の再利用', () => {
 		const { agent } = hookedAgent();
 		const destroy = vi.spyOn(agent, 'destroy');
 
-		createTransport({}, { CHIRAMISS_ALLOW_PRIVATE_IP: 'true' }).close();
+		createTransport({}, { SUMMALY_ALLOW_PRIVATE_IP: 'true' }).close();
 		createTransport({ agent: { http: agent } }, {}).close();
 		createTransport({ proxy: { http: 'http://proxy.example:8080' } }, {}).close();
 		expect(destroy).not.toHaveBeenCalled();

@@ -1,9 +1,8 @@
-// Derived from misskey-dev/summaly (MIT)
 import { fetchPage } from '@/extract/general.js';
 import { loadDom } from '@/html/dom.js';
 import type { Provider } from './provider.js';
 
-// Empty strings (absent elements, empty attributes) must fall through to the next source, as upstream does.
+// Empty strings (absent elements, empty attributes) must fall through to the next source.
 /* oxlint-disable typescript/prefer-nullish-coalescing */
 
 const HOSTNAMES = new Set([
@@ -30,7 +29,7 @@ export const amazon: Provider = {
 	test: url => HOSTNAMES.has(url.hostname),
 
 	async summarize(ctx, url) {
-		// Upstream fetched with scpaping()'s defaults, so redirects are always followed and content-length is never required.
+		// Redirects are always followed and content-length is never required, whatever the caller set.
 		// The rest of the context (transport, User-Agent, lang, timeouts, size limit) still applies.
 		const page = await fetchPage({ ...ctx, options: { ...ctx.options, followRedirects: true, contentLengthRequired: false } }, url);
 		const $ = loadDom(page.html);

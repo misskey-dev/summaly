@@ -1,10 +1,9 @@
-// Derived from misskey-dev/summaly (MIT)
 /**
- * Configuration loader for the standalone chiramiss server
+ * Configuration loader for the standalone summaly server
  */
 
 import ipaddr from 'ipaddr.js';
-import type { ProxyOptions, SummarizeOptions } from '@/index.js';
+import type { ProxyOptions, SummalyOptions } from '@/index.js';
 
 export type ServerConfig = {
 	/**
@@ -18,9 +17,9 @@ export type ServerConfig = {
 	port: number;
 
 	/**
-	 * Options passed to summarize
+	 * Options passed to summaly
 	 */
-	summarizeOptions: SummarizeOptions;
+	summalyOptions: SummalyOptions;
 };
 
 export const DEFAULT_SERVER_HOST = 'localhost';
@@ -233,18 +232,17 @@ function loadProxyOptions(env: NodeJS.ProcessEnv): ProxyOptions | undefined {
 }
 
 /**
- * Reads a server setting: `CHIRAMISS_<suffix>`, or `SUMMALY_<suffix>` (kept for summaly compatibility) when that is
- * unset or empty. Returns the value together with the name it came from, so error messages show the variable read.
+ * Reads the server setting `SUMMALY_<suffix>` (see readEnv), together with its name for error messages.
  */
 function readSetting(env: NodeJS.ProcessEnv, suffix: string): { name: string; value: string } | undefined {
-	return readFirstEnv(env, [`CHIRAMISS_${suffix}`, `SUMMALY_${suffix}`]);
+	return readFirstEnv(env, [`SUMMALY_${suffix}`]);
 }
 
 /**
  * Builds the standalone server configuration from environment variables.
  *
- * Each setting is read from `CHIRAMISS_<NAME>`, falling back to `SUMMALY_<NAME>` when that is unset or empty.
- * Unset or empty variables are omitted from `summarizeOptions` entirely, so that they do not
+ * Each setting is read from `SUMMALY_<NAME>`.
+ * Unset or empty variables are omitted from `summalyOptions` entirely, so that they do not
  * override values taken from the request (e.g. the `lang` query parameter).
  *
  * @throws {ServerConfigError} if a variable has an invalid value
@@ -255,73 +253,73 @@ export function loadServerConfig(env: NodeJS.ProcessEnv): ServerConfig {
 	const rawPort = readSetting(env, 'PORT');
 	const port = rawPort != null ? parseNonNegativeInteger(rawPort.name, rawPort.value, MAX_PORT) : DEFAULT_SERVER_PORT;
 
-	const summarizeOptions: SummarizeOptions = {};
+	const summalyOptions: SummalyOptions = {};
 
 	const lang = readSetting(env, 'LANG');
 
 	if (lang != null) {
-		summarizeOptions.lang = lang.value;
+		summalyOptions.lang = lang.value;
 	}
 
 	const userAgent = readSetting(env, 'USER_AGENT');
 
 	if (userAgent != null) {
-		summarizeOptions.userAgent = userAgent.value;
+		summalyOptions.userAgent = userAgent.value;
 	}
 
 	const followRedirects = readSetting(env, 'FOLLOW_REDIRECTS');
 
 	if (followRedirects != null) {
-		summarizeOptions.followRedirects = parseBoolean(followRedirects.name, followRedirects.value);
+		summalyOptions.followRedirects = parseBoolean(followRedirects.name, followRedirects.value);
 	}
 
 	const responseTimeout = readSetting(env, 'RESPONSE_TIMEOUT');
 
 	if (responseTimeout != null) {
-		summarizeOptions.responseTimeout = parseNonNegativeInteger(responseTimeout.name, responseTimeout.value, MAX_TIMEOUT);
+		summalyOptions.responseTimeout = parseNonNegativeInteger(responseTimeout.name, responseTimeout.value, MAX_TIMEOUT);
 	}
 
 	const operationTimeout = readSetting(env, 'OPERATION_TIMEOUT');
 
 	if (operationTimeout != null) {
-		summarizeOptions.operationTimeout = parseNonNegativeInteger(operationTimeout.name, operationTimeout.value, MAX_TIMEOUT);
+		summalyOptions.operationTimeout = parseNonNegativeInteger(operationTimeout.name, operationTimeout.value, MAX_TIMEOUT);
 	}
 
 	const contentLengthLimit = readSetting(env, 'CONTENT_LENGTH_LIMIT');
 
 	if (contentLengthLimit != null) {
-		summarizeOptions.contentLengthLimit = parseNonNegativeInteger(contentLengthLimit.name, contentLengthLimit.value);
+		summalyOptions.contentLengthLimit = parseNonNegativeInteger(contentLengthLimit.name, contentLengthLimit.value);
 	}
 
 	const contentLengthRequired = readSetting(env, 'CONTENT_LENGTH_REQUIRED');
 
 	if (contentLengthRequired != null) {
-		summarizeOptions.contentLengthRequired = parseBoolean(contentLengthRequired.name, contentLengthRequired.value);
+		summalyOptions.contentLengthRequired = parseBoolean(contentLengthRequired.name, contentLengthRequired.value);
 	}
 
 	const allowedPrivateNetworks = readSetting(env, 'ALLOWED_PRIVATE_NETWORKS');
 
 	if (allowedPrivateNetworks != null) {
-		summarizeOptions.allowedPrivateNetworks = parseCidrList(allowedPrivateNetworks.name, allowedPrivateNetworks.value);
+		summalyOptions.allowedPrivateNetworks = parseCidrList(allowedPrivateNetworks.name, allowedPrivateNetworks.value);
 	}
 
 	const proxy = loadProxyOptions(env);
 
 	if (proxy != null) {
-		summarizeOptions.proxy = proxy;
+		summalyOptions.proxy = proxy;
 	}
 
 	const cacheTtl = readSetting(env, 'CACHE_TTL');
 
 	if (cacheTtl != null) {
-		summarizeOptions.cacheTtl = parseNonNegativeInteger(cacheTtl.name, cacheTtl.value);
+		summalyOptions.cacheTtl = parseNonNegativeInteger(cacheTtl.name, cacheTtl.value);
 	}
 
 	const errorCacheTtl = readSetting(env, 'ERROR_CACHE_TTL');
 
 	if (errorCacheTtl != null) {
-		summarizeOptions.errorCacheTtl = parseNonNegativeInteger(errorCacheTtl.name, errorCacheTtl.value);
+		summalyOptions.errorCacheTtl = parseNonNegativeInteger(errorCacheTtl.name, errorCacheTtl.value);
 	}
 
-	return { host, port, summarizeOptions };
+	return { host, port, summalyOptions };
 }

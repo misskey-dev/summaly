@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 import type http from 'node:http';
 import { type ScrapeContext, fetchWithContext } from '@/context.js';
 import { parseHead } from '@/html/head.js';
@@ -48,7 +47,7 @@ export async function fetchPage(ctx: ScrapeContext, url: URL): Promise<Page> {
 }
 
 /**
- * Builds a summary from a fetched page (upstream parseGeneral()).
+ * Builds a summary from a fetched page.
  * `url` is the page URL used for the site name and for resolving relative links.
  */
 export async function summarizePage(ctx: ScrapeContext, url: URL, page: Pick<Page, 'html' | 'headers'>): Promise<Summary | null> {
@@ -81,6 +80,6 @@ export async function summarizePage(ctx: ScrapeContext, url: URL, page: Pick<Pag
 export async function scrapeGeneral(ctx: ScrapeContext, url: URL): Promise<Summary | null> {
 	const page = await fetchPage(ctx, url);
 
-	// Like upstream general(), the requested URL (not the post-redirect one) is the base.
+	// The requested URL (not the post-redirect one) is the base.
 	return await summarizePage(ctx, url, page);
 }

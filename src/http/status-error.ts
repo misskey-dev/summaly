@@ -1,4 +1,3 @@
-// Derived from misskey-dev/summaly (MIT)
 export class StatusError extends Error {
 	public name: string;
 	public statusCode: number;

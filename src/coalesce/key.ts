@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { privateIpAllowedByEnv } from '@/http/address-guard.js';
-import type { SummarizeOptions } from '@/types.js';
+import type { SummalyOptions } from '@/types.js';
 
 const ids = new WeakMap<object, number>();
 let nextId = 1;
@@ -72,7 +72,7 @@ function canonical(value: unknown): string {
  * Options that change how any request of a summary is sent or what it may reach, so they change every result
  * built from requests (the summary and each favicon check). Both keys take them from here, so they are listed once.
  */
-function requestParts(opts: SummarizeOptions, allowPrivateIp: boolean): Record<string, unknown> {
+function requestParts(opts: SummalyOptions, allowPrivateIp: boolean): Record<string, unknown> {
 	return {
 		userAgent: opts.userAgent,
 		responseTimeout: opts.responseTimeout,
@@ -108,7 +108,7 @@ function digest(parts: Record<string, unknown>): string {
  * `allowPrivateIp` is whether the environment allows private IPs (see privateIpAllowedByEnv); a call passes the value
  * its transport was built with.
  */
-export function buildRequestKey(url: string, opts: SummarizeOptions, allowPrivateIp = privateIpAllowedByEnv()): string {
+export function buildRequestKey(url: string, opts: SummalyOptions, allowPrivateIp = privateIpAllowedByEnv()): string {
 	return digest({
 		...requestParts(opts, allowPrivateIp),
 		purpose: 'summary',
@@ -127,6 +127,6 @@ export function buildRequestKey(url: string, opts: SummarizeOptions, allowPrivat
  * never checks a favicon, and which provider summarizes the page does not change a check's result.
  * `purpose` keeps it apart from every summary key. `allowPrivateIp` is as in buildRequestKey.
  */
-export function buildIconKey(url: string, opts: SummarizeOptions, allowPrivateIp = privateIpAllowedByEnv()): string {
+export function buildIconKey(url: string, opts: SummalyOptions, allowPrivateIp = privateIpAllowedByEnv()): string {
 	return digest({ ...requestParts(opts, allowPrivateIp), purpose: 'icon', url });
 }

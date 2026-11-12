@@ -4,13 +4,13 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { buildIconKey, buildRequestKey } from '@/coalesce/key.js';
 import {
-	createSummarizer,
-	defaultSummarizeOptions,
+	createSummaly,
+	summalyDefaultOptions,
 	type InflightCoordinator,
 	InProcessCoordinator,
 	MemorySummaryCache,
 	type SummaryCache,
-	type SummaryResult,
+	type SummalyResult,
 } from '@/index.js';
 import { JsonCache } from './helpers/json-cache.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
@@ -19,7 +19,7 @@ const allowedPrivateNetworks = ['127.0.0.0/8', '::1/128'];
 
 const servers: TestServer[] = [];
 const cleanups: (() => void)[] = [];
-const ALLOW_PRIVATE_IP_VARS = ['CHIRAMISS_ALLOW_PRIVATE_IP', 'SUMMALY_ALLOW_PRIVATE_IP'] as const;
+const ALLOW_PRIVATE_IP_VARS = ['SUMMALY_ALLOW_PRIVATE_IP'] as const;
 const originalAllowPrivateIp = ALLOW_PRIVATE_IP_VARS.map(name => [name, process.env[name]] as const);
 
 beforeEach(() => {
@@ -96,7 +96,7 @@ function newAgent(): http.Agent {
 	return agent;
 }
 
-const result: SummaryResult = {
+const result: SummalyResult = {
 	title: 'cached',
 	icon: null,
 	description: null,
@@ -112,10 +112,10 @@ const result: SummaryResult = {
 describe('favicon の確認結果のキャッシュ', () => {
 	test('同じサイトの別ページを順に要約すると、favicon への HEAD は1回で、icon も同じ', async () => {
 		const s = await site();
-		const summarize = createSummarizer({ allowedPrivateNetworks });
+		const summaly = createSummaly({ allowedPrivateNetworks });
 
-		const first = await summarize(`${s.url}a`);
-		const second = await summarize(`${s.url}b`);
+		const first = await summaly(`${s.url}a`);
+		const second = await summaly(`${s.url}b`);
 
 		expect(first.icon).toBe(s.favicon);
 		expect(second.icon).toBe(s.favicon);
@@ -124,65 +124,65 @@ describe('favicon の確認結果のキャッシュ', () => {
 
 	test('成功した確認は cacheTtl の間だけ使い、過ぎたら確認し直す', async () => {
 		const s = await site();
-		const summarize = createSummarizer({ allowedPrivateNetworks, cacheTtl: 100 });
+		const summaly = createSummaly({ allowedPrivateNetworks, cacheTtl: 100 });
 
-		await summarize(`${s.url}a`);
-		await summarize(`${s.url}b`);
+		await summaly(`${s.url}a`);
+		await summaly(`${s.url}b`);
 		expect(s.faviconHeads()).toBe(1);
 
 		await sleep(150);
-		expect((await summarize(`${s.url}c`)).icon).toBe(s.favicon);
+		expect((await summaly(`${s.url}c`)).icon).toBe(s.favicon);
 		expect(s.faviconHeads()).toBe(2);
 	});
 
 	test('HEAD が 404 の icon は null で、errorCacheTtl の間は確認し直さず、過ぎたら確認し直す', async () => {
 		const s = await site({ faviconStatus: 404 });
-		const summarize = createSummarizer({ allowedPrivateNetworks, errorCacheTtl: 100 });
+		const summaly = createSummaly({ allowedPrivateNetworks, errorCacheTtl: 100 });
 
-		expect((await summarize(`${s.url}a`)).icon).toBeNull();
-		expect((await summarize(`${s.url}b`)).icon).toBeNull();
+		expect((await summaly(`${s.url}a`)).icon).toBeNull();
+		expect((await summaly(`${s.url}b`)).icon).toBeNull();
 		expect(s.faviconHeads()).toBe(1);
 
 		await sleep(150);
-		expect((await summarize(`${s.url}c`)).icon).toBeNull();
+		expect((await summaly(`${s.url}c`)).icon).toBeNull();
 		expect(s.faviconHeads()).toBe(2);
 	});
 
 	test('cache: false なら毎回確認する', async () => {
 		const s = await site();
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache: false });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache: false });
 
-		await summarize(`${s.url}a`);
-		await summarize(`${s.url}b`);
+		await summaly(`${s.url}a`);
+		await summaly(`${s.url}b`);
 
 		expect(s.faviconHeads()).toBe(2);
 	});
 
 	test('cacheTtl: 0 なら成功した確認を保存しない', async () => {
 		const s = await site();
-		const summarize = createSummarizer({ allowedPrivateNetworks, cacheTtl: 0 });
+		const summaly = createSummaly({ allowedPrivateNetworks, cacheTtl: 0 });
 
-		expect((await summarize(`${s.url}a`)).icon).toBe(s.favicon);
-		expect((await summarize(`${s.url}b`)).icon).toBe(s.favicon);
+		expect((await summaly(`${s.url}a`)).icon).toBe(s.favicon);
+		expect((await summaly(`${s.url}b`)).icon).toBe(s.favicon);
 
 		expect(s.faviconHeads()).toBe(2);
 	});
 
 	test('errorCacheTtl: 0 なら失敗した確認を保存しない', async () => {
 		const s = await site({ faviconStatus: 404 });
-		const summarize = createSummarizer({ allowedPrivateNetworks, errorCacheTtl: 0 });
+		const summaly = createSummaly({ allowedPrivateNetworks, errorCacheTtl: 0 });
 
-		await summarize(`${s.url}a`);
-		await summarize(`${s.url}b`);
+		await summaly(`${s.url}a`);
+		await summaly(`${s.url}b`);
 
 		expect(s.faviconHeads()).toBe(2);
 	});
 
 	test('同時の要約（別ページ、同じ favicon）は coordinator があれば HEAD を1本にする', async () => {
 		const s = await site({ faviconDelayMs: 200 });
-		const summarize = createSummarizer({ allowedPrivateNetworks });
+		const summaly = createSummaly({ allowedPrivateNetworks });
 
-		const results = await Promise.all([summarize(`${s.url}a`), summarize(`${s.url}b`)]);
+		const results = await Promise.all([summaly(`${s.url}a`), summaly(`${s.url}b`)]);
 
 		expect(s.faviconHeads()).toBe(1);
 		expect(results.map(r => r.icon)).toEqual([s.favicon, s.favicon]);
@@ -190,9 +190,9 @@ describe('favicon の確認結果のキャッシュ', () => {
 
 	test('同時の要約（別ページ、同じ favicon）は coordinator: false なら HEAD を2本送る', async () => {
 		const s = await site({ faviconDelayMs: 200 });
-		const summarize = createSummarizer({ allowedPrivateNetworks, coordinator: false });
+		const summaly = createSummaly({ allowedPrivateNetworks, coordinator: false });
 
-		const results = await Promise.all([summarize(`${s.url}a`), summarize(`${s.url}b`)]);
+		const results = await Promise.all([summaly(`${s.url}a`), summaly(`${s.url}b`)]);
 
 		expect(s.faviconHeads()).toBe(2);
 		expect(results.map(r => r.icon)).toEqual([s.favicon, s.favicon]);
@@ -201,33 +201,33 @@ describe('favicon の確認結果のキャッシュ', () => {
 	test('JSON だけを保持するキャッシュでも働く', async () => {
 		const s = await site();
 		const cache = new JsonCache();
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache });
 
-		await summarize(`${s.url}a`);
-		expect((await summarize(`${s.url}b`)).icon).toBe(s.favicon);
+		await summaly(`${s.url}a`);
+		expect((await summaly(`${s.url}b`)).icon).toBe(s.favicon);
 
 		expect(s.faviconHeads()).toBe(1);
-		const iconKey = buildIconKey(s.favicon, { ...defaultSummarizeOptions, allowedPrivateNetworks });
+		const iconKey = buildIconKey(s.favicon, { ...summalyDefaultOptions, allowedPrivateNetworks });
 
 		expect(JSON.parse(cache.stored.get(iconKey) ?? 'null')).toEqual({ kind: 'icon', href: s.favicon });
 	});
 
 	test('userAgent が違えば共有しない', async () => {
 		const s = await site();
-		const summarize = createSummarizer({ allowedPrivateNetworks });
+		const summaly = createSummaly({ allowedPrivateNetworks });
 
-		await summarize(`${s.url}a`, { userAgent: 'BotA/1.0' });
-		await summarize(`${s.url}b`, { userAgent: 'BotB/1.0' });
+		await summaly(`${s.url}a`, { userAgent: 'BotA/1.0' });
+		await summaly(`${s.url}b`, { userAgent: 'BotB/1.0' });
 
 		expect(s.faviconHeads()).toBe(2);
 	});
 
 	test('agent が違えば共有しない', async () => {
 		const s = await site();
-		const summarize = createSummarizer();
+		const summaly = createSummaly();
 
-		await summarize(`${s.url}a`, { agent: { http: newAgent() } });
-		await summarize(`${s.url}b`, { agent: { http: newAgent() } });
+		await summaly(`${s.url}a`, { agent: { http: newAgent() } });
+		await summaly(`${s.url}b`, { agent: { http: newAgent() } });
 
 		expect(s.faviconHeads()).toBe(2);
 	});
@@ -235,10 +235,10 @@ describe('favicon の確認結果のキャッシュ', () => {
 	test('allowedPrivateNetworks が違えば共有せず、許可した設定で得た icon を許可していない呼び出しに返さない', async () => {
 		const icons = await site({ host: '127.0.0.2' });
 		const pages = await site({ faviconHref: icons.favicon });
-		const summarize = createSummarizer();
+		const summaly = createSummaly();
 
-		const allowed = await summarize(`${pages.url}a`, { allowedPrivateNetworks: ['127.0.0.1/32', '127.0.0.2/32'] });
-		const denied = await summarize(`${pages.url}b`, { allowedPrivateNetworks: ['127.0.0.1/32'] });
+		const allowed = await summaly(`${pages.url}a`, { allowedPrivateNetworks: ['127.0.0.1/32', '127.0.0.2/32'] });
+		const denied = await summaly(`${pages.url}b`, { allowedPrivateNetworks: ['127.0.0.1/32'] });
 
 		expect(allowed.icon).toBe(icons.favicon);
 		expect(denied.icon).toBeNull();
@@ -249,13 +249,13 @@ describe('favicon の確認結果のキャッシュ', () => {
 	test('プライベート IP 許可の環境変数が違えば共有せず、許可した設定で得た icon を許可していない呼び出しに返さない', async () => {
 		const icons = await site({ host: '127.0.0.2' });
 		const pages = await site({ faviconHref: icons.favicon });
-		const summarize = createSummarizer({ allowedPrivateNetworks: ['127.0.0.1/32'] });
+		const summaly = createSummaly({ allowedPrivateNetworks: ['127.0.0.1/32'] });
 
-		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'true';
-		const allowed = await summarize(`${pages.url}a`);
+		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
+		const allowed = await summaly(`${pages.url}a`);
 
-		delete process.env.CHIRAMISS_ALLOW_PRIVATE_IP;
-		const denied = await summarize(`${pages.url}b`);
+		delete process.env.SUMMALY_ALLOW_PRIVATE_IP;
+		const denied = await summaly(`${pages.url}b`);
 
 		expect(allowed.icon).toBe(icons.favicon);
 		expect(denied.icon).toBeNull();
@@ -265,12 +265,12 @@ describe('favicon の確認結果のキャッシュ', () => {
 	test('要約の途中でプライベート IP 許可の環境変数が変わっても、許可した設定で得た icon を許可していない呼び出しに返さない', async () => {
 		const icons = await site({ host: '127.0.0.2' });
 		// The variable is removed while the first call is fetching its page, after its transport was built.
-		const pages = await site({ faviconHref: icons.favicon, onPageGet: () => delete process.env.CHIRAMISS_ALLOW_PRIVATE_IP });
-		const summarize = createSummarizer({ allowedPrivateNetworks: ['127.0.0.1/32'] });
+		const pages = await site({ faviconHref: icons.favicon, onPageGet: () => delete process.env.SUMMALY_ALLOW_PRIVATE_IP });
+		const summaly = createSummaly({ allowedPrivateNetworks: ['127.0.0.1/32'] });
 
-		process.env.CHIRAMISS_ALLOW_PRIVATE_IP = 'true';
-		const allowed = await summarize(`${pages.url}a`);
-		const denied = await summarize(`${pages.url}b`);
+		process.env.SUMMALY_ALLOW_PRIVATE_IP = 'true';
+		const allowed = await summaly(`${pages.url}a`);
+		const denied = await summaly(`${pages.url}b`);
 
 		expect(allowed.icon).toBe(icons.favicon);
 		expect(denied.icon).toBeNull();
@@ -288,10 +288,10 @@ describe('favicon の確認結果のキャッシュ', () => {
 				}
 			},
 		});
-		const summarize = createSummarizer({ allowedPrivateNetworks: networks });
+		const summaly = createSummaly({ allowedPrivateNetworks: networks });
 
-		const allowed = await summarize(`${pages.url}a`);
-		const denied = await summarize(`${pages.url}b`);
+		const allowed = await summaly(`${pages.url}a`);
+		const denied = await summaly(`${pages.url}b`);
 
 		expect(allowed.icon).toBe(icons.favicon);
 		expect(denied.icon).toBeNull();
@@ -307,10 +307,10 @@ describe('favicon の確認結果のキャッシュ', () => {
 		const agent: { http?: http.Agent; https?: https.Agent } = { http: httpAgent, https: httpsAgent };
 		// The caller drops its http agent while the first call is fetching its page, after its transport was built.
 		const pages = await site({ faviconHref: icons.favicon, onPageGet: () => delete agent.http });
-		const summarize = createSummarizer({ allowedPrivateNetworks: ['127.0.0.1/32'] });
+		const summaly = createSummaly({ allowedPrivateNetworks: ['127.0.0.1/32'] });
 
-		const allowed = await summarize(`${pages.url}a`, { agent });
-		const denied = await summarize(`${pages.url}b`, { agent: { https: httpsAgent } });
+		const allowed = await summaly(`${pages.url}a`, { agent });
+		const denied = await summaly(`${pages.url}b`, { agent: { https: httpsAgent } });
 
 		expect(allowed.icon).toBe(icons.favicon);
 		expect(denied.icon).toBeNull();
@@ -335,10 +335,10 @@ describe('favicon の確認結果のキャッシュ', () => {
 				}
 			},
 		};
-		const opts = { ...defaultSummarizeOptions, allowedPrivateNetworks };
-		const summarize = createSummarizer({ allowedPrivateNetworks, coordinator });
+		const opts = { ...summalyDefaultOptions, allowedPrivateNetworks };
+		const summaly = createSummaly({ allowedPrivateNetworks, coordinator });
 
-		await summarize(`${s.url}a`);
+		await summaly(`${s.url}a`);
 
 		expect(nested).toEqual([[buildRequestKey(`${s.url}a`, opts), buildIconKey(s.favicon, opts)]]);
 	});
@@ -346,16 +346,16 @@ describe('favicon の確認結果のキャッシュ', () => {
 	test('要約のキーに icon のエントリ、icon のキーに要約のエントリがあっても、取り直して正しい結果を返す', async () => {
 		const s = await site();
 		const cache = new MemorySummaryCache();
-		const opts = { ...defaultSummarizeOptions, allowedPrivateNetworks };
+		const opts = { ...summalyDefaultOptions, allowedPrivateNetworks };
 		const pageUrl = `${s.url}a`;
 		const summaryKey = buildRequestKey(pageUrl, opts);
 		const iconKey = buildIconKey(s.favicon, opts);
 
 		await cache.set(summaryKey, { kind: 'icon', href: 'https://wrong.example/icon.png' }, 60_000);
 		await cache.set(iconKey, { kind: 'ok', value: { ...result, icon: 'https://wrong.example/icon.png' } }, 60_000);
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache });
 
-		const summary = await summarize(pageUrl);
+		const summary = await summaly(pageUrl);
 
 		expect(summary.title).toBe('Page');
 		expect(summary.icon).toBe(s.favicon);
@@ -368,7 +368,7 @@ describe('favicon の確認結果のキャッシュ', () => {
 	test('icon のキーでキャッシュが失敗しても要約は失敗せず、キャッシュなしで確認した icon を返す', async () => {
 		const s = await site();
 		const inner = new MemorySummaryCache();
-		const iconKey = buildIconKey(s.favicon, { ...defaultSummarizeOptions, allowedPrivateNetworks });
+		const iconKey = buildIconKey(s.favicon, { ...summalyDefaultOptions, allowedPrivateNetworks });
 		const cache: SummaryCache = {
 			get: async key => {
 				if (key === iconKey) {
@@ -379,9 +379,9 @@ describe('favicon の確認結果のキャッシュ', () => {
 			},
 			set: (key, entry, ttlMs) => inner.set(key, entry, ttlMs),
 		};
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache });
 
-		const summary = await summarize(`${s.url}a`);
+		const summary = await summaly(`${s.url}a`);
 
 		expect(summary.title).toBe('Page');
 		expect(summary.icon).toBe(s.favicon);
@@ -390,9 +390,9 @@ describe('favicon の確認結果のキャッシュ', () => {
 
 	test('icon のエントリの保存に失敗しても、その favicon に HEAD を送り直さない', async () => {
 		const s = await site();
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache: failingIconSet(new MemorySummaryCache()) });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache: failingIconSet(new MemorySummaryCache()) });
 
-		const summary = await summarize(`${s.url}a`);
+		const summary = await summaly(`${s.url}a`);
 
 		expect(summary.icon).toBe(s.favicon);
 		expect(s.faviconHeads()).toBe(1);
@@ -400,9 +400,9 @@ describe('favicon の確認結果のキャッシュ', () => {
 
 	test('icon のエントリの保存に失敗しても、同時に待っていた要約は HEAD を送らずに結果を受け取る', async () => {
 		const s = await site({ faviconDelayMs: 200 });
-		const summarize = createSummarizer({ allowedPrivateNetworks, cache: failingIconSet(new MemorySummaryCache()) });
+		const summaly = createSummaly({ allowedPrivateNetworks, cache: failingIconSet(new MemorySummaryCache()) });
 
-		const results = await Promise.all([summarize(`${s.url}a`), summarize(`${s.url}b`), summarize(`${s.url}c`)]);
+		const results = await Promise.all([summaly(`${s.url}a`), summaly(`${s.url}b`), summaly(`${s.url}c`)]);
 
 		expect(results.map(r => r.icon)).toEqual([s.favicon, s.favicon, s.favicon]);
 		expect(s.faviconHeads()).toBe(1);
@@ -422,9 +422,9 @@ describe('favicon の確認結果のキャッシュ', () => {
 				return value;
 			},
 		};
-		const summarize = createSummarizer({ allowedPrivateNetworks, coordinator });
+		const summaly = createSummaly({ allowedPrivateNetworks, coordinator });
 
-		const summary = await summarize(`${s.url}a`);
+		const summary = await summaly(`${s.url}a`);
 
 		expect(summary.icon).toBe(s.favicon);
 		expect(s.faviconHeads()).toBe(1);
