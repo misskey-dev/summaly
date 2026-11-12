@@ -1,185 +1,173 @@
+// Derived from misskey-dev/summaly (MIT)
+import { InProcessCoordinator } from '@/coalesce/in-process-coordinator.js';
+import { buildRequestKey } from '@/coalesce/key.js';
+import { MemorySummaryCache } from '@/coalesce/memory-cache.js';
+import { type CoalesceDeps, runCoalesced } from '@/coalesce/run.js';
+import { type ScrapeContext, createScrapeContext, fetchWithContext, fixOptions } from '@/context.js';
+import { scrapeGeneral } from '@/extract/general.js';
+import { privateIpAllowedByEnv } from '@/http/address-guard.js';
+import { GuardedAgentPool } from '@/http/agent-pool.js';
+import { builtinProviders } from '@/providers/index.js';
+import { fromPlugin } from '@/providers/provider.js';
+import type { SummarizeOptions, SummaryResult } from '@/types.js';
+import { VERSION } from '@/version.js';
+
+export const version: string = VERSION;
+
+export { InProcessCoordinator } from '@/coalesce/in-process-coordinator.js';
+export { MemorySummaryCache } from '@/coalesce/memory-cache.js';
+export type { MemorySummaryCacheOptions } from '@/coalesce/memory-cache.js';
+export { StatusError } from '@/http/status-error.js';
+export { default } from '@/fastify-plugin.js';
+export type { FastifyLike } from '@/fastify-plugin.js';
+
+export type {
+	GeneralScrapingOptions,
+	Player,
+	ProxyOptions,
+	Summary,
+	SummarizeOptions,
+	SummaryPlugin,
+	SummaryResult,
+	SummalyOptions,
+	SummalyPlugin,
+	SummalyResult,
+} from '@/types.js';
+export type {
+	CacheEntry,
+	InflightCoordinator,
+	SerializedError,
+	SummaryCache,
+} from '@/coalesce/types.js';
+
 /**
- * summaly
- * https://github.com/misskey-dev/summaly
+ * Defaults merged under the options of every call.
  */
-
-import got from 'got';
-import type { Agents as GotAgents } from 'got';
-import type { FastifyInstance } from 'fastify';
-import { SummalyResult as _SummalyResult } from '@/summary.js';
-import { SummalyPlugin as _SummalyPlugin } from '@/iplugin.js';
-import { general, type GeneralScrapingOptions } from '@/general.js';
-import { DEFAULT_BOT_UA, DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, agent, setAgent } from '@/utils/got.js';
-import { plugins as builtinPlugins } from '@/plugins/index.js';
-
-export type SummalyResult = _SummalyResult;
-
-export type SummalyPlugin = _SummalyPlugin;
-
-export type SummalyOptions = {
-	/**
-	 * Accept-Language for the request
-	 */
-	lang?: string | null;
-
-	/**
-	 * Whether follow redirects
-	 */
-	followRedirects?: boolean;
-
-	/**
-	 * Custom Plugins
-	 */
-	plugins?: SummalyPlugin[];
-
-	/**
-	 * Custom HTTP agent
-	 */
-	agent?: GotAgents;
-
-	/**
-	 * User-Agent for the request
-	 */
-	userAgent?: string;
-
-	/**
-	 * Response timeout.
-	 * Set timeouts for each phase, such as host name resolution and socket communication.
-	 */
-	responseTimeout?: number;
-
-	/**
-	 * Operation timeout.
-	 * Set the timeout from the start to the end of the request.
-	 */
-	operationTimeout?: number;
-
-	/**
-	 * Maximum content length.
-	 * If set to true, an error will occur if the content-length value returned from the other server is larger than this parameter (or if the received body size exceeds this parameter).
-	 */
-	contentLengthLimit?: number;
-
-	/**
-	 * Content length required.
-	 * If set to true, it will be an error if the other server does not return content-length.
-	 */
-	contentLengthRequired?: boolean;
-};
-
-export const summalyDefaultOptions = {
+export const defaultSummarizeOptions: SummarizeOptions = {
 	lang: null,
 	followRedirects: true,
 	plugins: [],
-} as SummalyOptions;
+};
 
-export const version = _VERSION_ as string;
+/**
+ * Alias of `defaultSummarizeOptions`, kept for summaly compatibility.
+ */
+export const summalyDefaultOptions: SummarizeOptions = defaultSummarizeOptions;
+
+const DEFAULT_CACHE_TTL = 5 * 60 * 1000;
+const DEFAULT_ERROR_CACHE_TTL = 30 * 1000;
+
+/**
+ * Creates a summarize function with its own result cache, in-flight sharing and connection pool.
+ * Options given per call are merged over `base`. `cache: false` / `coordinator: false` (in either) turns that part off.
+ * Its calls with the same `allowedPrivateNetworks` reuse each other's idle connections for a short time
+ * (see GuardedAgentPool); separate summarizers never share connections.
+ */
+export function createSummarizer(base: SummarizeOptions = {}): (url: string, options?: SummarizeOptions) => Promise<SummaryResult> {
+	const memoryCache = new MemorySummaryCache();
+	const inProcessCoordinator = new InProcessCoordinator();
+	const agentPool = new GuardedAgentPool();
+
+	return (url, options = {}) => {
+		// Fixed when the call starts: the summary key, the transport and the favicon check keys are all built from
+		// these, whatever the caller or the environment changes while the call runs.
+		const opts = fixOptions({
+			...defaultSummarizeOptions,
+			...base,
+			...options,
+		});
+		const allowPrivateIp = privateIpAllowedByEnv();
+		const cache = options.cache ?? base.cache ?? memoryCache;
+		const coordinator = options.coordinator ?? base.coordinator ?? inProcessCoordinator;
+		const deps: CoalesceDeps = {
+			cache: cache === false ? null : cache,
+			coordinator: coordinator === false ? null : coordinator,
+			cacheTtl: options.cacheTtl ?? base.cacheTtl ?? DEFAULT_CACHE_TTL,
+			errorCacheTtl: options.errorCacheTtl ?? base.errorCacheTtl ?? DEFAULT_ERROR_CACHE_TTL,
+		};
+
+		return runCoalesced(
+			deps,
+			() => buildRequestKey(url, opts, allowPrivateIp),
+			() => summarizeUncached(url, opts, deps, allowPrivateIp, agentPool),
+		);
+	};
+}
+
+/**
+ * Alias of `createSummarizer`, kept for summaly compatibility.
+ */
+export const createSummaly: (base?: SummarizeOptions) => (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = createSummarizer;
 
 /**
  * Summarize an web page
  */
-export const summaly = async (url: string, options?: SummalyOptions): Promise<SummalyResult> => {
-	if (options?.agent) setAgent(options.agent);
+export const summarize: (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = createSummarizer();
 
-	const opts: SummalyOptions = {
-		...summalyDefaultOptions,
-		...options,
-	};
+/**
+ * Alias of `summarize`, kept for summaly compatibility.
+ */
+export const summaly: (url: string, options?: SummarizeOptions) => Promise<SummaryResult> = summarize;
 
-	const plugins = builtinPlugins.concat(opts.plugins || []);
+/**
+ * The whole summary without caching or sharing it: final URL, provider match, scraping.
+ * `deps` is handed on for the favicon checks, whose results are cached and shared across summaries.
+ * `allowPrivateIp` is the value the summary key was built with, so the transport uses it too.
+ * `agentPool` is the summarizer's connection pool.
+ */
+async function summarizeUncached(
+	url: string,
+	opts: SummarizeOptions,
+	deps: CoalesceDeps,
+	allowPrivateIp: boolean,
+	agentPool: GuardedAgentPool,
+): Promise<SummaryResult> {
+	const ctx = createScrapeContext(opts, deps, allowPrivateIp, agentPool);
 
-	let actualUrl = url;
-	if (opts.followRedirects) {
-		// .catch(() => url)にすればいいけど、jestにtrace-redirectを食わせるのが面倒なのでtry-catch
-		try {
-			const timeout = opts.responseTimeout ?? DEFAULT_RESPONSE_TIMEOUT;
-			const operationTimeout = opts.operationTimeout ?? DEFAULT_OPERATION_TIMEOUT;
-			actualUrl = await got
-				.head(url, {
-					headers: {
-						accept: 'text/html,application/xhtml+xml',
-						'user-agent': opts.userAgent ?? DEFAULT_BOT_UA,
-						'accept-language': opts.lang ?? undefined,
-					},
-					timeout: {
-						lookup: timeout,
-						connect: timeout,
-						secureConnect: timeout,
-						socket: timeout, // read timeout
-						response: timeout,
-						send: timeout,
-						request: operationTimeout, // whole operation timeout
-					},
-					agent,
-					http2: false,
-					retry: {
-						limit: 0,
-					},
-				})
-				.then(res => res.url);
-		} catch {
-			actualUrl = url;
+	// The requests of this call share the transport's connections. Guarded connections that completed their responses
+	// stay idle in the summarizer's pool for later calls; proxy connections end with the call (see Transport#close).
+	try {
+		const actualUrl = opts.followRedirects ? await resolveFinalUrl(ctx, url) : url;
+		const target = new URL(actualUrl);
+
+		const providers = [...builtinProviders, ...(opts.plugins ?? []).map(fromPlugin)];
+		const match = providers.find(provider => provider.test(target));
+
+		const summary = match ? await match.summarize(ctx, target) : await scrapeGeneral(ctx, target);
+
+		if (summary == null) {
+			throw new Error('failed summarize');
 		}
+
+		return Object.assign(summary, {
+			url: actualUrl,
+		});
+	} finally {
+		ctx.transport.close();
 	}
+}
 
-	const _url = new URL(actualUrl);
+/**
+ * Follows redirects with HEAD to find the page's final URL. Falls back to `url` on any failure, as upstream does.
+ * Goes through the context's transport, so every hop is checked against the private IP guard.
+ */
+async function resolveFinalUrl(ctx: ScrapeContext, url: string): Promise<string> {
+	try {
+		const res = await fetchWithContext(ctx, {
+			url,
+			method: 'HEAD',
+			headers: {
+				'accept': 'text/html,application/xhtml+xml',
+				'accept-language': ctx.options.lang ?? undefined,
+			},
+			followRedirects: true,
+			// Like upstream's plain got.head(): no size or content-length checks (a HEAD has no body).
+			contentLengthLimit: Number.POSITIVE_INFINITY,
+			contentLengthRequired: false,
+		});
 
-	// Find matching plugin
-	const match = plugins.filter(plugin => plugin.test(_url))[0];
-
-	// Get summary
-	const scrapingOptions: GeneralScrapingOptions = {
-		lang: opts.lang,
-		userAgent: opts.userAgent,
-		responseTimeout: opts.responseTimeout,
-		followRedirects: opts.followRedirects,
-		operationTimeout: opts.operationTimeout,
-		contentLengthLimit: opts.contentLengthLimit,
-		contentLengthRequired: opts.contentLengthRequired,
-	};
-
-	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-	const summary = await (match ? match.summarize : general)(_url, scrapingOptions);
-
-	if (summary == null) {
-		throw new Error('failed summarize');
+		return res.url;
+	} catch {
+		return url;
 	}
-
-	return Object.assign(summary, {
-		url: actualUrl,
-	});
-};
-
-// eslint-disable-next-line import/no-default-export
-export default function (fastify: FastifyInstance, options: SummalyOptions, done: (err?: Error) => void) {
-	fastify.get<{
-		Querystring: {
-			url?: string;
-			lang?: string;
-		};
-	}>('/', async (req, reply) => {
-		const url = req.query.url as string;
-		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-		if (url == null) {
-			return reply.status(400).send({
-				error: 'url is required',
-			});
-		}
-
-		try {
-			const summary = await summaly(url, {
-				lang: req.query.lang as string,
-				followRedirects: false,
-				...options,
-			});
-
-			return summary;
-		} catch (e) {
-			return reply.status(500).send({
-				error: e,
-			});
-		}
-	});
-
-	done();
 }
