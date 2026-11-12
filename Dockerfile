@@ -20,15 +20,15 @@ COPY src ./src
 RUN pnpm build
 
 # ---- runtime ----
-# built-server/server.mjs bundles every dependency (fastify included), so no node_modules is needed.
-# THIRD-PARTY-LICENSES.txt holds the licenses of the bundled packages.
+# built-server/ bundles every dependency (fastify included), so no node_modules is needed:
+# server.mjs, the chunks it loads on demand (cheerio, for Amazon pages) and THIRD-PARTY-LICENSES.txt with their licenses.
 FROM node:${NODE_VERSION}-slim AS runtime
 ENV NODE_ENV=production
 # Listen on all interfaces so that the server is reachable through a published port
 ENV SUMMALY_HOST=0.0.0.0
 ENV SUMMALY_PORT=3000
 WORKDIR /app
-COPY --from=build /app/built-server/server.mjs /app/built-server/THIRD-PARTY-LICENSES.txt ./
+COPY --from=build /app/built-server/ ./
 COPY LICENSE ./
 USER node
 EXPOSE 3000

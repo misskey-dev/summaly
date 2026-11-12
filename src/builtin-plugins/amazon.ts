@@ -31,7 +31,7 @@ export const amazon = defineBuiltinPlugin({
 		// Redirects are always followed and content-length is never required, whatever the caller set.
 		// The rest of the context (transport, User-Agent, lang, timeouts, size limit) still applies.
 		const page = await fetchPage(url, { followRedirects: true, contentLengthRequired: false });
-		const $ = loadDom(page.html);
+		const $ = await loadDom(page.html);
 
 		const title = $('#title').text();
 

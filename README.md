@@ -347,7 +347,7 @@ pnpm build
 pnpm serve
 ```
 
-`pnpm serve` runs `node built-server/server.mjs`, a single file that bundles every dependency (their licenses are in `built-server/THIRD-PARTY-LICENSES.txt`). `docker build -t summaly .` builds the image.
+`pnpm serve` runs `node built-server/server.mjs`. `built-server/` bundles every dependency, so it runs without `node_modules` (their licenses are in `built-server/THIRD-PARTY-LICENSES.txt`). `docker build -t summaly .` builds the image.
 
 The server logs to standard output (Fastify's JSON logs) and, on SIGTERM / SIGINT, answers the requests in progress before exiting.
 

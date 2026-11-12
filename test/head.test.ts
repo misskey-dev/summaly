@@ -152,7 +152,42 @@ describe('parseHead', () => {
 });
 
 describe('loadDom', () => {
-	test('cheerio の API を返す', () => {
-		expect(loadDom('<p id="a">x</p>')('#a').text()).toBe('x');
+	test('cheerio の API を返す', async () => {
+		expect((await loadDom('<p id="a">x</p>'))('#a').text()).toBe('x');
+	});
+
+	test('cheerio は Amazon 以外のページの要約では読み込まず、loadDom の最初の呼び出しで読み込む', async () => {
+		let loads = 0;
+
+		vi.resetModules();
+		vi.doMock('cheerio', async importOriginal => {
+			loads++;
+
+			return await importOriginal();
+		});
+		try {
+			const { createSummaly } = await import('@/index.js');
+			const { startTestServer } = await import('./helpers/test-server.js');
+			const page = '<html><head><title>T</title></head></html>';
+			const server = await startTestServer((_req, res) => {
+				res.writeHead(200, { 'content-type': 'text/html', 'content-length': Buffer.byteLength(page) });
+				res.end(page);
+			});
+
+			try {
+				expect((await createSummaly({ allowedPrivateNetworks: ['127.0.0.0/8'] })(server.url)).title).toBe('T');
+			} finally {
+				await server.close();
+			}
+			expect(loads).toBe(0);
+
+			const dom = await import('@/html/dom.js');
+
+			await dom.loadDom('<p></p>');
+			expect(loads).toBe(1);
+		} finally {
+			vi.doUnmock('cheerio');
+			vi.resetModules();
+		}
 	});
 });
