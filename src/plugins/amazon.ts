@@ -1,6 +1,5 @@
-import { fetchPage } from '@/extract/general.js';
 import { loadDom } from '@/html/dom.js';
-import type { Provider } from './provider.js';
+import { defineBuiltinPlugin } from '@/plugin/define.js';
 
 // Empty strings (absent elements, empty attributes) must fall through to the next source.
 /* oxlint-disable typescript/prefer-nullish-coalescing */
@@ -23,15 +22,15 @@ const HOSTNAMES = new Set([
 ]);
 
 /** Reads the product body (`#title`, `#landingImage`, `#productDescription`), so it needs the full DOM. */
-export const amazon: Provider = {
-	name: 'amazon',
+export const amazon = defineBuiltinPlugin({
+	name: 'summaly:amazon',
 
 	test: url => HOSTNAMES.has(url.hostname),
 
-	async summarize(ctx, url) {
+	async summarize({ url, fetchPage }) {
 		// Redirects are always followed and content-length is never required, whatever the caller set.
 		// The rest of the context (transport, User-Agent, lang, timeouts, size limit) still applies.
-		const page = await fetchPage({ ...ctx, options: { ...ctx.options, followRedirects: true, contentLengthRequired: false } }, url);
+		const page = await fetchPage(url, { followRedirects: true, contentLengthRequired: false });
 		const $ = loadDom(page.html);
 
 		const title = $('#title').text();
@@ -80,4 +79,4 @@ export const amazon: Provider = {
 			fediverseCreator: null,
 		};
 	},
-};
+});

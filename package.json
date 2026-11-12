@@ -12,6 +12,17 @@
   "main": "./built/index.js",
   "type": "module",
   "types": "./built/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./built/index.d.ts",
+      "default": "./built/index.js"
+    },
+    "./plugin": {
+      "types": "./built/plugin.d.ts",
+      "default": "./built/plugin.js"
+    },
+    "./package.json": "./package.json"
+  },
   "packageManager": "pnpm@12.17.0",
   "engines": {
     "node": "^22.22.2 || ^24.17.0 || >=26.4.0"

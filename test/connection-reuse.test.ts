@@ -5,7 +5,7 @@ import net, { type AddressInfo, type Socket } from 'node:net';
 import tls from 'node:tls';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { createSummaly } from '@/index.js';
-import type { SummalyPlugin } from '@/types.js';
+import { defineSummalyPlugin } from '@/plugin.js';
 import { runSourceScript } from './helpers/run-source.js';
 import { LOOPBACK_CERT, LOOPBACK_KEY } from './helpers/tls-cert.js';
 
@@ -167,10 +167,11 @@ describe.each(['http', 'https'] as const)('1回の要約の中で接続を再利
 	test('要約が失敗しても、完了した応答の接続は次の要約で使える', async () => {
 		const origin = await startOrigin(scheme);
 		// The HEAD for the final URL succeeds and leaves an idle socket; then the summary fails.
-		const failing: SummalyPlugin = {
+		const failing = defineSummalyPlugin({
+			name: 'failing',
 			test: () => true,
 			summarize: () => Promise.reject(new Error('plugin failed')),
-		};
+		});
 
 		await expect(summaly(origin.url, { plugins: [failing] })).rejects.toThrow('plugin failed');
 		expect(origin.connections()).toBe(1);

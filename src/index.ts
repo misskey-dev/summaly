@@ -6,9 +6,10 @@ import { type ScrapeContext, createScrapeContext, fetchWithContext, fixOptions }
 import { scrapeGeneral } from '@/extract/general.js';
 import { privateIpAllowedByEnv } from '@/http/address-guard.js';
 import { GuardedAgentPool } from '@/http/agent-pool.js';
-import { builtinProviders } from '@/providers/index.js';
-import { fromPlugin } from '@/providers/provider.js';
-import type { SummalyOptions, SummalyResult } from '@/types.js';
+import { completeSummary, createPluginContext } from '@/plugin/context.js';
+import { assertPlugins } from '@/plugin/define.js';
+import { builtinPluginNames, builtinPlugins } from '@/plugins/index.js';
+import type { Summary, SummalyOptions, SummalyResult } from '@/types.js';
 import { VERSION } from '@/version.js';
 
 export const version: string = VERSION;
@@ -21,12 +22,10 @@ export { default } from '@/fastify-plugin.js';
 export type { FastifyLike } from '@/fastify-plugin.js';
 
 export type {
-	GeneralScrapingOptions,
 	Player,
 	ProxyOptions,
 	Summary,
 	SummalyOptions,
-	SummalyPlugin,
 	SummalyResult,
 } from '@/types.js';
 export type {
@@ -53,8 +52,10 @@ const DEFAULT_ERROR_CACHE_TTL = 30 * 1000;
  * Options given per call are merged over `base`. `cache: false` / `coordinator: false` (in either) turns that part off.
  * Its calls with the same `allowedPrivateNetworks` reuse each other's idle connections for a short time
  * (see GuardedAgentPool); separate summarizers never share connections.
+ * @throws {TypeError} when `base.plugins` holds something not made by defineSummalyPlugin, or two plugins with one name
  */
 export function createSummaly(base: SummalyOptions = {}): (url: string, options?: SummalyOptions) => Promise<SummalyResult> {
+	assertPlugins(base.plugins, builtinPluginNames);
 	const memoryCache = new MemorySummaryCache();
 	const inProcessCoordinator = new InProcessCoordinator();
 	const agentPool = new GuardedAgentPool();
@@ -67,6 +68,12 @@ export function createSummaly(base: SummalyOptions = {}): (url: string, options?
 			...base,
 			...options,
 		});
+
+		try {
+			assertPlugins(opts.plugins, builtinPluginNames);
+		} catch (error) {
+			return Promise.reject(error);
+		}
 		const allowPrivateIp = privateIpAllowedByEnv();
 		const cache = options.cache ?? base.cache ?? memoryCache;
 		const coordinator = options.coordinator ?? base.coordinator ?? inProcessCoordinator;
@@ -91,7 +98,7 @@ export function createSummaly(base: SummalyOptions = {}): (url: string, options?
 export const summaly: (url: string, options?: SummalyOptions) => Promise<SummalyResult> = createSummaly();
 
 /**
- * The whole summary without caching or sharing it: final URL, provider match, scraping.
+ * The whole summary without caching or sharing it: final URL, plugin match, scraping.
  * `deps` is handed on for the favicon checks, whose results are cached and shared across summaries.
  * `allowPrivateIp` is the value the summary key was built with, so the transport uses it too.
  * `agentPool` is the summarizer's connection pool.
@@ -111,14 +118,12 @@ async function summarizeUncached(
 		const actualUrl = opts.followRedirects ? await resolveFinalUrl(ctx, url) : url;
 		const target = new URL(actualUrl);
 
-		const providers = [...builtinProviders, ...(opts.plugins ?? []).map(fromPlugin)];
-		const match = providers.find(provider => provider.test(target));
-
-		const summary = match ? await match.summarize(ctx, target) : await scrapeGeneral(ctx, target);
-
-		if (summary == null) {
-			throw new Error('failed summarize');
-		}
+		// The caller's plugins first, so that they can take over URLs a built-in plugin would summarize.
+		const plugins = [...(opts.plugins ?? []), ...builtinPlugins];
+		const match = plugins.find(plugin => plugin.test(target));
+		const result = match ? await match.summarize(createPluginContext(ctx, target)) : null;
+		// A plugin returning null hands the URL over to the generic rules.
+		const summary: Summary = result != null ? completeSummary(result) : await scrapeGeneral(ctx, target);
 
 		return Object.assign(summary, {
 			url: actualUrl,

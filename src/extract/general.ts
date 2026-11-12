@@ -50,7 +50,7 @@ export async function fetchPage(ctx: ScrapeContext, url: URL): Promise<Page> {
  * Builds a summary from a fetched page.
  * `url` is the page URL used for the site name and for resolving relative links.
  */
-export async function summarizePage(ctx: ScrapeContext, url: URL, page: Pick<Page, 'html' | 'headers'>): Promise<Summary | null> {
+export async function summarizePage(ctx: ScrapeContext, url: URL, page: Pick<Page, 'html' | 'headers'>): Promise<Summary> {
 	const head = parseHead(page.html);
 
 	const title = pickTitle(head);
@@ -77,7 +77,7 @@ export async function summarizePage(ctx: ScrapeContext, url: URL, page: Pick<Pag
 }
 
 /** Fetches `url` and summarizes it with the generic (non-provider) rules. */
-export async function scrapeGeneral(ctx: ScrapeContext, url: URL): Promise<Summary | null> {
+export async function scrapeGeneral(ctx: ScrapeContext, url: URL): Promise<Summary> {
 	const page = await fetchPage(ctx, url);
 
 	// The requested URL (not the post-redirect one) is the base.

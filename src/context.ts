@@ -5,14 +5,11 @@ import type { GuardedAgentPool } from '@/http/agent-pool.js';
 import { type FetchRequest, type FetchResult, fetchResponse } from '@/http/request.js';
 import { type Transport, createTransport } from '@/http/transport.js';
 import { type ResolvedOptions, resolveOptions } from '@/options.js';
-import { toScrapingOptions } from '@/providers/provider.js';
-import type { GeneralScrapingOptions, SummalyOptions } from '@/types.js';
+import type { SummalyOptions } from '@/types.js';
 
 /** Everything one summary needs to make requests. Built per call; holds no global state. */
 export type ScrapeContext = {
 	options: ResolvedOptions;
-	/** The caller's raw values (no defaults filled in, lang not validated), as handed to plugins. */
-	scrapingOptions: GeneralScrapingOptions;
 	transport: Transport;
 	/**
 	 * The summarizer's cache and in-flight sharing, for results shared between summaries (favicon checks).
@@ -58,7 +55,6 @@ export function createScrapeContext(
 
 	return {
 		options: resolveOptions(fixed),
-		scrapingOptions: toScrapingOptions(fixed),
 		transport: createTransport({
 			agent: fixed.agent,
 			allowedPrivateNetworks: fixed.allowedPrivateNetworks,

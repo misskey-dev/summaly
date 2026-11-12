@@ -1,13 +1,12 @@
-import { fetchSubresource } from '@/context.js';
 import { clip } from '@/extract/text.js';
-import type { Provider } from './provider.js';
+import { defineBuiltinPlugin } from '@/plugin/define.js';
 
 type QueryResponse = {
 	query?: { pages?: Record<string, { title: string; extract: string }> };
 };
 
-export const wikipedia: Provider = {
-	name: 'wikipedia',
+export const wikipedia = defineBuiltinPlugin({
+	name: 'summaly:wikipedia',
 
 	test(url) {
 		if (!url.hostname) {
@@ -17,13 +16,12 @@ export const wikipedia: Provider = {
 		return url.hostname.endsWith('.wikipedia.org');
 	},
 
-	async summarize(ctx, url) {
+	async summarize({ url, fetch }) {
 		const lang = url.host ? url.host.split('.')[0] : null;
 		const title = url.pathname ? url.pathname.split('/')[2] : null;
 		const endpoint = `https://${lang}.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro=&explaintext=&titles=${title}`;
 
-		const res = await fetchSubresource(ctx, endpoint, 'GET');
-		const body = JSON.parse(res.body.toString('utf-8')) as QueryResponse;
+		const body = (await fetch(endpoint)).json() as QueryResponse;
 
 		const pages = body.query?.pages;
 
@@ -50,4 +48,4 @@ export const wikipedia: Provider = {
 			fediverseCreator: null,
 		};
 	},
-};
+});

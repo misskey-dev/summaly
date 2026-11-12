@@ -1,6 +1,7 @@
 import type * as http from 'node:http';
 import type * as https from 'node:https';
 import type { InflightCoordinator, SummaryCache } from '@/coalesce/types.js';
+import type { SummalyPlugin } from '@/plugin/define.js';
 
 export type Summary = {
 	/**
@@ -83,21 +84,6 @@ export type Player = {
 	allow: string[];
 };
 
-export type GeneralScrapingOptions = {
-	lang?: string | null;
-	userAgent?: string;
-	followRedirects?: boolean;
-	responseTimeout?: number;
-	operationTimeout?: number;
-	contentLengthLimit?: number;
-	contentLengthRequired?: boolean;
-};
-
-export interface SummalyPlugin {
-	test(url: URL): boolean;
-	summarize(url: URL, opts?: GeneralScrapingOptions): Promise<Summary | null>;
-}
-
 export type ProxyOptions = {
 	/**
 	 * Proxy URL for http: targets
@@ -127,9 +113,9 @@ export type SummalyOptions = {
 	followRedirects?: boolean;
 
 	/**
-	 * Custom Plugins
+	 * Plugins made with defineSummalyPlugin (`@misskey-dev/summaly/plugin`), tried in order before the built-in ones
 	 */
-	plugins?: SummalyPlugin[];
+	plugins?: readonly SummalyPlugin[];
 
 	/**
 	 * Custom HTTP agent

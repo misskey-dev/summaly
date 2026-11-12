@@ -11,11 +11,11 @@ import {
 	MemorySummaryCache,
 	StatusError,
 	summalyDefaultOptions,
-	type SummalyPlugin,
 	type SummalyOptions,
 	type SummalyResult,
 	type SummaryCache,
 } from '@/index.js';
+import { defineSummalyPlugin, type SummalyPlugin } from '@/plugin.js';
 import { JsonCache } from './helpers/json-cache.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 
@@ -107,8 +107,8 @@ function recordingCache(): SummaryCache & { gets: () => number; storedKinds: Cac
 /** A plugin that answers for `hostname` with a fixed summary plus `extra` fields, and counts its calls. */
 function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): SummalyPlugin & { calls: () => number } {
 	let calls = 0;
-
-	return {
+	const plugin = defineSummalyPlugin({
+		name: `fixed:${hostname}`,
 		test: url => url.hostname === hostname,
 		summarize: async () => {
 			calls++;
@@ -126,8 +126,9 @@ function fixedPlugin(hostname: string, extra: Record<string, unknown> = {}): Sum
 				...extra,
 			};
 		},
-		calls: () => calls,
-	};
+	});
+
+	return { ...plugin, calls: () => calls };
 }
 
 /** Estimated bytes of one entry, as MemorySummaryCache accounts it. */
@@ -715,7 +716,8 @@ describe('buildRequestKey', () => {
 
 	test('結果を変えうるオプションが違えば key も違う', () => {
 		const agent = new http.Agent();
-		const plugin: SummalyPlugin = { test: () => false, summarize: async () => null };
+		const plugin = defineSummalyPlugin({ name: 'a', test: () => false, summarize: async () => null });
+		const other = defineSummalyPlugin({ name: 'b', test: () => false, summarize: async () => null });
 		const variants: SummalyOptions[] = [
 			{},
 			{ lang: 'ja' },
@@ -737,14 +739,17 @@ describe('buildRequestKey', () => {
 			{ agent: { https: agent as unknown as https.Agent } },
 			{ agent: { http: new http.Agent() } },
 			{ plugins: [plugin] },
-			{ plugins: [{ ...plugin }] },
+			{ plugins: [other] },
+			{ plugins: [plugin, other] },
+			{ plugins: [other, plugin] },
 		];
 		const keys = variants.map(opts => buildRequestKey(url, opts));
 
 		expect(new Set(keys).size).toBe(variants.length);
 		expect(buildRequestKey('https://example.com/other', {})).not.toBe(keys[0]);
 		expect(buildRequestKey(url, { agent: { http: agent } })).toBe(keys[15]);
-		expect(buildRequestKey(url, { plugins: [plugin] })).toBe(keys[18]);
+		// Plugins are identified by name, not by object.
+		expect(buildRequestKey(url, { plugins: [defineSummalyPlugin({ name: 'a', test: () => true, summarize: async () => null })] })).toBe(keys[18]);
 	});
 
 	test('cache / coordinator / TTL は key に含めない', () => {
@@ -766,9 +771,9 @@ describe('buildRequestKey', () => {
 		expect(enabled).not.toBe(unset);
 	});
 
-	test('agent と plugin の同一性はプロセスごとの値を含み、別のプロセスとは key が重ならない', async () => {
+	test('agent の同一性はプロセスごとの値を含み、別のプロセスとは key が重ならない。plugin は名前なのでプロセスをまたいで同じ key になる', async () => {
 		// Fresh copies of the module stand in for two processes: in each, object numbers start at 1,
-		// so the first agent (or plugin) in each gets the same number.
+		// so the first agent in each gets the same number.
 		vi.resetModules();
 		const first = await import('@/coalesce/key.js');
 
@@ -777,11 +782,11 @@ describe('buildRequestKey', () => {
 		const agents = [new http.Agent(), new http.Agent()];
 
 		cleanups.push(() => agents.forEach(a => a.destroy()));
-		const plugin = (): SummalyPlugin => ({ test: () => false, summarize: async () => null });
+		const plugin = (): SummalyPlugin => defineSummalyPlugin({ name: 'p', test: () => false, summarize: async () => null });
 
 		expect(first.objectId(agents[0])).toBe(second.objectId(agents[1]));
 		expect(first.buildRequestKey(url, { agent: { http: agents[0] } })).not.toBe(second.buildRequestKey(url, { agent: { http: agents[1] } }));
-		expect(first.buildRequestKey(url, { plugins: [plugin()] })).not.toBe(second.buildRequestKey(url, { plugins: [plugin()] }));
+		expect(first.buildRequestKey(url, { plugins: [plugin()] })).toBe(second.buildRequestKey(url, { plugins: [plugin()] }));
 		// Keys without objects are the same in every process.
 		expect(first.buildRequestKey(url, { lang: 'ja' })).toBe(second.buildRequestKey(url, { lang: 'ja' }));
 	});
@@ -848,7 +853,7 @@ describe('buildIconKey', () => {
 	});
 
 	test('HEAD に使わない設定（lang、plugins、followRedirects、contentLengthRequired）と cache / coordinator / TTL は含めない', () => {
-		const plugin: SummalyPlugin = { test: () => false, summarize: async () => null };
+		const plugin = defineSummalyPlugin({ name: 'p', test: () => false, summarize: async () => null });
 		const base = buildIconKey(url, {});
 
 		expect(buildIconKey(url, {

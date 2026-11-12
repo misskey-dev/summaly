@@ -4,7 +4,7 @@ import { Agent as httpsAgent } from 'node:https';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createSummaly, summalyDefaultOptions } from '@/index.js';
 import { StatusError } from '@/http/status-error.js';
-import type { GeneralScrapingOptions, Summary, SummalyPlugin } from '@/types.js';
+import { defineSummalyPlugin, type SummalyPlugin, type SummalyPluginOptions, type SummalyPluginResult } from '@/plugin.js';
 import { DEFAULT_BOT_UA } from '@/version.js';
 import { loopbackAgents } from './helpers/loopback-agent.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
@@ -359,72 +359,50 @@ describe('プライベート IP の扱いとプロバイダ', () => {
 		expect(uas.every(ua => ua === DEFAULT_BOT_UA)).toBe(true);
 	});
 
-	test('カスタムプラグインは組み込みより後に評価され、GeneralScrapingOptions を受け取る', async () => {
-		const pluginSummary: Summary = {
+	test('カスタムプラグインは組み込みより先に試され、リダイレクト後の URL と既定値を埋めた options を受け取る', async () => {
+		const calls: { url: string; options: SummalyPluginOptions }[] = [];
+		const plugin = defineSummalyPlugin({
+			name: 'catch-all',
+			test: () => true,
+			summarize: async ({ url, options }) => {
+				calls.push({ url: url.href, options });
+
+				return { title: 'from plugin' };
+			},
+		});
+		const host = await serve(onlyRoot((_req, res) => sendWithLength(res, Buffer.from('<html></html>'))));
+
+		const custom = await summaly(host, { plugins: [plugin], lang: 'not a valid lang!', allowedPrivateNetworks });
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0].url).toBe(`${host}/`);
+		expect(calls[0].options).toMatchObject({ lang: null, userAgent: DEFAULT_BOT_UA, followRedirects: true, contentLengthRequired: false });
+		expect(custom).toEqual({
 			title: 'from plugin',
 			icon: null,
 			description: null,
 			thumbnail: null,
 			thumbnailStyle: null,
-			player: { url: null, width: null, height: null, allow: [] },
 			sitename: null,
+			player: { url: null, width: null, height: null, allow: [] },
+			sensitive: false,
 			activityPub: null,
 			fediverseCreator: null,
-		};
-		const calls: { url: string; opts?: GeneralScrapingOptions }[] = [];
-		const plugin: SummalyPlugin = {
-			test: () => true,
-			summarize: async (url, opts) => {
-				calls.push({ url: url.href, opts });
-
-				return { ...pluginSummary };
-			},
-		};
-
-		// A URL no builtin matches goes to the plugin, with these GeneralScrapingOptions:
-		// the caller's raw values merged over summalyDefaultOptions, so unset keys stay undefined and lang is not validated.
-		const host = await serve(onlyRoot((_req, res) => sendWithLength(res, Buffer.from('<html></html>'))));
-		const custom = await summaly(host, { plugins: [plugin], lang: 'not a valid lang!', allowedPrivateNetworks });
-
-		expect(custom).toEqual({ ...pluginSummary, url: `${host}/` });
-		expect(calls).toHaveLength(1);
-		expect(calls[0].url).toBe(`${host}/`);
-		expect(calls[0].opts).toStrictEqual({
-			lang: 'not a valid lang!',
-			userAgent: undefined,
-			followRedirects: true,
-			responseTimeout: undefined,
-			operationTimeout: undefined,
-			contentLengthLimit: undefined,
-			contentLengthRequired: undefined,
+			url: `${host}/`,
 		});
 
-		// Values the caller does give are passed through as given.
-		const given = await summaly(host, {
-			plugins: [plugin],
-			lang: 'ja',
-			userAgent: 'test-ua',
-			followRedirects: false,
-			responseTimeout: 1000,
-			operationTimeout: 2000,
-			contentLengthLimit: 3000,
-			contentLengthRequired: true,
-			allowedPrivateNetworks,
-		});
+		// A URL a built-in plugin would take goes to the caller's plugin first.
+		const agents = loopbackAgents(Number(new URL(host).port));
 
-		expect(given).toEqual({ ...pluginSummary, url: host });
+		cleanups.push(() => agents.destroy());
+		const taken = await summaly('https://ja.wikipedia.org/wiki/Wiki', { plugins: [plugin], followRedirects: false, agent: { http: agents.http, https: agents.https } });
+
+		expect(taken.title).toBe('from plugin');
 		expect(calls).toHaveLength(2);
-		expect(calls[1].opts).toStrictEqual({
-			lang: 'ja',
-			userAgent: 'test-ua',
-			followRedirects: false,
-			responseTimeout: 1000,
-			operationTimeout: 2000,
-			contentLengthLimit: 3000,
-			contentLengthRequired: true,
-		});
+	});
 
-		// A URL a builtin matches goes to the builtin even though the plugin matches too.
+	test('どのカスタムプラグインにも合わない URL は組み込みのプラグインが要約する', async () => {
+		const plugin = defineSummalyPlugin({ name: 'example-only', test: url => url.hostname === 'example.com', summarize: async () => ({ title: 'x' }) });
 		const wikiBody = Buffer.from(JSON.stringify({ query: { pages: { 1: { title: 'Wiki', extract: 'text' } } } }));
 		const wiki = await serve((_req, res) => {
 			res.writeHead(200, { 'content-type': 'application/json', 'content-length': wikiBody.byteLength });
@@ -435,7 +413,77 @@ describe('プライベート IP の扱いとプロバイダ', () => {
 		cleanups.push(() => agents.destroy());
 		const builtin = await summaly('https://ja.wikipedia.org/wiki/Wiki', { plugins: [plugin], agent: { http: agents.http, https: agents.https } });
 
-		expect(builtin).toMatchObject({ title: 'Wiki', description: 'text', sitename: 'Wikipedia', url: 'https://ja.wikipedia.org/wiki/Wiki' });
-		expect(calls).toHaveLength(2);
+		expect(builtin).toMatchObject({ title: 'Wiki', description: 'text', sitename: 'Wikipedia', sensitive: false, url: 'https://ja.wikipedia.org/wiki/Wiki' });
+	});
+
+	test('プラグインが null を返したら、汎用の規則で要約する', async () => {
+		let called = 0;
+		const plugin = defineSummalyPlugin({
+			name: 'pass',
+			test: () => true,
+			summarize: async () => {
+				called++;
+
+				return null;
+			},
+		});
+		const host = await serve(onlyRoot((_req, res) => sendWithLength(res, fixture('htmls/og-title.html'))));
+
+		const summary = await summaly(host, { plugins: [plugin], allowedPrivateNetworks });
+
+		expect(called).toBe(1);
+		expect(summary.title).toBe('Strawberry Pasta');
+	});
+
+	test('プラグインが返さなかったフィールドは補い、返したフィールドはそのまま残す', async () => {
+		const plugin = defineSummalyPlugin({
+			name: 'partial',
+			test: () => true,
+			summarize: async () => ({ title: 't', sensitive: true, player: { url: 'https://player.example/', width: 1, height: 2, allow: ['autoplay'] }, extra: 1 } as SummalyPluginResult),
+		});
+		const host = await serve(onlyRoot((_req, res) => sendWithLength(res, Buffer.from('<html></html>'))));
+
+		const summary = await summaly(host, { plugins: [plugin], followRedirects: false, allowedPrivateNetworks });
+
+		expect(summary).toEqual({
+			title: 't',
+			icon: null,
+			description: null,
+			thumbnail: null,
+			thumbnailStyle: null,
+			sitename: null,
+			player: { url: 'https://player.example/', width: 1, height: 2, allow: ['autoplay'] },
+			sensitive: true,
+			activityPub: null,
+			fediverseCreator: null,
+			extra: 1,
+			url: host,
+		});
+	});
+
+	test('プラグインのリクエストにもプライベート IP の遮断が効く', async () => {
+		const target = await serve(onlyRoot((_req, res) => sendWithLength(res, Buffer.from('{}'))));
+		const plugin = defineSummalyPlugin({
+			name: 'fetches-loopback',
+			test: url => url.hostname === 'public.example',
+			summarize: async ({ fetch }) => {
+				await fetch(target);
+
+				return { title: 'reached' };
+			},
+		});
+
+		await expect(summaly('https://public.example/', { plugins: [plugin], followRedirects: false })).rejects.toThrow(StatusError);
+	});
+
+	test('defineSummalyPlugin で作っていないプラグインと、名前が重なるプラグインは TypeError で拒否する', async () => {
+		const plain = { name: 'plain', test: () => true, summarize: async () => null };
+		const a = defineSummalyPlugin({ name: 'dup', test: () => true, summarize: async () => null });
+		const b = defineSummalyPlugin({ name: 'dup', test: () => false, summarize: async () => null });
+
+		await expect(summaly('https://example.com/', { plugins: [plain as unknown as SummalyPlugin] })).rejects.toThrow('defineSummalyPlugin');
+		await expect(summaly('https://example.com/', { plugins: [a, b] })).rejects.toThrow('Duplicate plugin name: dup');
+		expect(() => createSummaly({ plugins: [a, b] })).toThrow(TypeError);
+		expect(() => createSummaly({ plugins: [{ ...a, [Symbol.for('summaly.plugin')]: 2 } as unknown as SummalyPlugin] })).toThrow('another version');
 	});
 });
