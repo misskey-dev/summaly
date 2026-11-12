@@ -13,6 +13,9 @@
   "type": "module",
   "types": "./built/index.d.ts",
   "packageManager": "pnpm@12.17.0",
+  "engines": {
+    "node": "^22.22.2 || ^24.17.0 || >=26.4.0"
+  },
   "files": [
     "built",
     "LICENSE"
@@ -20,15 +23,15 @@
   "scripts": {
     "build": "tsdown",
     "oxlint": "oxlint",
-    "test": "vitest run ./test/index.test.ts ./test/server.test.ts",
+    "typecheck": "tsc --noEmit",
+    "typecheck:compat": "tsc -p tsconfig.compat.json && node scripts/check-no-fastify.mjs",
+    "test": "vitest run --exclude test/docker.test.ts",
     "serve": "node ./built/server.js",
     "test:docker": "docker build -t summaly:test . && vitest run ./test/docker.test.ts"
   },
   "devDependencies": {
     "@misskey-dev/oxlint-fmt-config": "0.1.1",
     "@stylistic/eslint-plugin": "5.10.0",
-    "@types/debug": "4.1.13",
-    "@types/escape-regexp": "0.0.3",
     "@types/node": "26.6.6",
     "fastify": "5.12.8",
     "oxlint": "1.91.0",
@@ -38,12 +41,11 @@
     "vitest": "5.1.0"
   },
   "dependencies": {
-    "chardet": "2.2.0",
-    "cheerio": "1.2.0",
-    "escape-regexp": "0.0.1",
-    "got": "16.2.0",
-    "html-entities": "2.6.0",
-    "ipaddr.js": "2.5.0"
+    "chardet": "^2.2.0",
+    "cheerio": "^1.2.0",
+    "html-entities": "^2.6.0",
+    "htmlparser2": "^12.0.0",
+    "ipaddr.js": "^2.5.0"
   },
   "optionalDependencies": {
     "fastify": "5.12.8"

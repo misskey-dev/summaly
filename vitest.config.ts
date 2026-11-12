@@ -8,6 +8,9 @@ export default defineConfig({
 			'@': fileURLToPath(new URL('./src', import.meta.url)),
 		},
 	},
+	test: {
+		setupFiles: ['./test/setup.ts'],
+	},
 	define: {
 		_VERSION_: JSON.stringify(JSON.parse(readFileSync('./package.json', 'utf-8')).version),
 	},

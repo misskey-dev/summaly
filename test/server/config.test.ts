@@ -4,7 +4,7 @@
  */
 
 import { expect, test, describe } from 'vitest';
-import { DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, ServerConfigError, loadServerConfig, type ServerConfig } from '../src/config.js';
+import { DEFAULT_SERVER_HOST, DEFAULT_SERVER_PORT, ServerConfigError, loadServerConfig, type ServerConfig } from '@/server/config.js';
 
 describe('loadServerConfig', () => {
 	test('何も指定しない場合はデフォルト値になる', () => {

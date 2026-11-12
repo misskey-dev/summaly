@@ -38,7 +38,7 @@ export function parseProxyUrl(value: string, scheme: 'http' | 'https'): URL {
  * with `***`. Works on the raw text, so it also covers values `new URL()` cannot parse (where the parsed
  * user name and password are unavailable) and a user name used alone as a token.
  *
- * The standalone server keeps a copy for its startup errors (packages/server/src/config.ts); change both together.
+ * The standalone server keeps a copy for its startup errors (src/server/config.ts); change both together.
  */
 function redactUserinfo(value: string): string {
 	const at = value.lastIndexOf('@');

@@ -4,7 +4,7 @@
  */
 
 import Fastify, { type FastifyInstance } from 'fastify';
-import { createSummarizer, type InflightCoordinator, type SummaryCache } from '@tiramiss-community/chiramiss';
+import { createSummarizer, type InflightCoordinator, type SummaryCache } from '@/index.js';
 import type { ServerConfig } from './config.js';
 import { resolveRequestOptions } from './query.js';
 

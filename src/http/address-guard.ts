@@ -35,7 +35,7 @@ export function guardKey(guard: AddressGuard): string {
  * - IPv4-mapped IPv6 (::ffff:0:0/96) is refused: addresses are checked after ipaddr.process() turns mapped
  *   addresses into IPv4, so such a network would never match anything.
  *
- * The standalone server repeats these checks at startup (packages/server/src/config.ts checkCidr);
+ * The standalone server repeats these checks at startup (src/server/config.ts checkCidr);
  * change both together.
  */
 function parseAllowedNetwork(cidr: string): Network {

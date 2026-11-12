@@ -43,9 +43,12 @@
 	"compileOnSave": false,
 	"include": [
 		"./tsdown.config.ts",
-		"./src/**/*"
+		"./vitest.config.ts",
+		"./src/**/*",
+		"./test/**/*"
 	],
 	"exclude": [
 		"node_modules",
+		"./test/compat/**/*",
 	]
 }

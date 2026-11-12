@@ -24,9 +24,16 @@ jobs:
       - name: Install
         run: |
           pnpm i --frozen-lockfile
+      - name: Typecheck
+        run: |
+          pnpm typecheck
       - name: Build
         run: |
           pnpm build
+      # Checks the built .d.ts against the host app's usage; needs the build above.
+      - name: Typecheck (compat)
+        run: |
+          pnpm typecheck:compat
       - name: Test
         run: |
           SKIP_NETWORK_TEST=true pnpm test

@@ -1,9 +1,10 @@
 {
-	"extends": "../../tsconfig.base.json",
+	"extends": "./tsconfig.json",
 	"compilerOptions": {
 		"noEmit": true,
 		"skipLibCheck": false,
 		"types": ["node"]
 	},
-	"include": ["./test/compat/**/*"]
+	"include": ["./test/compat/**/*"],
+	"exclude": []
 }

@@ -8,20 +8,20 @@ import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
 import { expect, test, describe, beforeEach, afterEach } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
-import { MemorySummaryCache, type CacheEntry, type InflightCoordinator, type SummaryCache } from '@tiramiss-community/chiramiss';
-import { buildApp } from '../src/app.js';
-import { loadServerConfig } from '../src/config.js';
+import { MemorySummaryCache, type CacheEntry, type InflightCoordinator, type SummaryCache } from '@/index.js';
+import { buildApp } from '@/server/app.js';
+import { loadServerConfig } from '@/server/config.js';
 import {
 	LIB_DEFAULT_CONTENT_LENGTH_LIMIT,
 	LIB_DEFAULT_OPERATION_TIMEOUT,
 	LIB_DEFAULT_RESPONSE_TIMEOUT,
 	parseQueryOptions,
 	resolveRequestOptions,
-} from '../src/query.js';
+} from '@/server/query.js';
 // The lib's internal defaults, reachable here through the test-only "@" alias
 import { DEFAULT_MAX_RESPONSE_SIZE, DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT } from '@/options.js';
 
-const content = fs.readFileSync(new URL('../../chiramiss/test/fixtures/htmls/basic.html', import.meta.url));
+const content = fs.readFileSync(new URL('../fixtures/htmls/basic.html', import.meta.url));
 
 /** The page to be summarized is served on loopback, so the private IP block must let it through. */
 const LOOPBACK_ENV = { SUMMALY_ALLOWED_PRIVATE_NETWORKS: '127.0.0.0/8' };

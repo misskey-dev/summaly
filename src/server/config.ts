@@ -4,7 +4,7 @@
  */
 
 import ipaddr from 'ipaddr.js';
-import type { ProxyOptions, SummarizeOptions } from '@tiramiss-community/chiramiss';
+import type { ProxyOptions, SummarizeOptions } from '@/index.js';
 
 export type ServerConfig = {
 	/**
@@ -140,7 +140,7 @@ function parseCidrList(name: string, value: string): string[] {
 }
 
 /**
- * Same checks as the lib's parseAllowedNetwork (packages/chiramiss/src/http/address-guard.ts), repeated here
+ * Same checks as the lib's parseAllowedNetwork (src/http/address-guard.ts), repeated here
  * so a bad value stops the server at startup instead of failing every request; change both together.
  * - IPv4 must be four plain decimal parts without leading zeros: ipaddr.parseCIDR also reads octal, hex and
  *   short forms ('192.168.010.0/24' is 192.168.8.0/24), which would allow a network other than the one meant.
@@ -189,7 +189,7 @@ function parseProxyUrl(name: string, value: string): string {
  * Replaces everything between the scheme separator (`scheme://`, or the start when there is none) and the last `@`
  * with `***`. Works on the raw text, so it also covers values `new URL()` cannot parse.
  *
- * A copy of the lib's redactUserinfo in packages/chiramiss/src/http/proxy/proxy-url.ts (internal there, not exported).
+ * A copy of the lib's redactUserinfo in src/http/proxy/proxy-url.ts (internal there, not exported).
  * Both must change together, so that a proxy URL is redacted the same way at startup and at request time.
  */
 function redactUserinfo(value: string): string {

@@ -1,5 +1,5 @@
 /**
- * Graceful shutdown of the built server process (src/index.ts): SIGTERM lets an in-flight request finish, then exits 0.
+ * Graceful shutdown of the built server process (src/server/index.ts): SIGTERM lets an in-flight request finish, then exits 0.
  */
 
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
@@ -8,9 +8,12 @@ import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeAll, expect, test } from 'vitest';
 
-const serverDir = fileURLToPath(new URL('..', import.meta.url));
+const rootDir = fileURLToPath(new URL('../..', import.meta.url));
 const PAGE = '<html><head><title>Slow page</title></head><body></body></html>';
 const SLOW_MS = 1000;
+
+// On Windows, SIGTERM cannot be handled: child.kill('SIGTERM') terminates the process at once.
+const unsupported = process.platform === 'win32';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 
@@ -21,8 +24,11 @@ afterEach(async () => {
 });
 
 beforeAll(() => {
-	// The test runs the real entry point, so build it (and the lib it imports) first.
-	execFileSync('pnpm', ['--filter', '@tiramiss-community/chiramiss-server...', 'build'], { cwd: serverDir, stdio: 'ignore' });
+	if (unsupported) {
+		return;
+	}
+	// The test runs the real entry point, so build it first.
+	execFileSync('pnpm', ['build'], { cwd: rootDir, stdio: 'ignore' });
 }, 120_000);
 
 /** A page server that answers after SLOW_MS and resolves `requested` when the request arrives. */
@@ -44,14 +50,14 @@ async function startSlowServer(): Promise<{ url: string; requested: Promise<void
 	return { url: `http://127.0.0.1:${port}/`, requested };
 }
 
-/** Starts `node built/index.js` on a free port and resolves with its base URL once it is listening. */
+/** Starts `node built/server.js` on a free port and resolves with its base URL once it is listening. */
 async function startServerProcess(): Promise<{ child: ChildProcess; url: string; exited: Promise<number | null> }> {
 	const env: NodeJS.ProcessEnv = { ...process.env, SUMMALY_HOST: '127.0.0.1', SUMMALY_PORT: '0', SUMMALY_ALLOWED_PRIVATE_NETWORKS: '127.0.0.0/8' };
 
 	for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy']) {
 		delete env[name];
 	}
-	const child = spawn(process.execPath, ['built/index.js'], { cwd: serverDir, env, stdio: ['ignore', 'pipe', 'inherit'] });
+	const child = spawn(process.execPath, ['built/server.js'], { cwd: rootDir, env, stdio: ['ignore', 'pipe', 'inherit'] });
 	const exited = new Promise<number | null>(resolve => child.once('exit', code => resolve(code)));
 
 	cleanups.push(() => {
@@ -79,7 +85,7 @@ async function startServerProcess(): Promise<{ child: ChildProcess; url: string;
 	return { child, url, exited };
 }
 
-test('SIGTERM を受けても処理中の要求は 200 で完了し、keep-alive の接続が残っていてもプロセスは 0 で終わる', async () => {
+test.skipIf(unsupported)('SIGTERM を受けても処理中の要求は 200 で完了し、keep-alive の接続が残っていてもプロセスは 0 で終わる', async () => {
 	const page = await startSlowServer();
 	const server = await startServerProcess();
 

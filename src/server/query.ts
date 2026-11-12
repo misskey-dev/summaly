@@ -2,11 +2,11 @@
  * Reads summarize options from the query string of `GET /`
  */
 
-import type { SummarizeOptions } from '@tiramiss-community/chiramiss';
+import type { SummarizeOptions } from '@/index.js';
 import { MAX_TIMEOUT, toNonNegativeInteger } from './config.js';
 
 // Mirrors DEFAULT_RESPONSE_TIMEOUT / DEFAULT_OPERATION_TIMEOUT / DEFAULT_MAX_RESPONSE_SIZE in
-// packages/chiramiss/src/options.ts, which the lib's public entry does not export. test/app.test.ts checks they match.
+// src/options.ts, which the lib's public entry does not export. test/server/app.test.ts checks they match.
 export const LIB_DEFAULT_RESPONSE_TIMEOUT = 20 * 1000;
 export const LIB_DEFAULT_OPERATION_TIMEOUT = 60 * 1000;
 export const LIB_DEFAULT_CONTENT_LENGTH_LIMIT = 10 * 1024 * 1024;

@@ -1,8 +1,9 @@
 // Fails if any built declaration file references the fastify module (the published types must not depend on it).
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('../built', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../built', import.meta.url));
 const patterns = [
 	/\b(?:from|import)\s*\(?\s*['"]fastify(?:\/[^'"]*)?['"]/,
 	/\bexport\s+[^;]*?\bfrom\s*['"]fastify(?:\/[^'"]*)?['"]/,
