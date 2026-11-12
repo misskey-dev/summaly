@@ -543,3 +543,81 @@ describe('再利用したソケットに前の応答の余りが届いたら、�
 		expect(origin.connections()).toBe(2);
 	});
 });
+
+/** Answers `/old` with a redirect to `/` (only to `method`, if given) and everything else as serveDefault. */
+function redirecting(
+	writeRedirect: (res: http.ServerResponse) => void,
+	method?: 'GET' | 'HEAD',
+): http.RequestListener {
+	return (req, res) => {
+		if (req.url === '/old' && (method === undefined || req.method === method)) {
+			writeRedirect(res);
+
+			return;
+		}
+		serveDefault(req, res);
+	};
+}
+
+describe.each(['http', 'https'] as const)('リダイレクトの応答を受けた接続を再利用する (%s)', scheme => {
+	test('HEAD へのリダイレクトの後も、同じ接続で続ける', async () => {
+		const origin = await startOrigin(scheme, '127.0.0.1', redirecting((res) => {
+			res.writeHead(302, { location: '/', 'content-length': '0' });
+			res.end();
+		}));
+		const summary = await summarize(new URL('/old', origin.url).href);
+
+		expect(summary.title).toBe('page');
+		expect(origin.requestsBySocket()).toEqual([['HEAD /old', 'HEAD /', 'GET /', 'HEAD /favicon.ico']]);
+	});
+
+	test('GET へのリダイレクトに短い本文があっても、読み切って同じ接続で続ける', async () => {
+		const origin = await startOrigin(scheme, '127.0.0.1', redirecting((res) => {
+			res.writeHead(302, { location: '/', 'content-type': 'text/html', 'content-length': '5' });
+			res.end('Moved');
+		}, 'GET'));
+		const summary = await summarize(new URL('/old', origin.url).href);
+
+		expect(summary.title).toBe('page');
+		expect(origin.requestsBySocket()).toEqual([['HEAD /old', 'GET /old', 'GET /', 'HEAD /favicon.ico']]);
+	});
+
+	test('GET へのリダイレクトの本文がチャンク形式でも、短ければ読み切って同じ接続で続ける', async () => {
+		const origin = await startOrigin(scheme, '127.0.0.1', redirecting((res) => {
+			res.writeHead(302, { location: '/', 'content-type': 'text/html' });
+			res.write('Mo');
+			res.end('ved');
+		}, 'GET'));
+		const summary = await summarize(new URL('/old', origin.url).href);
+
+		expect(summary.title).toBe('page');
+		expect(origin.connections()).toBe(1);
+	});
+
+	test('GET へのリダイレクトの本文が大きいときは、読まずに接続を捨てる', async () => {
+		const origin = await startOrigin(scheme, '127.0.0.1', redirecting((res) => {
+			const body = 'x'.repeat(1024 * 1024);
+
+			res.writeHead(302, { location: '/', 'content-type': 'text/html', 'content-length': String(body.length) });
+			res.end(body);
+		}, 'GET'));
+		const summary = await summarize(new URL('/old', origin.url).href);
+
+		expect(summary.title).toBe('page');
+		expect(origin.connections()).toBe(2);
+	});
+
+	test('GET へのリダイレクトの本文が届ききらなくても、待たずに新しい接続で続ける', async () => {
+		const origin = await startOrigin(scheme, '127.0.0.1', redirecting((res) => {
+			res.writeHead(302, { location: '/', 'content-type': 'text/html', 'content-length': '10' });
+			res.write('Mov');
+			// The rest never comes.
+		}, 'GET'));
+		const started = performance.now();
+		const summary = await summarize(new URL('/old', origin.url).href, { responseTimeout: 10_000, operationTimeout: 10_000 });
+
+		expect(summary.title).toBe('page');
+		expect(performance.now() - started).toBeLessThan(2000);
+		expect(origin.connections()).toBe(2);
+	});
+});

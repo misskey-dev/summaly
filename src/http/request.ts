@@ -35,6 +35,10 @@ export type FetchResult = {
 const MAX_REDIRECTS = 10;
 // Same as got: 300 and 304 are not followed.
 const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
+/** A redirect body up to this size is read and dropped, so that its connection can serve the next hop. */
+const REDIRECT_BODY_DRAIN_LIMIT = 16 * 1024;
+/** How long a redirect body may take to arrive before its connection is cut instead (ms). */
+const REDIRECT_BODY_DRAIN_TIMEOUT = 500;
 
 export async function fetchResponse(transport: Transport, req: FetchRequest): Promise<FetchResult> {
 	const controller = new AbortController();
@@ -62,7 +66,7 @@ async function fetchFollowingRedirects(transport: Transport, req: FetchRequest, 
 		const location = res.headers.location;
 
 		if (req.followRedirects && location && REDIRECT_CODES.has(res.statusCode ?? 0)) {
-			res.destroy();
+			await discardRedirect(res, req.method, signal);
 			if (redirects >= MAX_REDIRECTS) {
 				throw new Error(`Redirected ${MAX_REDIRECTS} times. Aborting.`);
 			}
@@ -75,6 +79,59 @@ async function fetchFollowingRedirects(transport: Transport, req: FetchRequest, 
 			throw timeoutError() ?? e;
 		}
 	}
+}
+
+/**
+ * Drops a redirect response. When it has no body (HEAD, which is how redirects are usually followed) or a short one
+ * (by Content-Length or chunked), the body is read to its end, so the keep-alive connection goes back to the pool and
+ * the next hop, usually on the same site, does not open a new connection (and for https, handshake again).
+ * Any other body (larger than REDIRECT_BODY_DRAIN_LIMIT, delimited by the connection closing, or not done within
+ * REDIRECT_BODY_DRAIN_TIMEOUT) is cut by destroying the response, so the next hop never waits on it.
+ */
+function discardRedirect(res: http.IncomingMessage, method: FetchRequest['method'], signal: AbortSignal): Promise<void> {
+	const contentLength = res.headers['content-length'];
+	const chunked = /\bchunked\b/i.test(res.headers['transfer-encoding'] ?? '');
+	const drainable = method === 'HEAD'
+		|| chunked
+		|| (contentLength !== undefined && Number(contentLength) <= REDIRECT_BODY_DRAIN_LIMIT);
+
+	if (!drainable) {
+		res.destroy();
+
+		return Promise.resolve();
+	}
+
+	return new Promise(resolve => {
+		let received = 0;
+		let settled = false;
+		const finish = (cut: boolean) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			clearTimeout(timer);
+			signal.removeEventListener('abort', onAbort);
+			if (cut) {
+				res.destroy();
+			}
+			resolve();
+		};
+		const onAbort = () => finish(true);
+		const timer = setTimeout(() => finish(true), REDIRECT_BODY_DRAIN_TIMEOUT);
+
+		signal.addEventListener('abort', onAbort, { once: true });
+		res.on('data', (chunk: Buffer) => {
+			received += chunk.length;
+			if (received > REDIRECT_BODY_DRAIN_LIMIT) {
+				finish(true);
+			}
+		});
+		res.on('end', () => finish(false));
+		// Closed before its end: the connection is gone and cannot be reused. Either way the redirect is followed, and
+		// an error here says nothing about the next hop, so it only ends the wait.
+		res.on('close', () => finish(false));
+		res.on('error', () => finish(false));
+	});
 }
 
 function parseHttpUrl(input: string): URL {
