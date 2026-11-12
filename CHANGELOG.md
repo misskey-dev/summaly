@@ -12,10 +12,10 @@ v6 では、内部実装を一から見直し、よりパフォーマンスが�
 * Fastify プラグインのデフォルトエクスポートを廃止し、`@misskey-dev/summaly/fastify` の `fastifySummaly` に移動しました
   * fastify は optional な peerDependencies になり、自動ではインストールされません
 * プラグインシステムを刷新しました
-  * **【重要】**プラグインは `@misskey-dev/summaly/plugin` の `defineSummalyPlugin()` で定義できます。`summarize` は通信のための関数を持つ `ctx` (`SummalyPluginContext`) を引数で受け取ります。
-  * **【重要】**`name` が必須になりました。`summaly:` で始まる名前は組み込みプラグイン用に予約されています
+  * **【重要】** プラグインは `@misskey-dev/summaly/plugin` の `defineSummalyPlugin()` で定義できます。`summarize` は通信のための関数を持つ `ctx` (`SummalyPluginContext`) を引数で受け取ります。
+  * **【重要】** `name` が必須になりました。`summaly:` で始まる名前は組み込みプラグイン用に予約されています
   * `summaly()` 実行時に渡したプラグインは、組み込みプラグインより先に `test` されます。
-  * **【重要】**`summarize` が `null` を返すと、`failed summarize` のエラーではなく、汎用の規則で要約します
+  * **【重要】** `summarize` が `null` を返すと、`failed summarize` のエラーではなく、汎用の規則で要約します
   * `GeneralScrapingOptions` 型を廃止しました。プラグインの型はルートではなく `@misskey-dev/summaly/plugin` から公開します
 * `summalyDefaultOptions` を廃止しました。既定値を変えるには `createSummaly(base)` を使ってください
 * ルートから公開する型を `SummalyResult`、`SummalyOptions`、`SummalyInstance`、`Player` にしました（`Summary` は `@misskey-dev/summaly/plugin` から公開します）
