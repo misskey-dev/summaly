@@ -6,7 +6,7 @@ export const branchioDeeplinks = defineBuiltinPlugin({
 	// Deep links made with Branch.io
 	test: url => /^[a-zA-Z0-9]+\.app\.link$/.test(url.hostname) || url.hostname === 'spotify.link',
 
-	async summarize({ url, general }) {
+	summarize: async ({ url, general }) => {
 		// https://help.branch.io/using-branch/docs/creating-a-deep-link#redirections
 		// Forcing the web redirect keeps branch.io from serving its own interstitial page.
 		const target = new URL(url);

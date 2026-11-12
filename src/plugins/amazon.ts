@@ -27,7 +27,7 @@ export const amazon = defineBuiltinPlugin({
 
 	test: url => HOSTNAMES.has(url.hostname),
 
-	async summarize({ url, fetchPage }) {
+	summarize: async ({ url, fetchPage }) => {
 		// Redirects are always followed and content-length is never required, whatever the caller set.
 		// The rest of the context (transport, User-Agent, lang, timeouts, size limit) still applies.
 		const page = await fetchPage(url, { followRedirects: true, contentLengthRequired: false });

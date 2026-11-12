@@ -5,7 +5,7 @@ export const bluesky = defineBuiltinPlugin({
 
 	test: url => url.hostname === 'bsky.app',
 
-	async summarize({ url, fetchPage, summarizePage }) {
+	summarize: async ({ url, fetchPage, summarizePage }) => {
 		// Fetched with GET only: bsky.app answers HEAD with 404.
 		return await summarizePage(await fetchPage(url));
 	},

@@ -8,15 +8,9 @@ type QueryResponse = {
 export const wikipedia = defineBuiltinPlugin({
 	name: 'summaly:wikipedia',
 
-	test(url) {
-		if (!url.hostname) {
-			return false;
-		}
+	test: url => url.hostname.endsWith('.wikipedia.org'),
 
-		return url.hostname.endsWith('.wikipedia.org');
-	},
-
-	async summarize({ url, fetch }) {
+	summarize: async ({ url, fetch }) => {
 		const lang = url.host ? url.host.split('.')[0] : null;
 		const title = url.pathname ? url.pathname.split('/')[2] : null;
 		const endpoint = `https://${lang}.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro=&explaintext=&titles=${title}`;

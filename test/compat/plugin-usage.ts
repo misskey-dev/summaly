@@ -10,7 +10,7 @@ type ApiResponse = { title: string; text: string };
 const examplePlugin: SummalyPlugin = defineSummalyPlugin({
 	name: 'example',
 	test: url => url.hostname === 'example.com',
-	async summarize({ url, fetch, options }) {
+	summarize: async ({ url, fetch, options }) => {
 		if (url.pathname === '/') {
 			// Leave the top page to the generic rules.
 			return null;
@@ -25,7 +25,7 @@ const examplePlugin: SummalyPlugin = defineSummalyPlugin({
 export const genericPlugin = defineSummalyPlugin({
 	name: 'generic',
 	test: url => url.hostname.endsWith('.example.net'),
-	async summarize(ctx: SummalyPluginContext): Promise<Summary> {
+	summarize: async (ctx: SummalyPluginContext): Promise<Summary> => {
 		const page = await ctx.fetchPage(ctx.url, { followRedirects: true });
 		const summary = await ctx.summarizePage(page);
 

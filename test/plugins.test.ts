@@ -237,24 +237,6 @@ describe('defineSummalyPlugin', () => {
 		expect(isSummalyPlugin({ name: 'plain', test: () => true, summarize })).toBe(false);
 	});
 
-	test('メソッドとして書いた test() と summarize() は this を保つ', async () => {
-		const definition = {
-			name: 'with-this',
-			host: 'example.com',
-			test(url: URL): boolean {
-				return url.hostname === this.host;
-			},
-			async summarize(): Promise<{ title: string }> {
-				return { title: this.host };
-			},
-		};
-		const plugin = defineSummalyPlugin(definition);
-		const { ctx } = await loopback((_req, res) => res.writeHead(404).end());
-
-		expect(plugin.test(new URL('https://example.com/'))).toBe(true);
-		expect(await plugin.summarize(createPluginContext(ctx, new URL('https://example.com/')))).toEqual({ title: 'example.com' });
-	});
-
 	const invalid: [string, unknown, string][] = [
 		['name が空', { name: '', test: () => true, summarize }, 'non-empty name'],
 		['name が summaly: で始まる', { name: 'summaly:mine', test: () => true, summarize }, 'reserved'],

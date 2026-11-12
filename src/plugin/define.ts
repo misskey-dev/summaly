@@ -96,9 +96,10 @@ export type SummalyPluginDefinition = {
 	 * Must be unique among the plugins of a summary; names starting with `summaly:` are reserved.
 	 */
 	name: string;
-	/** Whether this plugin summarizes `url` (after redirects when `followRedirects` is on). */
-	test(url: URL): boolean;
-	summarize(ctx: SummalyPluginContext): Promise<SummalyPluginResult>;
+	/** Whether this plugin summarizes `url` (after redirects when `followRedirects` is on). Called without `this`. */
+	test: (url: URL) => boolean;
+	/** Summarizes `ctx.url`. Called without `this`. */
+	summarize: (ctx: SummalyPluginContext) => Promise<SummalyPluginResult>;
 };
 
 export type SummalyPlugin = Readonly<SummalyPluginDefinition> & {
@@ -126,9 +127,8 @@ function createPlugin(definition: SummalyPluginDefinition, builtin: boolean): Su
 
 	return Object.freeze({
 		name,
-		// Called through the definition, so that methods using `this` keep working.
-		test: (url: URL) => definition.test(url),
-		summarize: (ctx: SummalyPluginContext) => definition.summarize(ctx),
+		test: definition.test,
+		summarize: definition.summarize,
 		[SUMMALY_PLUGIN]: PLUGIN_API_VERSION,
 	});
 }
@@ -142,8 +142,8 @@ function createPlugin(definition: SummalyPluginDefinition, builtin: boolean): Su
  * export default defineSummalyPlugin({
  * 	name: 'example',
  * 	test: url => url.hostname === 'example.com',
- * 	async summarize({ url, fetchPage, summarizePage }) {
- * 		return summarizePage(await fetchPage(url));
+ * 	summarize: async ({ url, fetchPage, summarizePage }) => {
+ * 		return await summarizePage(await fetchPage(url));
  * 	},
  * });
  * ```
