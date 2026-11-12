@@ -46,12 +46,11 @@ will be ... ↓
 }
 ```
 
-summaly is a library, a Fastify plugin and a standalone server (Docker image `ghcr.io/misskey-dev/summaly`).
+* **Performance:** Only the `<head>` of a page is parsed, and the page's encoding is decided mostly the way browsers do, while still reading pages whose server declares the wrong charset.
+* **Caching:** Results can be cached and in-flight requests shared, through a cache you provide.
+* **Plugins:** Plugins summarize sites the generic rules cannot, with the same connection settings as the rest of the summary.
 
-* Requests to private IP addresses are blocked **before connecting**, for every redirect and for the oEmbed and favicon requests too.
-* Only the `<head>` of a page is parsed, and the page's encoding is decided mostly the way browsers do, while still reading pages whose server declares the wrong charset.
-* Results can be cached and in-flight requests shared, through a cache you provide.
-* Plugins summarize sites the generic rules cannot, with the same connection settings as the rest of the summary.
+`@misskey-dev/summaly` can be used in multiple ways: as a library in your Node.js project, as a Fastify plugin, or as a standalone server via Docker.
 
 Upgrading from v5? See [CHANGELOG.md](./CHANGELOG.md) for the breaking changes.
 
