@@ -5,22 +5,22 @@ export type LinkTag = { rel: string | null; type: string | null; href: string };
 
 export type HeadInfo = {
 	title: string | null;
-	/** 同じキーの最初の出現を返す。値は生のまま（エンティティは未デコード）。 */
+	/** The first value for the key, raw (entities not decoded). */
 	meta(key: `name:${string}` | `property:${string}`): string | undefined;
 	links: LinkTag[];
 };
 
 /**
- * これより深い入れ子に達したら読むのをやめる。htmlparser2 はタグ 1 つごとに現在の深さに比例する手間がかかるため、
- * 深さに上限がないと入れ子の深いページで二次時間になる。実際のページはこれよりずっと浅い。
+ * Reading stops at this nesting depth. htmlparser2 spends time proportional to the current depth on every tag,
+ * so without a limit a deeply nested page takes quadratic time. Real pages are far shallower than this.
  */
 const MAX_DEPTH = 128;
 
 /**
- * `</head>` か `<body>` に達するまでだけ読む軽量パーサ。
- * `<title>` が head の外にしかない場合に備え、head の後も title が取れるまでは title だけを探す。
- * head が終わり title も取れた時点でトークナイズを止め、残りの本文は読まない。
- * 入れ子が MAX_DEPTH を超えた時点でも止め、それまでに読めたものだけを返す。
+ * A light parser that reads only up to `</head>` or `<body>`.
+ * Since a page may have its `<title>` outside the head only, it keeps looking for the title (and nothing else)
+ * after the head until it finds one. Once the head has ended and the title is known, it stops tokenizing and never
+ * reads the rest of the body. It also stops when the nesting goes deeper than MAX_DEPTH, and returns what it read.
  */
 export function parseHead(html: string): HeadInfo {
 	const metas = new Map<string, string>();

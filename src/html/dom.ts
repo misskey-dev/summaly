@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 
-/** Amazon プロバイダ専用。それ以外は parseHead を使う。 */
+/** For the Amazon plugin only, which reads the page body. Everything else uses parseHead. */
 export function loadDom(html: string): cheerio.CheerioAPI {
 	return cheerio.load(html);
 }
