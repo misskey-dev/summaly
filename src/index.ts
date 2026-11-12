@@ -117,7 +117,7 @@ async function summarizeUncached(
 		const summary = match ? await match.summarize(ctx, target) : await scrapeGeneral(ctx, target);
 
 		if (summary == null) {
-			throw new Error('failed summaly');
+			throw new Error('failed summarize');
 		}
 
 		return Object.assign(summary, {

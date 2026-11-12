@@ -71,7 +71,7 @@ async function summaly(host: string, ctx = createScrapeContext({ allowedPrivateN
 	const summary = await scrapeGeneral(ctx, new URL(host));
 
 	if (summary === null) {
-		throw new Error('failed summaly');
+		throw new Error('failed summarize');
 	}
 
 	return summary;
