@@ -3,7 +3,9 @@ import type https from 'node:https';
 import type { ProxyOptions, SummalyOptions } from '@/types.js';
 import { type AddressGuard, createAddressGuard, privateIpAllowedByEnv } from './address-guard.js';
 import { type GuardedAgentPool, type GuardedAgentSet, createGuardedAgents } from './agent-pool.js';
-import { assertProxyOptions, createProxyAgents, selectProxyUrl } from './proxy/index.js';
+import { selectProxyUrl } from './proxy/no-proxy.js';
+import { assertProxyOptions } from './proxy/proxy-url.js';
+import { createProxyAgents } from './proxy/tunnel.js';
 
 /**
  * Per-call connection settings. Holds no global state: one transport serves one summary call and is closed when that

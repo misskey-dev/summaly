@@ -4,7 +4,7 @@
 
 import { setTimeout as sleep } from 'node:timers/promises';
 import { describe, expect, test } from 'vitest';
-import type { CacheEntry } from '@/cache.js';
+import type { CacheEntry } from '@/cache/index.js';
 import { MemorySummaryCache } from '@/server/memory-cache.js';
 
 const errorEntry = (message: string): CacheEntry => ({ kind: 'error', error: { name: 'Error', message } });

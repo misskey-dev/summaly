@@ -3,7 +3,7 @@
  */
 
 import ipaddr from 'ipaddr.js';
-import type { ProxyOptions, SummalyOptions } from '@/index.js';
+import type { ProxyOptions, SummalyOptions } from '@/types.js';
 import { MAX_TIMEOUT, toNonNegativeInteger } from '@/util/integer.js';
 import type { MemorySummaryCacheOptions } from './memory-cache.js';
 

@@ -2,11 +2,11 @@ import http from 'node:http';
 import https from 'node:https';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { buildIconKey, buildRequestKey, objectId } from '@/coalesce/key.js';
-import { runCoalesced, runCoalescedIcon } from '@/coalesce/run.js';
-import { type CacheEntry, InProcessCoordinator, type SummaryCache } from '@/cache.js';
+import { buildIconKey, buildRequestKey, objectId } from '@/cache/key.js';
+import { runCoalesced, runCoalescedIcon } from '@/cache/run.js';
+import { type CacheEntry, InProcessCoordinator, type SummaryCache } from '@/cache/index.js';
 import { createSummaly, StatusError, type SummalyOptions, type SummalyResult } from '@/index.js';
-import { defineSummalyPlugin, type SummalyPlugin } from '@/plugin.js';
+import { defineSummalyPlugin, type SummalyPlugin } from '@/plugin/index.js';
 import { MemorySummaryCache } from '@/server/memory-cache.js';
 import { JsonCache } from './helpers/json-cache.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
@@ -688,10 +688,10 @@ describe('buildRequestKey', () => {
 		// Fresh copies of the module stand in for two processes: in each, object numbers start at 1,
 		// so the first agent in each gets the same number.
 		vi.resetModules();
-		const first = await import('@/coalesce/key.js');
+		const first = await import('@/cache/key.js');
 
 		vi.resetModules();
-		const second = await import('@/coalesce/key.js');
+		const second = await import('@/cache/key.js');
 		const agents = [new http.Agent(), new http.Agent()];
 
 		cleanups.push(() => agents.forEach(a => a.destroy()));

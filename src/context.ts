@@ -1,5 +1,5 @@
-import { buildIconKey } from '@/coalesce/key.js';
-import type { CoalesceDeps } from '@/coalesce/run.js';
+import { buildIconKey } from '@/cache/key.js';
+import type { CoalesceDeps } from '@/cache/run.js';
 import { privateIpAllowedByEnv } from '@/http/address-guard.js';
 import type { GuardedAgentPool } from '@/http/agent-pool.js';
 import { type FetchRequest, type FetchResult, fetchResponse } from '@/http/request.js';

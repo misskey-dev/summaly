@@ -1,4 +1,4 @@
-import type { CacheEntry, InflightCoordinator, SerializedError, SummaryCache } from '@/coalesce/types.js';
+import type { CacheEntry, InflightCoordinator, SerializedError, SummaryCache } from '@/cache/types.js';
 import { StatusError } from '@/http/status-error.js';
 import type { SummalyResult } from '@/types.js';
 

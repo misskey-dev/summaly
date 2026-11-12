@@ -3,5 +3,5 @@
  * summaly uses neither unless it is given one (the `cache` and `coordinator` options).
  */
 
-export { InProcessCoordinator } from '@/coalesce/in-process-coordinator.js';
-export type { CacheEntry, InflightCoordinator, SerializedError, SummaryCache } from '@/coalesce/types.js';
+export { InProcessCoordinator } from '@/cache/in-process-coordinator.js';
+export type { CacheEntry, InflightCoordinator, SerializedError, SummaryCache } from '@/cache/types.js';

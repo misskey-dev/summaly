@@ -1,4 +1,4 @@
-import type { CacheEntry, SummaryCache } from '@/coalesce/types.js';
+import type { CacheEntry, SummaryCache } from '@/cache/types.js';
 
 /**
  * A summary of a page usually stores two entries (the summary and its favicon check), so this keeps about

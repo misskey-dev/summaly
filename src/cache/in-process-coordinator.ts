@@ -1,4 +1,4 @@
-import type { InflightCoordinator } from '@/coalesce/types.js';
+import type { InflightCoordinator } from '@/cache/types.js';
 
 /**
  * Shares in-flight tasks within this process: while a task for a key runs, `run` with the same key returns its promise.

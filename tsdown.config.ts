@@ -75,11 +75,12 @@ export default defineConfig([
 	// Library (published API): `.`, `./cache`, `./fastify` and `./plugin`
 	{
 		...common,
+		// Each entry is an index.ts that only re-exports.
 		entry: {
 			index: './src/index.ts',
-			cache: './src/cache.ts',
-			fastify: './src/fastify.ts',
-			plugin: './src/plugin.ts',
+			cache: './src/cache/index.ts',
+			fastify: './src/fastify/index.ts',
+			plugin: './src/plugin/index.ts',
 		},
 		outDir: './built',
 		outExtensions: () => ({ js: '.js', dts: '.d.ts' }),

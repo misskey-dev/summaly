@@ -7,7 +7,7 @@ import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
 import { expect, test, describe, beforeEach, afterEach } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
-import type { CacheEntry, InflightCoordinator, SummaryCache } from '@/cache.js';
+import type { CacheEntry, InflightCoordinator, SummaryCache } from '@/cache/index.js';
 import { buildApp } from '@/server/app.js';
 import { loadServerConfig } from '@/server/config.js';
 import { MemorySummaryCache } from '@/server/memory-cache.js';

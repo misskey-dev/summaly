@@ -4,7 +4,7 @@ import { Agent as httpsAgent } from 'node:https';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createSummaly } from '@/index.js';
 import { StatusError } from '@/http/status-error.js';
-import { defineSummalyPlugin, type SummalyPlugin, type SummalyPluginOptions, type SummalyPluginResult } from '@/plugin.js';
+import { defineSummalyPlugin, type SummalyPlugin, type SummalyPluginOptions, type SummalyPluginResult } from '@/plugin/index.js';
 import { DEFAULT_BOT_UA } from '@/version.js';
 import { loopbackAgents } from './helpers/loopback-agent.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';

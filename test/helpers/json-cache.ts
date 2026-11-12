@@ -1,4 +1,4 @@
-import type { CacheEntry, SummaryCache } from '@/cache.js';
+import type { CacheEntry, SummaryCache } from '@/cache/index.js';
 
 /** A SummaryCache that keeps only JSON strings, like a Redis-backed implementation would. */
 export class JsonCache implements SummaryCache {

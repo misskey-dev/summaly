@@ -5,7 +5,7 @@ import net, { type AddressInfo, type Socket } from 'node:net';
 import tls from 'node:tls';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { createSummaly } from '@/index.js';
-import { defineSummalyPlugin } from '@/plugin.js';
+import { defineSummalyPlugin } from '@/plugin/index.js';
 import { runSourceScript } from './helpers/run-source.js';
 import { LOOPBACK_CERT, LOOPBACK_KEY } from './helpers/tls-cert.js';
 

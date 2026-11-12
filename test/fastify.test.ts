@@ -1,9 +1,9 @@
 import Fastify, { type FastifyRegisterOptions } from 'fastify';
 import { afterEach, describe, expect, test } from 'vitest';
-import { fastifySummaly, type SummalyFastifyOptions } from '@/fastify.js';
+import { fastifySummaly, type SummalyFastifyOptions } from '@/fastify/index.js';
 import { parseQueryOptions, resolveRequestOptions } from '@/fastify/query.js';
 import { DEFAULT_MAX_RESPONSE_SIZE, DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT } from '@/options.js';
-import { defineSummalyPlugin, type SummalyPlugin } from '@/plugin.js';
+import { defineSummalyPlugin, type SummalyPlugin } from '@/plugin/index.js';
 import { JsonCache } from './helpers/json-cache.js';
 import { startTestServer, type TestServer } from './helpers/test-server.js';
 

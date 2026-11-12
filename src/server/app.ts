@@ -3,8 +3,8 @@
  */
 
 import Fastify, { type FastifyInstance } from 'fastify';
-import { InProcessCoordinator, type InflightCoordinator, type SummaryCache } from '@/cache.js';
-import { fastifySummaly } from '@/fastify.js';
+import { InProcessCoordinator, type InflightCoordinator, type SummaryCache } from '@/cache/index.js';
+import { fastifySummaly } from '@/fastify/index.js';
 import type { ServerConfig } from './config.js';
 import { MemorySummaryCache } from './memory-cache.js';
 

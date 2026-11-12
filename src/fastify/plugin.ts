@@ -1,14 +1,8 @@
-/**
- * @misskey-dev/summaly/fastify: summaly as a Fastify plugin. Needs `fastify` (a peer dependency).
- */
-
 import type { FastifyPluginAsync } from 'fastify';
-import { toErrorBody } from '@/fastify/error.js';
-import { resolveRequestOptions } from '@/fastify/query.js';
-import { createSummaly } from '@/index.js';
+import { createSummaly } from '@/summaly.js';
 import type { SummalyOptions } from '@/types.js';
-
-export type { SummalyErrorBody } from '@/fastify/error.js';
+import { toErrorBody } from './error.js';
+import { resolveRequestOptions } from './query.js';
 
 /**
  * Options of fastifySummaly: summaly options applied to every request.
