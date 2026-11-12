@@ -39,6 +39,7 @@ export function buildApp(config: ServerConfig, deps: AppDeps = {}, options: AppO
 		...config.summalyOptions,
 		cache: deps.cache ?? new MemorySummaryCache(config.cache),
 		coordinator: deps.coordinator ?? new InProcessCoordinator(),
+		cacheControl: config.cacheControl,
 	});
 
 	app.get('/healthz', async () => ({ status: 'ok' }));

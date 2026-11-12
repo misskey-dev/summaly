@@ -27,6 +27,11 @@ export type ServerConfig = {
 	 * TTLs of the server's cache (see MemorySummaryCache); unset ones use its defaults
 	 */
 	cache: Pick<MemorySummaryCacheOptions, 'ttl' | 'errorTtl'>;
+
+	/**
+	 * Cache-Control header of a successful summary; unset uses the Fastify plugin's default
+	 */
+	cacheControl?: string;
 };
 
 export const DEFAULT_SERVER_HOST = 'localhost';
@@ -305,5 +310,12 @@ export function loadServerConfig(env: NodeJS.ProcessEnv): ServerConfig {
 		cache.errorTtl = parseNonNegativeInteger(errorCacheTtl.name, errorCacheTtl.value);
 	}
 
-	return { host, port, summalyOptions, cache };
+	const config: ServerConfig = { host, port, summalyOptions, cache };
+	const cacheControl = readSetting(env, 'CACHE_CONTROL');
+
+	if (cacheControl != null) {
+		config.cacheControl = cacheControl.value;
+	}
+
+	return config;
 }

@@ -34,6 +34,8 @@ v6 では、内部実装を一から見直し、よりパフォーマンスが�
 * `proxy` オプションで、外向きのプロキシを指定できるようになりました
 * Fastify プラグインが、Misskey が Summaly プロキシに送るクエリ（`userAgent`、`followRedirects`、タイムアウト、サイズ）を読むようになりました
   * 登録時のオプションがクエリより優先され、タイムアウトとサイズはクエリで厳格化できますが、設定値以上に緩和することはできません
+* Fastify プラグイン（スタンドアロンサーバー）が、成功した要約の応答に `Cache-Control` ヘッダーを付けるようになりました
+  * 既定値は `public, max-age=86400, stale-while-revalidate=43200` です。`cacheControl` オプション（スタンドアロンサーバーでは `SUMMALY_CACHE_CONTROL`）で変更でき、`false` に設定すると付与しません
 * スタンドアロンサーバーの機能を拡充しました
   * `GET /healthz` を追加しました
   * 結果を短時間キャッシュし、同じ URL への同時の要求を 1 本にまとめます（`SUMMALY_CACHE_TTL`、`SUMMALY_ERROR_CACHE_TTL`）

@@ -134,6 +134,19 @@ describe('環境変数で設定したサーバーの動作', () => {
 	});
 
 
+	test('成功した要約には既定の Cache-Control が付き、SUMMALY_CACHE_CONTROL で変えられる', async () => {
+		app = await createApp({});
+		const byDefault = await app.inject({ method: 'GET', url: '/', query: { url: targetUrl } });
+
+		expect(byDefault.headers['cache-control']).toBe('public, max-age=86400, stale-while-revalidate=43200');
+		await app.close();
+
+		app = await createApp({ SUMMALY_CACHE_CONTROL: 'no-store' });
+		const changed = await app.inject({ method: 'GET', url: '/', query: { url: targetUrl } });
+
+		expect(changed.headers['cache-control']).toBe('no-store');
+	});
+
 	test('GET /healthz は 200 {status:"ok"}', async () => {
 		app = await createApp({});
 		const res = await app.inject({ method: 'GET', url: '/healthz' });

@@ -305,6 +305,7 @@ It serves `GET /?url=<url>&lang=<lang>&...` (under the `prefix` you register it 
   * `lang`, `userAgent` and `followRedirects` given as options win over the query. `followRedirects` defaults to `false`.
   * The timeouts and `contentLengthLimit` given as options (or their defaults) are upper bounds: a query value is used only when it is above 0 and not above the bound. A timeout option of `0` (no timeout) has no bound.
   * The query can turn `contentLengthRequired` on, but not off.
+* A successful summary has a `Cache-Control` header, for a reverse proxy or a CDN in front: `public, max-age=86400, stale-while-revalidate=43200` by default. The `cacheControl` option changes it (`false` sends none). Errors never have one.
 * A missing `url` gives 400 `{ "error": "url is required" }`.
 * A failed summary gives 500 `{ "error": { "name", "message", "statusCode"?, "statusMessage"?, "isPermanentError"?, "code"? } }`: the error's name and message (up to 1024 characters), the status for an error response, and the system error code (such as `ENOTFOUND`) for a connection error. Never the stack.
 
@@ -369,6 +370,7 @@ Unset or empty variables are ignored, and the default is used. Invalid values (e
 | **SUMMALY_ALLOWED_PRIVATE_NETWORKS**  | none                             | Comma-separated CIDRs exempt from the private IP block, e.g. `10.0.0.0/8,fd00::/8` |
 | **SUMMALY_CACHE_TTL**                 | `300000`                         | How long successful summaries (and favicon checks) are cached, in ms (`0` = not cached) |
 | **SUMMALY_ERROR_CACHE_TTL**           | `30000`                          | How long failures are cached, in ms (`0` = not cached) |
+| **SUMMALY_CACHE_CONTROL**             | `public, max-age=86400, stale-while-revalidate=43200` | `Cache-Control` header of a successful summary (e.g. `no-store` to keep caches in front from storing it) |
 | **HTTP_PROXY** / `http_proxy`         | none                             | Proxy for `http:` targets (see [Proxies](#proxies)) |
 | **HTTPS_PROXY** / `https_proxy`       | none                             | Proxy for `https:` targets |
 | **NO_PROXY** / `no_proxy`             | none                             | Hosts that bypass the proxy |

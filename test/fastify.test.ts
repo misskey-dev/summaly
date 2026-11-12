@@ -115,6 +115,29 @@ describe('fastifySummaly', () => {
 		expect(res.json().title).toBe('Plugin Title');
 	});
 
+	test('成功した要約には既定の Cache-Control を付け、エラーには付けない', async () => {
+		const { app, origin } = await setup();
+		const ok = await app.inject({ method: 'GET', url: '/', query: { url: `${origin}/ok-cache-control` } });
+		const failed = await app.inject({ method: 'GET', url: '/', query: { url: `${origin}/missing-cache-control` } });
+		const noUrl = await app.inject({ method: 'GET', url: '/' });
+
+		expect(ok.headers['cache-control']).toBe('public, max-age=86400, stale-while-revalidate=43200');
+		expect(failed.statusCode).toBe(500);
+		expect(failed.headers['cache-control']).toBeUndefined();
+		expect(noUrl.headers['cache-control']).toBeUndefined();
+	});
+
+	test('cacheControl で Cache-Control を変えられ、false なら付けない', async () => {
+		const custom = await setup({ cacheControl: 'no-store' });
+		const none = await setup({ cacheControl: false });
+		const customRes = await custom.app.inject({ method: 'GET', url: '/', query: { url: `${custom.origin}/ok-custom` } });
+		const noneRes = await none.app.inject({ method: 'GET', url: '/', query: { url: `${none.origin}/ok-none` } });
+
+		expect(customRes.headers['cache-control']).toBe('no-store');
+		expect(noneRes.statusCode).toBe(200);
+		expect(noneRes.headers['cache-control']).toBeUndefined();
+	});
+
 	test('does not follow redirects by default', async () => {
 		const { app, origin } = await setup();
 		const res = await app.inject({ method: 'GET', url: '/', query: { url: `${origin}/redir-default` } });

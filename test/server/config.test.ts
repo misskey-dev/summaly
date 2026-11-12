@@ -358,6 +358,7 @@ describe('SUMMALY_*', () => {
 		{ suffix: 'ALLOWED_PRIVATE_NETWORKS', value: '10.0.0.0/8', expected: { summalyOptions: { allowedPrivateNetworks: ['10.0.0.0/8'] } }, invalid: 'nope' },
 		{ suffix: 'CACHE_TTL', value: '60000', expected: { cache: { ttl: 60000 } }, invalid: 'NaN' },
 		{ suffix: 'ERROR_CACHE_TTL', value: '5000', expected: { cache: { errorTtl: 5000 } }, invalid: '+1' },
+		{ suffix: 'CACHE_CONTROL', value: 'public, max-age=60', expected: { cacheControl: 'public, max-age=60' }, invalid: '' },
 	];
 
 	const defaults: ServerConfig = { host: 'localhost', port: 3000, summalyOptions: {}, cache: {} };
