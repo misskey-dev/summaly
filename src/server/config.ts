@@ -4,6 +4,7 @@
 
 import ipaddr from 'ipaddr.js';
 import type { ProxyOptions, SummalyOptions } from '@/index.js';
+import { MAX_TIMEOUT, toNonNegativeInteger } from '@/util/integer.js';
 import type { MemorySummaryCacheOptions } from './memory-cache.js';
 
 export type ServerConfig = {
@@ -32,12 +33,6 @@ export const DEFAULT_SERVER_HOST = 'localhost';
 export const DEFAULT_SERVER_PORT = 3000;
 
 const MAX_PORT = 65535;
-
-/**
- * Largest delay accepted by setTimeout (2^31 - 1 ms).
- * Larger values are silently replaced with 1 ms by Node.js, which would make every request time out.
- */
-export const MAX_TIMEOUT = 2147483647;
 
 export class ServerConfigError extends Error {
 	constructor(message: string) {
@@ -89,24 +84,6 @@ function parseBoolean(name: string, value: string): boolean {
 		default:
 			throw invalidValue(name, value, 'one of true, false, 1, 0');
 	}
-}
-
-/**
- * Parses a decimal integer between 0 and `max`, or returns undefined when `value` is not one.
- * Only plain digits are accepted (no sign, exponent, fraction or surrounding spaces).
- */
-export function toNonNegativeInteger(value: string, max = Number.MAX_SAFE_INTEGER): number | undefined {
-	if (!/^\d+$/.test(value)) {
-		return undefined;
-	}
-
-	const parsed = Number(value);
-
-	if (!Number.isSafeInteger(parsed) || parsed > max) {
-		return undefined;
-	}
-
-	return parsed;
 }
 
 function parseNonNegativeInteger(name: string, value: string, max = Number.MAX_SAFE_INTEGER): number {

@@ -50,14 +50,14 @@ async function startSlowServer(): Promise<{ url: string; requested: Promise<void
 	return { url: `http://127.0.0.1:${port}/`, requested };
 }
 
-/** Starts `node built/server.js` on a free port and resolves with its base URL once it is listening. */
+/** Starts `node built-server/server.mjs` on a free port and resolves with its base URL once it is listening. */
 async function startServerProcess(): Promise<{ child: ChildProcess; url: string; exited: Promise<number | null> }> {
 	const env: NodeJS.ProcessEnv = { ...process.env, SUMMALY_HOST: '127.0.0.1', SUMMALY_PORT: '0', SUMMALY_ALLOWED_PRIVATE_NETWORKS: '127.0.0.0/8' };
 
 	for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy']) {
 		delete env[name];
 	}
-	const child = spawn(process.execPath, ['built/server.js'], { cwd: rootDir, env, stdio: ['ignore', 'pipe', 'inherit'] });
+	const child = spawn(process.execPath, ['built-server/server.mjs'], { cwd: rootDir, env, stdio: ['ignore', 'pipe', 'inherit'] });
 	const exited = new Promise<number | null>(resolve => child.once('exit', code => resolve(code)));
 
 	cleanups.push(() => {

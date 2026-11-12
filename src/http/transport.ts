@@ -1,5 +1,5 @@
-import http from 'node:http';
-import https from 'node:https';
+import type http from 'node:http';
+import type https from 'node:https';
 import type { ProxyOptions, SummalyOptions } from '@/types.js';
 import { type AddressGuard, createAddressGuard, privateIpAllowedByEnv } from './address-guard.js';
 import { type GuardedAgentPool, type GuardedAgentSet, createGuardedAgents } from './agent-pool.js';

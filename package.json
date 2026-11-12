@@ -21,6 +21,10 @@
       "types": "./built/cache.d.ts",
       "default": "./built/cache.js"
     },
+    "./fastify": {
+      "types": "./built/fastify.d.ts",
+      "default": "./built/fastify.js"
+    },
     "./plugin": {
       "types": "./built/plugin.d.ts",
       "default": "./built/plugin.js"
@@ -39,9 +43,9 @@
     "build": "tsdown",
     "oxlint": "oxlint",
     "typecheck": "tsc --noEmit",
-    "typecheck:compat": "tsc -p tsconfig.compat.json && node scripts/check-no-fastify.mjs",
+    "typecheck:compat": "tsc -p tsconfig.compat.json && tsc -p tsconfig.compat-fastify.json",
     "test": "vitest run --exclude test/docker.test.ts",
-    "serve": "node ./built/server.js",
+    "serve": "node ./built-server/server.mjs",
     "test:docker": "docker build -t summaly:test . && vitest run ./test/docker.test.ts"
   },
   "devDependencies": {
@@ -62,7 +66,12 @@
     "htmlparser2": "^12.0.0",
     "ipaddr.js": "^2.5.0"
   },
-  "optionalDependencies": {
-    "fastify": "5.12.8"
+  "peerDependencies": {
+    "fastify": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "fastify": {
+      "optional": true
+    }
   }
 }

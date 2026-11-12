@@ -1,23 +1,18 @@
 /**
- * Reads summaly options from the query string of `GET /`
+ * Reads summaly options from the query string of `GET /` (see fastifySummaly)
  */
 
-import type { SummalyOptions } from '@/index.js';
-import { MAX_TIMEOUT, toNonNegativeInteger } from './config.js';
-
-// Mirrors DEFAULT_RESPONSE_TIMEOUT / DEFAULT_OPERATION_TIMEOUT / DEFAULT_MAX_RESPONSE_SIZE in
-// src/options.ts, which the lib's public entry does not export. test/server/app.test.ts checks they match.
-export const LIB_DEFAULT_RESPONSE_TIMEOUT = 20 * 1000;
-export const LIB_DEFAULT_OPERATION_TIMEOUT = 60 * 1000;
-export const LIB_DEFAULT_CONTENT_LENGTH_LIMIT = 10 * 1024 * 1024;
+import { DEFAULT_MAX_RESPONSE_SIZE, DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT } from '@/options.js';
+import type { SummalyOptions } from '@/types.js';
+import { MAX_TIMEOUT, toNonNegativeInteger } from '@/util/integer.js';
 
 /**
- * Builds the per-request options from the query and the options set by environment variables.
+ * Builds the per-request options from the query and the options the plugin was registered with
+ * (which the standalone server takes from environment variables).
  *
- * - lang, userAgent, followRedirects: the environment variable wins over the query; followRedirects defaults to false
- *   like the Fastify plugin.
- * - responseTimeout, operationTimeout, contentLengthLimit: the query may only tighten. The ceiling is the environment
- *   variable when set, otherwise the lib default; a query value is used only when it is above 0 and not above the
+ * - lang, userAgent, followRedirects: the registered option wins over the query; followRedirects defaults to false.
+ * - responseTimeout, operationTimeout, contentLengthLimit: the query may only tighten. The ceiling is the registered
+ *   option when set, otherwise the lib default; a query value is used only when it is above 0 and not above the
  *   ceiling (0 would mean no timeout). Otherwise the ceiling applies. A timeout ceiling of 0 (no timeout) has no
  *   upper bound, so any timeout above 0 from the query tightens it and is used.
  * - contentLengthRequired: the query may only turn the check on.
@@ -29,9 +24,9 @@ export function resolveRequestOptions(query: Record<string, unknown>, envOptions
 		followRedirects: false,
 		...fromQuery,
 		...envOptions,
-		responseTimeout: tightenTimeout(responseTimeout, envOptions.responseTimeout ?? LIB_DEFAULT_RESPONSE_TIMEOUT),
-		operationTimeout: tightenTimeout(operationTimeout, envOptions.operationTimeout ?? LIB_DEFAULT_OPERATION_TIMEOUT),
-		contentLengthLimit: tighten(contentLengthLimit, envOptions.contentLengthLimit ?? LIB_DEFAULT_CONTENT_LENGTH_LIMIT),
+		responseTimeout: tightenTimeout(responseTimeout, envOptions.responseTimeout ?? DEFAULT_RESPONSE_TIMEOUT),
+		operationTimeout: tightenTimeout(operationTimeout, envOptions.operationTimeout ?? DEFAULT_OPERATION_TIMEOUT),
+		contentLengthLimit: tighten(contentLengthLimit, envOptions.contentLengthLimit ?? DEFAULT_MAX_RESPONSE_SIZE),
 	};
 
 	if (contentLengthRequired === true) {

@@ -13,8 +13,6 @@ import { VERSION } from '@/version.js';
 export const version: string = VERSION;
 
 export { StatusError } from '@/http/status-error.js';
-export { default } from '@/fastify-plugin.js';
-export type { FastifyLike } from '@/fastify-plugin.js';
 
 export type {
 	Player,
