@@ -7,7 +7,44 @@ summaly
 [![][sakurako-badge]][himasaku]
 
 Get summary of web page: give it a URL and it returns the page's title, description, thumbnail, icon, oEmbed player and so on.
-Misskey uses it for URL previews.
+
+```javascript
+import { summaly } from '@misskey-dev/summaly';
+
+const summary = await summaly('https://www.youtube.com/watch?v=NMIEAhH_fTU');
+
+console.log(summary);
+```
+
+will be ... ↓
+
+```json
+{
+	"title": "【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)",
+	"icon": "https://www.youtube.com/s/desktop/cb518cf3/img/favicon.ico",
+	"description": "Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売THE IDOLM@STER CINDERELLA GIRLS CG STAR L...",
+	"thumbnail": "https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg",
+	"thumbnailStyle": "summary_large_image",
+	"player": {
+		"url": "https://www.youtube.com/embed/NMIEAhH_fTU?feature=oembed",
+		"width": 200,
+		"height": 113,
+		"allow": [
+			"autoplay",
+			"clipboard-write",
+			"encrypted-media",
+			"picture-in-picture",
+			"web-share",
+			"fullscreen"
+		]
+	},
+	"sitename": "YouTube",
+	"sensitive": false,
+	"activityPub": null,
+	"fediverseCreator": null,
+	"url": "https://www.youtube.com/watch?v=NMIEAhH_fTU"
+}
+```
 
 summaly is a library, a Fastify plugin and a standalone server (Docker image `ghcr.io/misskey-dev/summaly`).
 
@@ -167,46 +204,6 @@ See [Permissions Policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Permi
 A failed summary rejects with the error that caused it.
 A response with an error status (and a refused private address) gives a `StatusError` (exported), which has `statusCode`, `statusMessage` and `isPermanentError` (true for 4xx).
 Timeouts, size limits and connection errors give an `Error` with a message saying so.
-
-### Example
-
-```javascript
-import { summaly } from '@misskey-dev/summaly';
-
-const summary = await summaly('https://www.youtube.com/watch?v=NMIEAhH_fTU');
-
-console.log(summary);
-```
-
-will be ... ↓
-
-```json
-{
-	"title": "【アイドルマスター】「Stage Bye Stage」(歌：島村卯月、渋谷凛、本田未央)",
-	"icon": "https://www.youtube.com/s/desktop/cb518cf3/img/favicon.ico",
-	"description": "Website▶https://columbia.jp/idolmaster/Playlist▶https://www.youtube.com/playlist?list=PL83A2998CF3BBC86D2018年7月18日発売THE IDOLM@STER CINDERELLA GIRLS CG STAR L...",
-	"thumbnail": "https://i.ytimg.com/vi/NMIEAhH_fTU/maxresdefault.jpg",
-	"thumbnailStyle": "summary_large_image",
-	"player": {
-		"url": "https://www.youtube.com/embed/NMIEAhH_fTU?feature=oembed",
-		"width": 200,
-		"height": 113,
-		"allow": [
-			"autoplay",
-			"clipboard-write",
-			"encrypted-media",
-			"picture-in-picture",
-			"web-share",
-			"fullscreen"
-		]
-	},
-	"sitename": "YouTube",
-	"sensitive": false,
-	"activityPub": null,
-	"fediverseCreator": null,
-	"url": "https://www.youtube.com/watch?v=NMIEAhH_fTU"
-}
-```
 
 Cache and in-flight sharing
 ----------------------------------------------------------------
