@@ -90,7 +90,7 @@ describe('Docker イメージ', () => {
 		fixtureId = await dockerOk([
 			'run', '-d', '--pull', 'never',
 			'--network', network, '--network-alias', 'fixture',
-			'-v', `${join(_dirname, 'htmls')}:/fixtures:ro`,
+			'-v', `${join(_dirname, 'fixtures', 'htmls')}:/fixtures:ro`,
 			'--entrypoint', 'node',
 			image, '-e', fixtureServerScript,
 		]);
