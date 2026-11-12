@@ -1,3 +1,60 @@
+6.0.0 / Unreleased
+------------------
+
+v6 では、内部実装を一から見直し、よりパフォーマンスが向上したほか、プラグインシステムの刷新により、プラグインの開発における開発者体験を改善しています。
+
+`summaly()` の呼び出し方と `SummalyResult` の形は v5 と変化していません。
+
+### 破壊的変更
+
+* Node.js `^22.22.2 || ^24.17.0 || >=26.4.0` が必要になりました
+* `package.json` に `exports` を追加し、各部をサブパスエクスポートにより取り出せるようになりました（任意の深いパスの import はできません）
+* Fastify プラグインのデフォルトエクスポートを廃止し、`@misskey-dev/summaly/fastify` の `fastifySummaly` に移動しました
+  * fastify は optional な peerDependencies になり、自動ではインストールされません
+* プラグインシステムを刷新しました
+  * **【重要】** プラグインは `@misskey-dev/summaly/plugin` の `defineSummalyPlugin()` で定義できます。`summarize` は通信のための関数を持つ `ctx` (`SummalyPluginContext`) を引数で受け取ります。
+  * **【重要】** `name` が必須になりました。`summaly:` で始まる名前は組み込みプラグイン用に予約されています
+  * `summaly()` 実行時に渡したプラグインは、組み込みプラグインより先に `test` されます。
+  * **【重要】** `summarize` が `null` を返すと、`failed summarize` のエラーではなく、汎用の規則で要約します
+  * `GeneralScrapingOptions` 型を廃止しました。プラグインの型はルートではなく `@misskey-dev/summaly/plugin` から公開します
+* `summalyDefaultOptions` を廃止しました。既定値を変えるには `createSummaly(base)` を使ってください
+* ルートから公開する型を `SummalyResult`、`SummalyOptions`、`SummalyInstance`、`Player` にしました（`Summary` は `@misskey-dev/summaly/plugin` から公開します）
+* `agent` の型が got の `Agents` から `{ http?: http.Agent, https?: https.Agent }` になりました
+  * プライベート IP アドレスの判定を agent に任せるかどうかは、scheme ごとに決まります。`agent.http` だけを渡した場合、`https:` の要求は summaly が判定します。
+* Fastify プラグイン（スタンドアロンサーバー）が要約に失敗したときの応答を `{ error: { name, message, statusCode?, statusMessage?, isPermanentError?, code? } }` にしました
+* スタンドアロンサーバーは `built/server.js` ではなく `built-server/server.mjs` になり、npm パッケージには含まれなくなりました
+
+### 新機能
+
+* `createSummaly(base)` で、設定と接続を共有する summaly のインスタンスを作れるようになりました
+  * `close()`（と `await using`）で、実行中の要約を待ってから接続を閉じます
+* `@misskey-dev/summaly/cache` を追加しました。キャッシュ（`SummaryCache`）と同時要求の共有（`InflightCoordinator`、`InProcessCoordinator`）を、渡したときだけ使います
+* プラグインの `ctx` を通した通信にも、プライベート IP アドレスの遮断・`agent`・`proxy`・User-Agent・タイムアウト・サイズ上限がかかります
+* `allowedPrivateNetworks` オプションで、プライベート IP アドレスの遮断から除外するネットワークを指定できるようになりました
+* `proxy` オプションで、外向きのプロキシを指定できるようになりました
+* Fastify プラグインが、Misskey が Summaly プロキシに送るクエリ（`userAgent`、`followRedirects`、タイムアウト、サイズ）を読むようになりました
+  * 登録時のオプションがクエリより優先され、タイムアウトとサイズはクエリで厳格化できますが、設定値以上に緩和することはできません
+* Fastify プラグイン（スタンドアロンサーバー）が、成功した要約の応答に `Cache-Control` ヘッダーを付けるようになりました
+  * 既定値は `public, max-age=86400, stale-while-revalidate=43200` です。`cacheControl` オプション（スタンドアロンサーバーでは `SUMMALY_CACHE_CONTROL`）で変更でき、`false` に設定すると付与しません
+* スタンドアロンサーバーの機能を拡充しました
+  * `GET /healthz` を追加しました
+  * 結果を短時間キャッシュし、同じ URL への同時の要求を 1 本にまとめます（`SUMMALY_CACHE_TTL`、`SUMMALY_ERROR_CACHE_TTL`）
+  * `SUMMALY_ALLOWED_PRIVATE_NETWORKS` と `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` を読むようになりました
+  * 依存を 1 ファイルにバンドルし、Docker イメージを軽量化しました
+	* `HEALTHCHECK` を追加しました
+
+### 挙動の変化
+
+* プライベート IP アドレスの遮断を、応答を受け取った後ではなく接続する前に行います。リダイレクトの各段と、oEmbed・favicon の要求も対象です
+* 必要ない場面ではページの `<head>` だけを解析するようにし、本文の解析を効率化しました
+* 文字コードの判定を改善しました
+* `contentLengthLimit` が、受信したバイト数に加えて展開後のバイト数にもかかります。圧縮された応答でも `content-length` ヘッダーを上限と比べます
+* タイムアウトに `0` を指定すると、タイムアウトしなくなります
+* oEmbed と favicon の要求にも、User-Agent・タイムアウト・サイズ上限がかかります
+* URL の検証処理を強化しました
+* 1 つのインスタンスの要求どうしで、サイトへの接続を短時間使い回します
+* 抽出結果の細部が変わる場合があります
+
 5.6.0 / 2026/11/12
 ------------------
 

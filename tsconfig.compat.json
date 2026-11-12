@@ -1,0 +1,12 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"skipLibCheck": false,
+		"types": ["node"]
+	},
+	"include": ["./test/compat/**/*"],
+	// fastify's own dependencies have declaration errors under skipLibCheck: false (see tsconfig.compat-fastify.json).
+	// Leaving it out also checks that the other entry points type-check without fastify's types.
+	"exclude": ["./test/compat/fastify-usage.ts"]
+}

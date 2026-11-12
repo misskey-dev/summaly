@@ -4,12 +4,12 @@
  */
 
 import process from 'node:process';
-import Fastify from 'fastify';
-import summaly from '@/index.js';
-import { ServerConfigError, loadServerConfig, type ServerConfig } from '@/server/config.js';
+import { buildApp } from './app.js';
+import { ServerConfigError, loadServerConfig, type ServerConfig } from './config.js';
 
 async function main(): Promise<void> {
 	let config: ServerConfig;
+
 	try {
 		config = loadServerConfig(process.env);
 	} catch (err) {
@@ -21,12 +21,21 @@ async function main(): Promise<void> {
 		process.exit(1);
 	}
 
-	const fastify = Fastify({ logger: true });
-	await fastify.register(summaly, config.summalyOptions);
+	const fastify = buildApp(config, {}, { logger: true });
 
 	let closing = false;
+
+	// A response sent during shutdown closes its connection: otherwise a keep-alive client's socket, idle once the
+	// in-flight request is answered, would hold fastify.close() open until the keep-alive timeout.
+	fastify.addHook('onSend', async (_request, reply) => {
+		if (closing) {
+			reply.header('connection', 'close');
+		}
+	});
 	const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
-		if (closing) return;
+		if (closing) {
+			return;
+		}
 		closing = true;
 		fastify.log.info(`Received ${signal}, shutting down`);
 		try {
@@ -37,6 +46,7 @@ async function main(): Promise<void> {
 		}
 		process.exit(0);
 	};
+
 	process.once('SIGINT', (signal) => void shutdown(signal));
 	process.once('SIGTERM', (signal) => void shutdown(signal));
 
