@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
-# Node.js version used for building and running (matches the CI workflows)
-ARG NODE_VERSION=22.23.2
+# Node.js version used for building and running
+# Must match .node-version (checked in CI)
+ARG NODE_VERSION=26.13.1
 
 # ---- base: pnpm and the manifests needed for installing dependencies ----
 # The stages up to "deps" run on the build machine's platform even when building for another platform

@@ -10,6 +10,16 @@
 	"minimumReleaseAge": "7 days",
 	"osvVulnerabilityAlerts": true,
 	"configMigration": true,
+	"customManagers": [
+		{
+			"description": "Dockerfile の ARG NODE_VERSION を .node-version と同じ datasource で更新し、同じ PR で上がるようにする",
+			"customType": "regex",
+			"managerFilePatterns": ["/(^|/)Dockerfile$/"],
+			"matchStrings": ["ARG NODE_VERSION=(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+			"depNameTemplate": "node",
+			"datasourceTemplate": "node-version"
+		}
+	],
 	"packageRules": [
 		{
 			"description": "パッチアップデートはまとめて1つのPRにする（0.x を含む）",
@@ -36,6 +46,12 @@
 			"description": "lockfile maintenance と digest 固定にはリリース日時がないので minimumReleaseAge を外す（間接依存の待機は pnpm-workspace.yaml の minimumReleaseAge で担保）",
 			"matchUpdateTypes": ["lockFileMaintenance", "pin", "pinDigest"],
 			"minimumReleaseAge": null
+		},
+		{
+			"description": "Dockerfile の node イメージは customManagers で更新するので、dockerfile マネージャーでは更新しない",
+			"matchManagers": ["dockerfile"],
+			"matchPackageNames": ["node"],
+			"enabled": false
 		}
 	]
 }
