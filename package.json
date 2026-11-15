@@ -12,7 +12,7 @@
   "main": "./built/index.js",
   "type": "module",
   "types": "./built/index.d.ts",
-  "packageManager": "pnpm@12.18.0",
+  "packageManager": "pnpm@12.20.0",
   "files": [
     "built",
     "LICENSE"
