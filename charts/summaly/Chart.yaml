@@ -3,4 +3,4 @@ name: summaly
 description: A Helm chart for Summaly
 type: application
 version: 0.2.3
-appVersion: 5.5.1-psr.4.3.3
+appVersion: 5.5.1-psr.4.3.4
