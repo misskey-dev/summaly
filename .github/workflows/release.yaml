@@ -33,7 +33,7 @@ jobs:
         run: npm ci --ignore-scripts --prefix scripts/release
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v3.3.0
+        uses: actions/create-github-app-token@v3.4.0
         with:
           repositories: ${{ github.event.repository.name }}
           client-id: ${{ secrets.RENOVATE_CLIENT_ID }}
