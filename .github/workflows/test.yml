@@ -29,6 +29,5 @@ jobs:
           SKIP_NETWORK_TEST=true pnpm test
       - name: Release workflow checks
         run: |
-          python3 -m unittest discover -s scripts/release -p "test_*.py"
           npm ci --ignore-scripts --prefix scripts/release
           npm test --prefix scripts/release

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Existing release version without v (including RC versions)
+        description: 'やり直す release の version (先頭の v は付けない。例: 1.4.1)'
         required: true
         type: string
 
@@ -12,38 +12,12 @@ permissions:
   contents: read
 
 jobs:
-  resolve:
-    name: Resolve the released commit
-    runs-on: ubuntu-latest
-    outputs:
-      sha: ${{ steps.resolve.outputs.sha }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          ref: master
-          fetch-depth: 0
-          persist-credentials: false
-      - id: resolve
-        env:
-          VERSION: ${{ inputs.version }}
-          GH_TOKEN: ${{ github.token }}
-        run: bash scripts/release/resolve_tag.sh
-
-  publish-image:
-    name: Publish Application Image
-    needs: resolve
-    permissions:
-      contents: read
-      packages: write
-    uses: Soli0222/shared-workflows/.github/workflows/publish-image.yaml@v1.1.0
-    with:
-      ref: ${{ needs.resolve.outputs.sha }}
-      version: ${{ inputs.version }}
-
-  publish-chart:
-    name: Publish Helm Chart
-    needs: [resolve, publish-image]
+  retry:
     permissions:
       contents: write
+      pull-requests: write
       packages: write
-    uses: Soli0222/shared-workflows/.github/workflows/publish-chart.yaml@v1.1.0
+    uses: Soli0222/shared-workflows/.github/workflows/release-retry.yaml@v1.3.0
+    secrets: inherit
+    with:
+      version: ${{ inputs.version }}
