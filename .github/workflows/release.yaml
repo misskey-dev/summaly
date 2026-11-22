@@ -13,67 +13,14 @@ concurrency:
   queue: max
 
 jobs:
-  release-please:
-    name: Release Please
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    outputs:
-      release-created: ${{ steps.release.outputs.release_created }}
-      version: ${{ steps.release.outputs.version }}
-      sha: ${{ steps.release.outputs.sha }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          ref: master
-          persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version: 26.13.1
-      - name: Install release tools
-        run: npm ci --ignore-scripts --prefix scripts/release
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v3.4.0
-        with:
-          repositories: ${{ github.event.repository.name }}
-          client-id: ${{ secrets.RENOVATE_CLIENT_ID }}
-          private-key: ${{ secrets.RENOVATE_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
-      - name: Release Please
-        id: release
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: npm run release --prefix scripts/release
-
-  publish-image:
-    name: Publish Application Image
-    needs: release-please
-    if: needs.release-please.outputs.release-created == 'true'
-    permissions:
-      contents: read
-      packages: write
-    uses: Soli0222/shared-workflows/.github/workflows/publish-image.yaml@v1.1.0
-    with:
-      ref: ${{ needs.release-please.outputs.sha }}
-      version: ${{ needs.release-please.outputs.version }}
-
-  # Reconcile the latest master chart after the released image is verified.
-  publish-chart:
-    name: Publish Helm Chart
-    needs: [release-please, publish-image]
+  release:
     permissions:
       contents: write
+      pull-requests: write
       packages: write
-    uses: Soli0222/shared-workflows/.github/workflows/publish-chart.yaml@v1.1.0
-
-  report-chart:
-    name: Report chart result
-    needs: publish-chart
-    runs-on: ubuntu-latest
-    steps:
-      - env:
-          RESULT: ${{ needs.publish-chart.outputs.result }}
-          VERSION: ${{ needs.publish-chart.outputs.version }}
-        run: echo "Chart result=$RESULT version=$VERSION" >> "$GITHUB_STEP_SUMMARY"
+    uses: Soli0222/shared-workflows/.github/workflows/release-pipeline.yaml@v1.3.0
+    secrets: inherit
+    with:
+      release-tools-prefix: scripts/release
+      node-version: '26.13.1'
+      api-versions: monitoring.coreos.com/v1
