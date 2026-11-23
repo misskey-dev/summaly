@@ -43,8 +43,7 @@
     "escape-regexp": "0.0.1",
     "got": "16.2.0",
     "html-entities": "2.6.0",
-    "ipaddr.js": "2.5.0",
-    "pino": "10.4.0"
+    "ipaddr.js": "2.5.0"
   },
   "optionalDependencies": {
     "fastify": "5.12.8"

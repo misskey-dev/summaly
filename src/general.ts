@@ -5,7 +5,6 @@ import { clip } from '@/utils/clip.js';
 import { cleanupTitle } from '@/utils/cleanup-title.js';
 
 import { get, head, scpaping } from '@/utils/got.js';
-import { logger } from '@/utils/logger.js';
 
 /**
  * Contains only the html snippet for a sanitized iframe as the thumbnail is
@@ -138,7 +137,15 @@ export type GeneralScrapingOptions = {
 	operationTimeout?: number;
 	contentLengthLimit?: number;
 	contentLengthRequired?: boolean;
-	requestId?: string;
+	logger?: SummalyLogger;
+};
+
+/**
+ * Logger for logging the fetch of pages, e.g. the request logger of Fastify (`req.log`).
+ * Errors are not logged with it, because they are thrown to the caller.
+ */
+export type SummalyLogger = {
+	info(obj: object, msg: string): void;
 };
 
 export async function general(_url: URL | string, opts?: GeneralScrapingOptions): Promise<Summary | null> {
@@ -147,51 +154,26 @@ export async function general(_url: URL | string, opts?: GeneralScrapingOptions)
 
 	const url = typeof _url === 'string' ? new URL(_url) : _url;
 
-	// 2. OGP取りに行ったときのレスポンス (開始)
-	if (opts?.requestId) {
-		logger.info({
-			requestId: opts.requestId,
-			targetUrl: url.href,
-		}, `Starting OGP fetch for URL: ${url.href}`);
-	}
+	opts?.logger?.info({ targetUrl: url.href }, 'Starting OGP fetch');
 
-	try {
-		const res = await scpaping(url.href, {
-			lang: lang || undefined,
-			userAgent: opts?.userAgent,
-			followRedirects: opts?.followRedirects,
-			responseTimeout: opts?.responseTimeout,
-			operationTimeout: opts?.operationTimeout,
-			contentLengthLimit: opts?.contentLengthLimit,
-			contentLengthRequired: opts?.contentLengthRequired,
-		});
+	const res = await scpaping(url.href, {
+		lang: lang || undefined,
+		userAgent: opts?.userAgent,
+		followRedirects: opts?.followRedirects,
+		responseTimeout: opts?.responseTimeout,
+		operationTimeout: opts?.operationTimeout,
+		contentLengthLimit: opts?.contentLengthLimit,
+		contentLengthRequired: opts?.contentLengthRequired,
+	});
 
-		// 2. OGP取りに行ったときのレスポンス (成功)
-		if (opts?.requestId) {
-			logger.info({
-				requestId: opts.requestId,
-				targetUrl: url.href,
-				statusCode: res.response.statusCode,
-				contentType: res.response.headers['content-type'],
-				contentLength: res.response.headers['content-length'],
-			}, `OGP fetch successful: ${res.response.statusCode}`);
-		}
+	opts?.logger?.info({
+		targetUrl: url.href,
+		statusCode: res.response.statusCode,
+		contentType: res.response.headers['content-type'],
+		contentLength: res.response.headers['content-length'],
+	}, 'OGP fetch succeeded');
 
-		return await parseGeneral(url, res);
-	} catch (error) {
-		// OGP取得エラーログ
-		if (opts?.requestId) {
-			logger.error({
-				requestId: opts.requestId,
-				targetUrl: url.href,
-				error: {
-					message: error instanceof Error ? error.message : String(error),
-					name: error instanceof Error ? error.name : 'Unknown',
-				},
-			}, `OGP fetch failed for URL: ${url.href}`);
-		}
-		throw error;
-	}
+	return await parseGeneral(url, res);
 }
 
 function headerEqualValueContains(search: string, headerValue: string | string[] | undefined) {

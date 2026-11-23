@@ -3,23 +3,14 @@
  * https://github.com/misskey-dev/summaly
  */
 
-import { randomUUID } from 'crypto';
 import got from 'got';
 import type { Agents as GotAgents } from 'got';
 import type { FastifyInstance } from 'fastify';
 import { SummalyResult as _SummalyResult } from '@/summary.js';
 import { SummalyPlugin as _SummalyPlugin } from '@/iplugin.js';
-import { general, type GeneralScrapingOptions } from '@/general.js';
+import { general, type GeneralScrapingOptions, type SummalyLogger } from '@/general.js';
 import { DEFAULT_BOT_UA, DEFAULT_OPERATION_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, agent, setAgent } from '@/utils/got.js';
 import { plugins as builtinPlugins } from '@/plugins/index.js';
-import { logger } from '@/utils/logger.js';
-
-declare module 'fastify' {
-	interface FastifyRequest {
-		requestId: string;
-		startTime: number;
-	}
-}
 
 export type SummalyResult = _SummalyResult;
 
@@ -76,9 +67,9 @@ export type SummalyOptions = {
 	contentLengthRequired?: boolean;
 
 	/**
-	 * Request ID for logging
+	 * Logger for logging the fetch of pages (e.g. `req.log` of Fastify)
 	 */
-	requestId?: string;
+	logger?: SummalyLogger;
 };
 
 export const summalyDefaultOptions = {
@@ -150,98 +141,32 @@ export const summaly = async (url: string, options?: SummalyOptions): Promise<Su
 		operationTimeout: opts.operationTimeout,
 		contentLengthLimit: opts.contentLengthLimit,
 		contentLengthRequired: opts.contentLengthRequired,
-		requestId: opts.requestId,
+		logger: opts.logger,
 	};
 
-	try {
-		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-		const summary = await (match ? match.summarize : general)(_url, scrapingOptions);
+	// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+	const summary = await (match ? match.summarize : general)(_url, scrapingOptions);
 
-		if (summary == null) {
-			const error = new Error('failed summarize');
-			if (opts.requestId) {
-				logger.error({
-					requestId: opts.requestId,
-					url: actualUrl,
-					error: {
-						message: error.message,
-						name: error.name,
-					},
-				}, 'Failed to summarize URL - summary is null');
-			}
-			throw error;
-		}
-
-		return Object.assign(summary, {
-			url: actualUrl,
-		});
-	} catch (error) {
-		if (opts.requestId) {
-			logger.error({
-				requestId: opts.requestId,
-				url: actualUrl,
-				error: {
-					message: error instanceof Error ? error.message : String(error),
-					name: error instanceof Error ? error.name : 'Unknown',
-					stack: error instanceof Error ? error.stack : undefined,
-				},
-			}, `Summaly function error: ${error instanceof Error ? error.message : String(error)}`);
-		}
-		throw error;
+	if (summary == null) {
+		throw new Error('failed summarize');
 	}
+
+	return Object.assign(summary, {
+		url: actualUrl,
+	});
 };
 
 // eslint-disable-next-line import/no-default-export
 export default function (fastify: FastifyInstance, options: SummalyOptions, done: (err?: Error) => void) {
-	// Request logger middleware
-	fastify.addHook('preHandler', async (req) => {
-		const requestId = randomUUID();
-		req.requestId = requestId;
-		req.startTime = Date.now();
-
-		// 1. 来たリクエストを表示
-		logger.info({
-			requestId,
-			method: req.method,
-			url: req.url,
-			query: req.query,
-			userAgent: req.headers['user-agent'],
-			ip: req.ip,
-		}, `Request received: ${req.method} ${req.url}`);
-	});
-
-	// Response logger middleware
-	fastify.addHook('onSend', async (req, reply, payload) => {
-		const requestId = req.requestId;
-		const startTime = req.startTime;
-		const responseTime = Date.now() - startTime;
-
-		// 3. リクエストに対するレスポンス
-		logger.info({
-			requestId,
-			method: req.method,
-			url: req.url,
-			statusCode: reply.statusCode,
-			responseTime: `${responseTime}ms`,
-		}, `Response sent: ${reply.statusCode} (${responseTime}ms)`);
-
-		return payload;
-	});
-
 	fastify.get<{
 		Querystring: {
 			url?: string;
 			lang?: string;
 		};
 	}>('/', async (req, reply) => {
-		const requestId = req.requestId;
 		const url = req.query.url as string;
 		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (url == null) {
-			logger.warn({
-				requestId,
-			}, 'Missing required URL parameter');
-
 			return reply.status(400).send({
 				error: 'url is required',
 			});
@@ -251,21 +176,13 @@ export default function (fastify: FastifyInstance, options: SummalyOptions, done
 			const summary = await summaly(url, {
 				lang: req.query.lang as string,
 				...options,
-				requestId, // summaly関数にrequestIdを渡す
+				logger: req.log,
 			});
 
 			return summary;
 		} catch (e) {
-			// 5. エラーハンドリングに入った場合のログ
-			logger.error({
-				requestId,
-				url,
-				error: {
-					message: e instanceof Error ? e.message : String(e),
-					name: e instanceof Error ? e.name : 'Unknown',
-					stack: e instanceof Error ? e.stack : undefined,
-				},
-			}, `Error occurred while processing URL: ${url}`);
+			// Log the details including the stack trace, and return only the message and name
+			req.log.error({ err: e, url }, 'Failed to summarize');
 
 			return reply.status(500).send({
 				error: {

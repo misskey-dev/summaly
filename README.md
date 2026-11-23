@@ -61,14 +61,14 @@ Invalid values (e.g. `SUMMALY_PORT=abc`) make the server exit with an error.
 | **SUMMALY_PORT**                    | (listen port)               | *integer* (0-65535)                            | `3000`                                        |
 | **SUMMALY_LANG**                    | `lang`                      | *string*                                       | the `lang` query parameter of the request     |
 | **SUMMALY_USER_AGENT**              | `userAgent`                 | *string*                                       | `SummalyBot/[version] (+[Link to README file in GitHub])` |
-| **SUMMALY_FOLLOW_REDIRECTS**        | `followRedirects`           | *boolean* (`true` / `false` / `1` / `0`)       | `false`                                       |
+| **SUMMALY_FOLLOW_REDIRECTS**        | `followRedirects`           | *boolean* (`true` / `false` / `1` / `0`)       | `true`                                        |
 | **SUMMALY_RESPONSE_TIMEOUT**        | `responseTimeout`           | *integer* (milliseconds, 0-2147483647)         | `20000`                                       |
 | **SUMMALY_OPERATION_TIMEOUT**       | `operationTimeout`          | *integer* (milliseconds, 0-2147483647)         | `60000`                                       |
 | **SUMMALY_CONTENT_LENGTH_LIMIT**    | `contentLengthLimit`        | *integer* (bytes)                              | `10485760`                                    |
 | **SUMMALY_CONTENT_LENGTH_REQUIRED** | `contentLengthRequired`     | *boolean* (`true` / `false` / `1` / `0`)       | `false`                                       |
 
 * The server listens on `localhost` by default. Since summaly fetches arbitrary URLs given by clients, be careful when exposing it to other hosts (e.g. `SUMMALY_HOST=0.0.0.0`).
-* `SUMMALY_LANG` and `SUMMALY_FOLLOW_REDIRECTS` take precedence over the per-request behavior of the Fastify plugin (the `lang` query parameter and `followRedirects: false`).
+* `SUMMALY_LANG` takes precedence over the `lang` query parameter of the request.
 * `plugins` and `agent` cannot be configured with environment variables. Register the Fastify plugin in your own server to use them.
 
 Run the server with Docker:
@@ -111,22 +111,24 @@ services:
 
 ### Logging
 
-This package includes comprehensive logging functionality powered by [pino](https://github.com/pinojs/pino). The following events are automatically logged:
+The server logs with the [built-in logger of Fastify](https://fastify.dev/docs/latest/Reference/Logging/) ([pino](https://github.com/pinojs/pino)). The following events are logged:
 
-1. **Request Logging**: All incoming requests with UUID, method, URL, query parameters, user agent, and IP address
-2. **OGP Fetch Logging**: HTTP requests made to fetch OGP data from target URLs, including response status and timing
-3. **Response Logging**: All outgoing responses with request UUID, status code, and response time
-4. **Error Logging**: Detailed error information including stack traces for debugging
+1. **Request**: method, URL, query parameters, user agent and IP address of each incoming request
+2. **OGP fetch**: the start of fetching the target page, and its status code, content type and content length when it succeeds
+3. **Response**: status code and response time (in milliseconds) of each request
+4. **Error**: the error with its stack trace when summarizing fails (the response contains only the message and name of the error)
 
-Each request is assigned a unique UUID for tracking across all log entries. Log output format can be controlled via environment variables:
+All the logs of a request share the same `requestId`. It is taken from the `X-Request-ID` request header if any, or generated as a UUID otherwise.
 
-- `LOG_LEVEL`: Set logging level (debug, info, warn, error) - default: `info`
-- `NODE_ENV`: When set to `development`, logs are formatted with pino-pretty for better readability
+- `LOG_LEVEL`: Logging level (`trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent`) - default: `info`
+- `NODE_ENV`: Unless set to `production`, logs are formatted with [pino-pretty](https://github.com/pinojs/pino-pretty) (a dev dependency) for readability. Otherwise logs are written as JSON lines. The Docker image sets `NODE_ENV=production`.
 
-Example log output:
+Example log output (`NODE_ENV=production`):
 ```json
-{"level":"info","time":1731234567890,"requestId":"550e8400-e29b-41d4-a716-446655440000","method":"GET","url":"/?url=https://example.com","query":{"url":"https://example.com"},"msg":"Request received: GET /?url=https://example.com"}
+{"level":"info","time":1795400342849,"pid":1,"hostname":"summaly","requestId":"caf1894c-ac82-419e-9845-89b3e607f8c1","req":{"method":"GET","url":"/?url=https://example.com/","query":{"url":"https://example.com/"},"userAgent":"Misskey/2026.11.0","ip":"10.0.0.1"},"msg":"incoming request"}
 ```
+
+When you use summaly as a function or register the Fastify plugin in your own server, you can pass a logger (e.g. a pino logger) as the `logger` option to log the fetch of pages. The Fastify plugin passes the request logger (`req.log`) automatically.
 
 #### opts (SummalyOptions)
 
@@ -141,6 +143,7 @@ Example log output:
 | **operationTimeout**      | *number*               | Set the timeout from the start to the end of the request.                                                                                                                           | `60000`                |
 | **contentLengthLimit**    | *number*               | If set to true, an error will occur if the content-length value returned from the other server is larger than this parameter (or if the received body size exceeds this parameter). | `10485760`             |
 | **contentLengthRequired** | *boolean*              | If set to true, it will be an error if the other server does not return content-length.                                                                                             | `false`                |
+| **logger**                | *{ info(obj, msg) }*   | Logger for logging the fetch of pages (e.g. a pino logger). Errors are not logged, because they are thrown to the caller.                                                         | `undefined`            |
 
 #### Plugin
 

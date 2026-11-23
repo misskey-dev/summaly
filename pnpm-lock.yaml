@@ -193,9 +193,6 @@ importers:
       ipaddr.js:
         specifier: 2.5.0
         version: 2.5.0
-      pino:
-        specifier: 10.4.0
-        version: 10.4.0
     devDependencies:
       '@misskey-dev/oxlint-fmt-config':
         specifier: 0.1.1
@@ -506,12 +503,6 @@ packages:
     peerDependenciesMeta:
       '@stylistic/eslint-plugin':
         optional: true
-
-  '@napi-rs/wasm-runtime@1.1.5':
-    resolution: {integrity: sha512-AWPoBRJ9tsnVhor4sjO7rkni+7p+2IAEFj6cx06UgP10jkQHqay/36uRV/bFkgrh18D9vb4cr8Q0Pthskgzy+Q==}
-    peerDependencies:
-      '@emnapi/core': ^1.7.1
-      '@emnapi/runtime': ^1.7.1
 
   '@napi-rs/wasm-runtime@1.2.6':
     resolution: {integrity: sha512-mRyDmEw9/fCDXCGfL1sbgIw/GUK0PVxRW4YwgPN61F3LQ+fSyoBFarJVzgGyhF6kRzEQZ0FejDqm4WLXSeqQmw==}
@@ -1036,9 +1027,6 @@ packages:
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^9.0.0 || ^10.0.0
-
-  '@tybys/wasm-util@0.10.2':
-    resolution: {integrity: sha512-RoBvJ2X0wuKlWFIjrwffGw1IqZHKQqzIchKaadZZfnNpsAYp2mM0h36JtPCjNDAHGgYez/15uMBpfGwchhiMgg==}
 
   '@tybys/wasm-util@0.10.4':
     resolution: {integrity: sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==}
@@ -2406,11 +2394,11 @@ snapshots:
     optionalDependencies:
       '@stylistic/eslint-plugin': 5.10.0(eslint@9.39.2(supports-color@7.2.0))
 
-  '@napi-rs/wasm-runtime@1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
+  '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
-      '@tybys/wasm-util': 0.10.2
+      '@tybys/wasm-util': 0.10.4
     optional: true
 
   '@napi-rs/wasm-runtime@1.2.6(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)':
@@ -2500,7 +2488,8 @@ snapshots:
   '@oxlint/binding-win32-x64-msvc@1.91.0':
     optional: true
 
-  '@pinojs/redact@0.4.0': {}
+  '@pinojs/redact@0.4.0':
+    optional: true
 
   '@quansync/fs@1.0.0':
     dependencies:
@@ -2585,7 +2574,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
-      '@napi-rs/wasm-runtime': 1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+      '@napi-rs/wasm-runtime': 1.2.6(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optional: true
 
   '@rolldown/binding-wasm32-wasi@1.3.2':
@@ -2700,11 +2689,6 @@ snapshots:
       espree: 10.4.0
       estraverse: 5.3.0
       picomatch: 4.0.7
-
-  '@tybys/wasm-util@0.10.2':
-    dependencies:
-      tslib: 2.8.1
-    optional: true
 
   '@tybys/wasm-util@0.10.4':
     dependencies:
@@ -3463,7 +3447,8 @@ snapshots:
       sonic-boom: 5.0.2
       strip-json-comments: 5.1.0
 
-  pino-std-serializers@7.1.0: {}
+  pino-std-serializers@7.1.0:
+    optional: true
 
   pino@10.4.0:
     dependencies:
@@ -3478,6 +3463,7 @@ snapshots:
       safe-stable-stringify: 2.5.0
       sonic-boom: 4.2.1
       thread-stream: 4.0.0
+    optional: true
 
   postcss@8.5.13:
     dependencies:
@@ -3490,7 +3476,8 @@ snapshots:
   process-warning@4.0.1:
     optional: true
 
-  process-warning@5.1.0: {}
+  process-warning@5.1.0:
+    optional: true
 
   pump@3.0.4:
     dependencies:
@@ -3501,11 +3488,14 @@ snapshots:
 
   quansync@1.0.0: {}
 
-  quick-format-unescaped@4.0.4: {}
+  quick-format-unescaped@4.0.4:
+    optional: true
 
-  real-require@0.2.0: {}
+  real-require@0.2.0:
+    optional: true
 
-  real-require@1.0.0: {}
+  real-require@1.0.0:
+    optional: true
 
   require-from-string@2.0.2:
     optional: true
@@ -3620,7 +3610,8 @@ snapshots:
       ret: 0.5.0
     optional: true
 
-  safe-stable-stringify@2.5.0: {}
+  safe-stable-stringify@2.5.0:
+    optional: true
 
   safer-buffer@2.1.2: {}
 
@@ -3641,6 +3632,7 @@ snapshots:
   sonic-boom@4.2.1:
     dependencies:
       atomic-sleep: 1.0.0
+    optional: true
 
   sonic-boom@5.0.2:
     dependencies:
@@ -3665,6 +3657,7 @@ snapshots:
   thread-stream@4.0.0:
     dependencies:
       real-require: 0.2.0
+    optional: true
 
   tinybench@6.2.3: {}
 
