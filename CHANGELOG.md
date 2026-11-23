@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.6.0-psr.4.4.0](https://github.com/Soli0222/summaly/compare/5.5.1-psr.4.3.4...5.6.0-psr.4.4.0) (2026-11-23)
+
+
+### 新機能
+
+* upstream 5.6.0 の取り込みに合わせてログと Renovate 設定を整理 ([aab6e2d](https://github.com/Soli0222/summaly/commit/aab6e2d8b34742e436cde1c483804820cab2826d))
+* upstream 5.6.0 を取り込む ([#227](https://github.com/Soli0222/summaly/issues/227)) ([0bbc999](https://github.com/Soli0222/summaly/commit/0bbc9995265cb396417fd78c93e93923dae65845))
+
 ## [5.5.1-psr.4.3.4](https://github.com/Soli0222/summaly/compare/5.5.1-psr.4.3.3...5.5.1-psr.4.3.4) (2026-11-13)
 
 
