@@ -1,16 +1,31 @@
 import { readFileSync } from 'node:fs';
-import { defineConfig } from 'tsdown';
+import { defineConfig, type UserConfig } from 'tsdown';
 
-export default defineConfig({
-	entry: './src/index.ts',
+const common = {
 	outExtensions: (_) => ({ js: '.js', dts: '.d.ts' }),
 	tsconfig: true,
-	dts: true,
 	deps: {
-		skipNodeModulesBundle: true,
+		neverBundle: true,
 	},
 	outDir: './built',
 	define: {
 		_VERSION_: JSON.stringify(JSON.parse(readFileSync('./package.json', 'utf-8')).version),
 	},
-});
+} satisfies UserConfig;
+
+export default defineConfig([
+	// Library (published API)
+	{
+		...common,
+		entry: './src/index.ts',
+		dts: true,
+	},
+	// Standalone server (`node built/server.js`)
+	{
+		...common,
+		entry: {
+			server: './src/server/index.ts',
+		},
+		dts: false,
+	},
+]);

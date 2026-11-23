@@ -26,13 +26,21 @@
       'security',
     ],
   },
+  customManagers: [
+    {
+      description: 'Update ARG NODE_VERSION in the Dockerfile, which the dockerfile manager cannot update because FROM uses the variable',
+      customType: 'regex',
+      managerFilePatterns: ['/(^|/)Dockerfile$/'],
+      matchStrings: ['ARG NODE_VERSION=(?<currentValue>\\d+\\.\\d+\\.\\d+)'],
+      depNameTemplate: 'node',
+      datasourceTemplate: 'docker',
+    },
+  ],
   packageRules: [
     {
-      description: 'Keep TypeScript 6 until typescript-eslint supports TypeScript 7 (https://github.com/Soli0222/summaly/issues/174)',
-      matchManagers: ['npm'],
-      matchFileNames: ['package.json'],
-      matchPackageNames: ['typescript'],
-      allowedVersions: '<7',
+      description: 'Pinned exactly by the peerDependencies of @misskey-dev/oxlint-fmt-config. Update it manually together with fmt-config',
+      matchPackageNames: ['@stylistic/eslint-plugin'],
+      enabled: false,
     },
     {
       matchManagers: [

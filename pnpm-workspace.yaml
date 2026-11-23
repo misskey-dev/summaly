@@ -1,2 +1,11 @@
+saveExact: true
 allowBuilds:
   esbuild: true
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: false
+minimumReleaseAgeExclude:
+  # Renovate security update: fastify@5.12.6
+  - fastify@5.12.6
+  - '@vitest/mocker@5.1.1'
+  - '@vitest/spy@5.1.1'
+  - vitest@5.1.1

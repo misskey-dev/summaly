@@ -1,6 +1,6 @@
 # Releases and Helm chart
 
-The `master` branch follows the latest stable Node.js release, including new majors before LTS. Runtime versions are pinned in Dockerfile and CI and updated together by Renovate. `@types/node` follows stable releases separately so its npm cooldown cannot hold back a runtime security patch. Alpine images use the `-alpine` variant to avoid blocking Node updates when an Alpine minor reaches the end of its image builds.
+The `master` branch follows the latest stable Node.js release, including new majors before LTS. Runtime versions are pinned in Dockerfile and CI and updated together by Renovate. `@types/node` follows stable releases separately so its npm cooldown cannot hold back a runtime security patch.
 
 Renovate reads `renovate.json5` as repository configuration. It must not also be passed as the bot's global configuration: mergeable custom managers and rules would be loaded twice.
 
@@ -30,7 +30,7 @@ Release creation and weekly merge use the existing `RENOVATE_CLIENT_ID` and `REN
 pnpm install --frozen-lockfile
 pnpm build
 SKIP_NETWORK_TEST=true pnpm test
-pnpm eslint
+pnpm oxlint
 python3 -m unittest discover -s scripts/release -p 'test_*.py'
 npm ci --ignore-scripts --prefix scripts/release
 npm test --prefix scripts/release
