@@ -30,6 +30,15 @@ export async function summarize(url: URL): Promise<summary> {
 
 	const thumbnail: string | undefined = $('#landingImage').attr('src');
 
+	const twitterCard =
+		$('meta[name="twitter:card"]').attr('content') ||
+		$('meta[property="twitter:card"]').attr('content');
+
+	const thumbnailStyle =
+		twitterCard === 'summary_large_image' ? 'summary_large_image' :
+		twitterCard === 'summary' ? 'summary' :
+		null;
+
 	const playerUrl =
 		$('meta[property="twitter:player"]').attr('content') ||
 		$('meta[name="twitter:player"]').attr('content');
@@ -47,6 +56,7 @@ export async function summarize(url: URL): Promise<summary> {
 		icon: 'https://www.amazon.com/favicon.ico',
 		description: description ? description.trim() : null,
 		thumbnail: thumbnail ? thumbnail.trim() : null,
+		thumbnailStyle,
 		player: {
 			url: playerUrl || null,
 			width: playerWidth ? parseInt(playerWidth) : null,

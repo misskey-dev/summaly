@@ -19,23 +19,22 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "eslint": "eslint",
-    "test": "vitest run ./test/index.test.ts",
-    "serve": "fastify start ./built/index.js"
+    "oxlint": "oxlint",
+    "test": "vitest run ./test/index.test.ts ./test/server.test.ts",
+    "serve": "node ./built/server.js",
+    "test:docker": "docker build -t summaly:test . && vitest run ./test/docker.test.ts"
   },
   "devDependencies": {
-    "@misskey-dev/eslint-plugin": "2.2.1",
+    "@misskey-dev/oxlint-fmt-config": "0.1.1",
+    "@stylistic/eslint-plugin": "5.10.0",
     "@types/escape-regexp": "0.0.3",
     "@types/node": "26.6.6",
-    "@typescript-eslint/eslint-plugin": "8.73.0",
-    "@typescript-eslint/parser": "8.73.0",
-    "eslint": "10.15.0",
-    "eslint-plugin-import": "2.32.0",
     "fastify": "5.12.8",
-    "fastify-cli": "8.0.3",
+    "oxlint": "1.91.0",
+    "oxlint-tsgolint": "7.0.2005",
     "pino-pretty": "13.2.0",
     "tsdown": "0.23.7",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vitest": "5.1.1"
   },
   "dependencies": {

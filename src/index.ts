@@ -4,7 +4,8 @@
  */
 
 import { randomUUID } from 'crypto';
-import got, { type Agents as GotAgents } from 'got';
+import got from 'got';
+import type { Agents as GotAgents } from 'got';
 import type { FastifyInstance } from 'fastify';
 import { SummalyResult as _SummalyResult } from '@/summary.js';
 import { SummalyPlugin as _SummalyPlugin } from '@/iplugin.js';
@@ -94,7 +95,10 @@ export const version = _VERSION_ as string;
 export const summaly = async (url: string, options?: SummalyOptions): Promise<SummalyResult> => {
 	if (options?.agent) setAgent(options.agent);
 
-	const opts = Object.assign(summalyDefaultOptions, options);
+	const opts: SummalyOptions = {
+		...summalyDefaultOptions,
+		...options,
+	};
 
 	const plugins = builtinPlugins.concat(opts.plugins || []);
 

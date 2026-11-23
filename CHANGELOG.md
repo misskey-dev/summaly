@@ -37,6 +37,24 @@
 * **deps:** update node pino to v10.4.0 ([#167](https://github.com/Soli0222/summaly/issues/167)) ([41728ba](https://github.com/Soli0222/summaly/commit/41728bae2676e81e38795ea3d1390302252f8de0))
 * keep TypeScript 6 until typescript-eslint supports TS 7 ([#175](https://github.com/Soli0222/summaly/issues/175)) ([7ffa9f1](https://github.com/Soli0222/summaly/commit/7ffa9f10b0c44a542ae1dee3f5763eec929c55d3))
 
+5.6.0 / 2026/11/12
+------------------
+
+* スタンドアロンサーバーとして起動する際に、環境変数で `SummalyOptions` やリッスンするアドレス・ポートを指定できるように
+  * `pnpm serve` (`node built/server.js`) で起動します。指定できる環境変数については README.md を参照してください
+  * デフォルトでは `localhost:3000` でリッスンします
+* スタンドアロンサーバーの起動に fastify-cli を使用しないように
+* Dockerfile を追加・Dockerでの起動に対応
+  * 起動方法・ビルド方法は README.md を参照してください
+* oEmbedのレスポンスが不正なときにエラーが発生する問題を修正
+* 依存関係の更新
+
+5.5.2 / 2026/09/18
+------------------
+
+* Amazon, Wikipedia のプラグインで `thumbnailStyle` が返されない問題を修正
+* 依存関係の更新
+
 5.5.1 / 2026/06/20
 ------------------
 
