@@ -69,6 +69,7 @@ Invalid values (e.g. `SUMMALY_PORT=abc`) make the server exit with an error.
 
 * The server listens on `localhost` by default. Since summaly fetches arbitrary URLs given by clients, be careful when exposing it to other hosts (e.g. `SUMMALY_HOST=0.0.0.0`).
 * `SUMMALY_LANG` takes precedence over the `lang` query parameter of the request.
+* On Kubernetes, a Service named `summaly` makes Kubernetes inject `SUMMALY_PORT=tcp://<cluster IP>:<port>` into pods in the same namespace (service links), and the server exits because it is not an integer. Set `enableServiceLinks: false` in the pod spec (the default in the Helm chart in this repository), or set `SUMMALY_PORT` explicitly.
 * `plugins` and `agent` cannot be configured with environment variables. Register the Fastify plugin in your own server to use them.
 
 Run the server with Docker:

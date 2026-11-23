@@ -9,6 +9,7 @@ fullnameOverride: ""
 # Image configuration
 image:
   repository: ghcr.io/soli0222/summaly
+  # -- Defaults to Chart.appVersion.
   tag: ""
   pullPolicy: IfNotPresent
 
@@ -19,6 +20,11 @@ replicaCount: 1
 
 # Container configuration
 containerPort: 3000
+
+# -- Inject Kubernetes service links (`<SERVICE>_PORT` etc.) into the pod.
+# Off by default: a Service named `summaly` sets `SUMMALY_PORT=tcp://...`, which
+# the server reads as its listen port and exits.
+enableServiceLinks: false
 
 # Pod security context
 podSecurityContext: {}

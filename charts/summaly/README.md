@@ -1,6 +1,6 @@
 # summaly
 
-![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 5.5.1-psr.4.3](https://img.shields.io/badge/AppVersion-5.5.1--psr.4.3-informational?style=flat-square)
+![Version: 0.3.0](https://img.shields.io/badge/Version-0.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 5.6.0-psr.4.4.0](https://img.shields.io/badge/AppVersion-5.6.0--psr.4.4.0-informational?style=flat-square)
 
 A Helm chart for Summaly
 
@@ -10,6 +10,7 @@ A Helm chart for Summaly
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
 | containerPort | int | `3000` |  |
+| enableServiceLinks | bool | `false` | Inject Kubernetes service links (`<SERVICE>_PORT` etc.) into the pod. Off by default: a Service named `summaly` sets `SUMMALY_PORT=tcp://...`, which the server reads as its listen port and exits. |
 | env[0].name | string | `"NODE_ENV"` |  |
 | env[0].value | string | `"production"` |  |
 | env[1].name | string | `"SUMMALY_RESPONSE_TIMEOUT"` |  |
