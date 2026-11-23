@@ -19,5 +19,5 @@ jobs:
       pull-requests: write
       checks: read
       statuses: read
-    uses: Soli0222/shared-workflows/.github/workflows/weekly-merge.yaml@v1.2.0
+    uses: Soli0222/shared-workflows/.github/workflows/weekly-merge.yaml@v1.3.0
     secrets: inherit
