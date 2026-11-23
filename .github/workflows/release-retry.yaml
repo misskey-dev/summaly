@@ -17,7 +17,7 @@ jobs:
       contents: write
       pull-requests: write
       packages: write
-    uses: Soli0222/shared-workflows/.github/workflows/release-retry.yaml@v1.3.0
+    uses: Soli0222/shared-workflows/.github/workflows/release-retry.yaml@v1.3.2
     secrets: inherit
     with:
       version: ${{ inputs.version }}

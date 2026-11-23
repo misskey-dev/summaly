@@ -17,7 +17,7 @@ jobs:
     permissions:
       contents: write
       packages: write
-    uses: Soli0222/shared-workflows/.github/workflows/chart-release.yaml@v1.3.0
+    uses: Soli0222/shared-workflows/.github/workflows/chart-release.yaml@v1.3.2
     secrets: inherit
     with:
       api-versions: monitoring.coreos.com/v1
