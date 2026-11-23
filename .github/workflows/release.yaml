@@ -18,7 +18,7 @@ jobs:
       contents: write
       pull-requests: write
       packages: write
-    uses: Soli0222/shared-workflows/.github/workflows/release-pipeline.yaml@v1.3.0
+    uses: Soli0222/shared-workflows/.github/workflows/release-pipeline.yaml@v1.3.1
     secrets: inherit
     with:
       release-tools-prefix: scripts/release
