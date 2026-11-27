@@ -1,0 +1,11 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		// Some declarations fastify depends on (thread-stream) do not type-check against the current @types/node.
+		"skipLibCheck": true,
+		"types": ["node"]
+	},
+	"include": ["./test/compat/fastify-usage.ts"],
+	"exclude": []
+}
